@@ -1,0 +1,9 @@
+[package]
+name = "puffin_cli"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+puffin_runtime = { path = "../puffin_runtime" }
+puffin_parser = { path = "../puffin_parser" }
+puffin_compiler = { path = "../puffin_compiler" }

@@ -1,0 +1,9 @@
+[workspace]
+resolver = "3"
+members = [
+    "puffin_cli",
+    "puffin_parser",
+    "puffin_ast",
+    "puffin_compiler",
+    "puffin_runtime",
+]
