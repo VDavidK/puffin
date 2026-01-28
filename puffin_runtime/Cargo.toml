@@ -7,3 +7,5 @@ edition = "2024"
 workspace = true
 
 [dependencies]
+num_enum = "0.7.5"
+ratatui = "0.30.0"
