@@ -6,10 +6,6 @@ edition = "2024"
 [lints]
 workspace = true
 
-[lints.clippy]
-print_stdout = "allow"
-print_stderr = "allow"
-
 [dependencies]
 puffin_runtime = { path = "../puffin_runtime" }
 puffin_parser = { path = "../puffin_parser" }
