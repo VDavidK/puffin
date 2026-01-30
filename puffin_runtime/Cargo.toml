@@ -9,3 +9,4 @@ workspace = true
 [dependencies]
 num_enum = "0.7.5"
 ratatui = "0.30.0"
+thiserror = "2.0.18"
