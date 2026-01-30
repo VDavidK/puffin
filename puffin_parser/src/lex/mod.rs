@@ -1,10 +1,5 @@
-mod position;
-mod span;
-mod snippet;
-
-use position::Position;
 use crate::lex::LexerError::UnterminatedStringLiteral;
-use crate::lex::span::Span;
+use puffin_ast::{span::Span, Token, TokenType, position::Position};
 
 #[derive(Debug, thiserror::Error)]
 pub enum LexerError {
@@ -16,97 +11,12 @@ pub enum LexerError {
     UnterminatedBlockComment(Position),
 }
 
-#[derive(Debug, Copy, Clone)]
-pub(crate) enum TokenType {
-    KwAnd, // "and"
-    KwOr, // "or"
-    KwNot, // "not"
-    KwTrue, // "true"
-    KwFalse, // "false"
-    KwIf, // "if"
-    KwElse, // "else"
-    KwMatch, // "match"
-    KwFor, // "for"
-    KwIn, // "in"
-    KwLayout, // "layout"
-    KwComponent, // "component"
-    KwSignal, // "signal"
-    KwLet, // "let"
-    KwConst, // "const"
-    KwExport, // "export"
-    KwFn, // "fn"
-    KwDo, // "do"
-    KwWhile, // "while"
-    KwBreak, // "break"
-    KwContinue, // "continue"
-
-    LeftBrace, // "{"
-    RightBrace, // "}"
-    LeftParen, // ")"
-    RightParen, // "("
-    LeftBracket, // "["
-    RightBracket, // "]"
-    Plus, // "+"
-    Minus, // "-"
-    Star, // "*"
-    Slash, // "/"
-    Dot, // "."
-    Comma, // ","
-    Colon, // ":"
-    Semicolon, // ";"
-    Percent, // "%"
-    Hash, // "#"
-    At, // "@"
-    Arrow, // "=>"
-    Increment, // "++"
-    Decrement, // "--"
-    IncrementAssign, // "+="
-    DecrementAssign, // "-="
-    MulAssign, // "*="
-    DivAssign, // "/="
-    Assign, // "="
-    IsEqualTo, // "=="
-    IsNotEqualTo, // "!="
-    GreaterThan, // ">"
-    LessThan, // "<"
-    GreaterOrEqual, // ">="
-    LessOrEqual, // "<="
-
-    Integer,
-    Float,
-    String,
-    Identifier,
-}
-
-#[derive(Debug, Clone)]
-pub struct Token {
-    pub(crate) span: Span,
-    lexeme: String,
-    ty: TokenType,
-}
-
-impl Token {
-    pub fn new(lex: impl AsRef<str>, span: Span, ty: TokenType) -> Self {
-        Self {
-            span,
-            lexeme: lex.as_ref().to_owned(),
-            ty
-        }
-    }
-}
-
-impl std::fmt::Display for Token {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_fmt(format_args!("Token {:?} '{}' at {}", self.ty, self.lexeme, self.span))
-    }
-}
-
 #[derive(Debug)]
 pub(crate) struct PuffinLexer<'a> {
     start: Position,
     end: Position,
-    pub(crate) src: &'a str,
-    pub(crate) src_name: &'a str,
+    src: &'a str,
+    src_name: &'a str,
 }
 
 impl<'a> Iterator for PuffinLexer<'a> {
@@ -253,11 +163,12 @@ impl<'a> PuffinLexer<'a> {
     }
 
     fn token(&mut self, ty: TokenType) -> Result<Token, LexerError> {
-        let tok = Token {
-            ty,
-            lexeme: self.lexeme().to_string(),
-            span: Span::from_positions(self.start.clone(), self.end.clone()),
-        };
+        let tok = Token::new(
+            self.lexeme().to_string(),
+            Span::from_positions(self.start.clone(), self.end.clone())
+                .with_snippet(&self.src.to_owned(), &self.src_name.to_owned(), 1),
+            ty
+        );
         self.advance();
         Ok(tok)
     }

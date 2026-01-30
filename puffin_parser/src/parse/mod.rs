@@ -27,11 +27,8 @@ impl<'a> PuffinParser<'a> {
     }
 
     pub(crate) fn run(self) -> Result<(), ParserError> {
-        let s = self.lexer.src.to_owned();
-        let sn = self.lexer.src_name.to_owned();
         let tokens = self.lexer.collect::<Result<Vec<_>, _>>()?;
-        for mut token in tokens {
-            token.span.attach_snippet(&s, &sn, 1);
+        for token in tokens {
             println!("{}", format!("{}", token).green());
         }
         Ok(())

@@ -1,5 +1,5 @@
-use super::snippet::Snippet;
-use super::position::Position;
+use crate::snippet::Snippet;
+use crate::position::Position;
 
 #[derive(Debug, Clone)]
 pub struct Span {

@@ -1,4 +1,4 @@
-use super::snippet::Snippet;
+use crate::snippet::Snippet;
 
 #[derive(Debug, Clone)]
 pub struct Position {
