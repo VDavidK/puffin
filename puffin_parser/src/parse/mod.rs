@@ -1,6 +1,15 @@
 use crate::lex::PuffinLexer;
 
 use colored::Colorize;
+use crate::lex;
+
+#[derive(Debug, thiserror::Error)]
+pub enum ParserError {
+    #[error(transparent)]
+    FileNotFoundError(#[from] std::io::Error),
+    #[error(transparent)]
+    LexerError(#[from] lex::LexerError),
+}
 
 #[cfg(test)]
 mod tests;
@@ -17,17 +26,14 @@ impl<'a> PuffinParser<'a> {
         }
     }
 
-    pub(crate) fn run(&mut self) {
-        for token in &mut self.lexer {
-            match token {
-                Ok(token) => {
-                    dbg!(token);
-                },
-                Err(err) => {
-                    println!("{}", format!("{}", err).red());
-                    break;
-                },
-            }
+    pub(crate) fn run(self) -> Result<(), ParserError> {
+        let s = self.lexer.src.to_owned();
+        let sn = self.lexer.src_name.to_owned();
+        let tokens = self.lexer.collect::<Result<Vec<_>, _>>()?;
+        for mut token in tokens {
+            token.span.attach_snippet(&s, &sn, 1);
+            println!("{}", format!("{}", token).green());
         }
+        Ok(())
     }
 }

@@ -1,15 +1,7 @@
-use crate::parse::PuffinParser;
+use crate::parse::{PuffinParser, ParserError};
 
 mod lex;
 mod parse;
-
-#[derive(Debug, thiserror::Error)]
-pub enum ParserError {
-    #[error(transparent)]
-    FileNotFoundError(#[from] std::io::Error),
-    #[error(transparent)]
-    LexerError(#[from] lex::LexerError),
-}
 
 /// Runs the parser (and lexer) on the given string.
 pub fn run_parser_str(src: impl AsRef<str>) -> Result<(), ParserError> {
@@ -24,8 +16,8 @@ pub fn run_parser_file(file_path: &str) -> Result<(), ParserError> {
 
 /// The actual function responsible for running the lexer and parser.
 fn run_parser(src: impl AsRef<str>, file_path: impl AsRef<str>) -> Result<(), ParserError> {
-    let mut parser = PuffinParser::new(src.as_ref(), file_path.as_ref());
+    let parser = PuffinParser::new(src.as_ref(), file_path.as_ref());
 
-    parser.run();
+    parser.run()?;
     Ok(())
 }
