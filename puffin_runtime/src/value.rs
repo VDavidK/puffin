@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Display};
+use std::{cell::RefCell, collections::HashMap, fmt::Display, rc::Rc};
 
 use serde_derive::{Deserialize, Serialize};
 
@@ -8,7 +8,7 @@ pub type IntType = i64;
 pub type FloatType = f64;
 pub type BoolType = bool;
 pub type StringType = String;
-pub type ObjectType = Object;
+pub type ObjectType = Rc<RefCell<Object>>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Value {
@@ -16,6 +16,8 @@ pub enum Value {
     Float(FloatType),
     Bool(BoolType),
     String(StringType),
+
+    #[serde(skip)]
     Object(ObjectType),
 }
 
@@ -93,6 +95,23 @@ impl<'a> From<&'a str> for Value {
     }
 }
 
+impl From<ObjectType> for Value {
+    fn from(value: ObjectType) -> Self {
+        Value::Object(value)
+    }
+}
+
+impl TryFrom<Value> for ObjectType {
+    type Error = RuntimeError;
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        match value {
+            Value::Object(s) => Ok(s),
+            _ => Err(RuntimeError::IncorrectType { ty: value.type_name().to_owned(), expected: "object".to_owned() }),
+        }
+    }
+}
+
 impl Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -100,21 +119,21 @@ impl Display for Value {
             Value::Float(v) => f.write_fmt(format_args!("{v}")),
             Value::Bool(v) => f.write_fmt(format_args!("{v}")),
             Value::String(v) => f.write_fmt(format_args!("{v}")),
-            Value::Object(v) => f.write_fmt(format_args!("{v}")),
+            Value::Object(v) => f.write_fmt(format_args!("{}", v.borrow())),
         }
     }
 }
 
 impl Value {
-    pub fn try_add(self, rhs: Self) -> Result<Value, RuntimeError> {
+    pub fn try_add(&self, rhs: &Self) -> Result<Value, RuntimeError> {
         match self {
             Value::Int(lhs) => match rhs {
                 Value::Int(rhs) => Ok(Value::Int(lhs + rhs)),
-                Value::Float(rhs) => Ok(Value::Float(lhs as FloatType + rhs)),
+                Value::Float(rhs) => Ok(Value::Float(*lhs as FloatType + rhs)),
                 _ => Err(RuntimeError::InvalidBinaryOperation { op: "add".to_owned(), lhs_type: self.type_name().to_owned(), rhs_type: rhs.type_name().to_owned() })
             },
             Value::Float(lhs) => match rhs {
-                Value::Int(rhs) => Ok(Value::Float(lhs + rhs as FloatType)),
+                Value::Int(rhs) => Ok(Value::Float(lhs + *rhs as FloatType)),
                 Value::Float(rhs) => Ok(Value::Float(lhs + rhs)),
                 _ => Err(RuntimeError::InvalidBinaryOperation { op: "add".to_owned(), lhs_type: self.type_name().to_owned(), rhs_type: rhs.type_name().to_owned() }),
             },
@@ -125,15 +144,15 @@ impl Value {
         }
     }
 
-    pub fn try_sub(self, rhs: Self) -> Result<Value, RuntimeError> {
+    pub fn try_sub(&self, rhs: &Self) -> Result<Value, RuntimeError> {
         match self {
             Value::Int(lhs) => match rhs {
                 Value::Int(rhs) => Ok(Value::Int(lhs - rhs)),
-                Value::Float(rhs) => Ok(Value::Float(lhs as FloatType - rhs)),
+                Value::Float(rhs) => Ok(Value::Float(*lhs as FloatType - rhs)),
                 _ => Err(RuntimeError::InvalidBinaryOperation { op: "subtract".to_owned(), lhs_type: self.type_name().to_owned(), rhs_type: rhs.type_name().to_owned() }),
             },
             Value::Float(lhs) => match rhs {
-                Value::Int(rhs) => Ok(Value::Float(lhs - rhs as FloatType)),
+                Value::Int(rhs) => Ok(Value::Float(lhs - *rhs as FloatType)),
                 Value::Float(rhs) => Ok(Value::Float(lhs - rhs)),
                 _ => Err(RuntimeError::InvalidBinaryOperation { op: "subtract".to_owned(), lhs_type: self.type_name().to_owned(), rhs_type: rhs.type_name().to_owned() }),
             },
@@ -142,20 +161,20 @@ impl Value {
         }
     }
 
-    pub fn try_div(self, rhs: Self) -> Result<Value, RuntimeError> {
+    pub fn try_div(&self, rhs: &Self) -> Result<Value, RuntimeError> {
         match self {
             Value::Int(lhs) => match rhs {
                 Value::Int(0) => Err(RuntimeError::DivideByZero),
                 Value::Int(rhs) => Ok(Value::Int(lhs / rhs)),
 
                 Value::Float(0.0) => Err(RuntimeError::DivideByZero),
-                Value::Float(rhs) => Ok(Value::Float(lhs as FloatType / rhs)),
+                Value::Float(rhs) => Ok(Value::Float(*lhs as FloatType / rhs)),
 
                 _ => Err(RuntimeError::InvalidBinaryOperation { op: "divide".to_owned(), lhs_type: self.type_name().to_owned(), rhs_type: rhs.type_name().to_owned() }),
             },
             Value::Float(lhs) => match rhs {
                 Value::Int(0) => Err(RuntimeError::DivideByZero),
-                Value::Int(rhs) => Ok(Value::Float(lhs / rhs as FloatType)),
+                Value::Int(rhs) => Ok(Value::Float(lhs / *rhs as FloatType)),
 
                 Value::Float(0.0) => Err(RuntimeError::DivideByZero),
                 Value::Float(rhs) => Ok(Value::Float(lhs / rhs)),
@@ -167,15 +186,15 @@ impl Value {
         }
     }
 
-    pub fn try_mul(self, rhs: Self) -> Result<Value, RuntimeError> {
+    pub fn try_mul(&self, rhs: &Self) -> Result<Value, RuntimeError> {
         match self {
             Value::Int(lhs) => match rhs {
                 Value::Int(rhs) => Ok(Value::Int(lhs * rhs)),
-                Value::Float(rhs) => Ok(Value::Float(lhs as FloatType * rhs)),
+                Value::Float(rhs) => Ok(Value::Float(*lhs as FloatType * rhs)),
                 _ => Err(RuntimeError::InvalidBinaryOperation { op: "multiply".to_owned(), lhs_type: self.type_name().to_owned(), rhs_type: rhs.type_name().to_owned() }),
             },
             Value::Float(lhs) => match rhs {
-                Value::Int(rhs) => Ok(Value::Float(lhs * rhs as FloatType)),
+                Value::Int(rhs) => Ok(Value::Float(lhs * *rhs as FloatType)),
                 Value::Float(rhs) => Ok(Value::Float(lhs * rhs)),
                 _ => Err(RuntimeError::InvalidBinaryOperation { op: "multiply".to_owned(), lhs_type: self.type_name().to_owned(), rhs_type: rhs.type_name().to_owned() }),
             },
@@ -184,15 +203,15 @@ impl Value {
         }
     }
 
-    pub fn try_mod(self, rhs: Self) -> Result<Value, RuntimeError> {
+    pub fn try_mod(&self, rhs: &Self) -> Result<Value, RuntimeError> {
         match self {
             Value::Int(lhs) => match rhs {
                 Value::Int(rhs) => Ok(Value::Int(lhs % rhs)),
-                Value::Float(rhs) => Ok(Value::Float(lhs as FloatType % rhs)),
+                Value::Float(rhs) => Ok(Value::Float(*lhs as FloatType % rhs)),
                 _ => Err(RuntimeError::InvalidBinaryOperation { op: "modulo".to_owned(), lhs_type: self.type_name().to_owned(), rhs_type: rhs.type_name().to_owned() }),
             },
             Value::Float(lhs) => match rhs {
-                Value::Int(rhs) => Ok(Value::Float(lhs % rhs as FloatType)),
+                Value::Int(rhs) => Ok(Value::Float(lhs % *rhs as FloatType)),
                 Value::Float(rhs) => Ok(Value::Float(lhs % rhs)),
                 _ => Err(RuntimeError::InvalidBinaryOperation { op: "modulo".to_owned(), lhs_type: self.type_name().to_owned(), rhs_type: rhs.type_name().to_owned() }),
             },
@@ -201,7 +220,7 @@ impl Value {
         }
     }
 
-    pub fn try_negate(self) -> Result<Value, RuntimeError> {
+    pub fn try_negate(&self) -> Result<Value, RuntimeError> {
         match self {
             Value::Int(lhs) => Ok(Value::Int(-lhs)),
             Value::Float(lhs) => Ok(Value::Float(-lhs)),
@@ -209,10 +228,10 @@ impl Value {
         }
     }
 
-    pub fn try_not(self) -> Result<Value, RuntimeError> {
+    pub fn try_not(&self) -> Result<Value, RuntimeError> {
         match self {
-            Value::Int(lhs) => Ok(Value::Bool(lhs != 0)),
-            Value::Float(lhs) => Ok(Value::Bool(lhs != 0.0)),
+            Value::Int(lhs) => Ok(Value::Bool(*lhs != 0)),
+            Value::Float(lhs) => Ok(Value::Bool(*lhs != 0.0)),
             Value::Bool(lhs) => Ok(Value::Bool(!lhs)),
             _ => Err(RuntimeError::InvalidUnaryOperation { op: "not".to_owned(), rhs_type: self.type_name().to_owned() }),
         }
@@ -243,6 +262,10 @@ impl Value {
     pub fn as_bool(self) -> Result<BoolType, RuntimeError> {
         TryInto::<BoolType>::try_into(self)
     }
+
+    pub fn as_object(self) -> Result<ObjectType, RuntimeError> {
+        TryInto::<ObjectType>::try_into(self)
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -268,4 +291,8 @@ impl Display for Object {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("[object Object]")
     }
+}
+
+pub fn new_object() -> ObjectType {
+    Rc::new(RefCell::new(Object::new()))
 }

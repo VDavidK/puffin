@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use num_enum::TryFromPrimitive;
 use ratatui::DefaultTerminal;
 
-use crate::{RuntimeError, Value, chunk::Chunk, op::OpCode};
+use crate::{RuntimeError, Value, chunk::Chunk, op::OpCode, value::new_object};
 
 
 #[derive(Debug)]
@@ -53,9 +53,7 @@ impl<'a> Vm<'a> {
             },
 
             OpCode::SetLocal => {
-                let top = self.peek_value()
-                    .ok_or(RuntimeError::StackEmpty)?
-                    .to_owned();
+                let top = self.pop_expecting()?;
 
                 let offset = self.fetch_u64()? as usize;
                 if offset >= self.stack.len() {
@@ -79,51 +77,82 @@ impl<'a> Vm<'a> {
                     .to_owned()
                     .as_string()?;
 
-                let top = self.peek_value()
-                    .ok_or(RuntimeError::StackEmpty)?
-                    .clone();
+                let top = self.pop_expecting()?;
 
                 self.globals.insert(literal, top);
             },
 
             OpCode::Pop => {
                 self.pop_expecting()?;
+            },
+
+            OpCode::NewObject => {
+                self.push_value(new_object());
             }
+
+            OpCode::GetField => {
+                let literal = self.fetch_literal()?
+                    .to_owned()
+                    .as_string()?;
+
+                let obj = self.pop_expecting()?
+                    .as_object()?;
+
+                let obj = obj.borrow();
+
+                let field = obj.get_field(&literal)
+                    .ok_or(RuntimeError::NoFieldMatchingName { name: literal })?;
+
+                self.push_value(field.to_owned());
+            },
+
+            OpCode::SetField => {
+                let literal = self.fetch_literal()?
+                    .to_owned()
+                    .as_string()?;
+
+                let value = self.pop_expecting()?;
+
+                let obj = self.pop_expecting()?
+                    .as_object()?;
+
+                obj.borrow_mut().set_field(literal, value.to_owned());
+            },
 
             OpCode::Add => {
                 let rhs = self.pop_expecting()?;
                 let lhs = self.pop_expecting()?;
 
-                self.push_value(lhs.try_add(rhs)?);
+                self.push_value(lhs.try_add(&rhs)?);
             },
             OpCode::Sub => {
                 let rhs = self.pop_expecting()?;
                 let lhs = self.pop_expecting()?;
 
-                self.push_value(lhs.try_sub(rhs)?);
+                self.push_value(lhs.try_sub(&rhs)?);
             },
             OpCode::Mul => {
                 let rhs = self.pop_expecting()?;
                 let lhs = self.pop_expecting()?;
 
-                self.push_value(lhs.try_mul(rhs)?);
+                self.push_value(lhs.try_mul(&rhs)?);
             },
             OpCode::Div => {
                 let rhs = self.pop_expecting()?;
                 let lhs = self.pop_expecting()?;
 
-                self.push_value(lhs.try_div(rhs)?);
+                self.push_value(lhs.try_div(&rhs)?);
             },
             OpCode::Mod => {
                 let rhs = self.pop_expecting()?;
                 let lhs = self.pop_expecting()?;
 
-                self.push_value(lhs.try_mod(rhs)?);
+                self.push_value(lhs.try_mod(&rhs)?);
             },
 
             OpCode::Poll => {
                 if ratatui::crossterm::event::read()?.is_key_press() {
-                    self.running = false;
+                    // self.running = false;
                 }
             },
             

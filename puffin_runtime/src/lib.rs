@@ -36,6 +36,9 @@ pub enum RuntimeError {
     #[error("Unable to perform unary {op} operation on {rhs_type}")]
     InvalidUnaryOperation { op: String, rhs_type: String },
 
+    #[error("No field on object matching the name {name}")]
+    NoFieldMatchingName { name: String },
+
     #[error("Attempt to divide by zero")]
     DivideByZero,
 

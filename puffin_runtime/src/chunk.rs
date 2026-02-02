@@ -5,7 +5,6 @@ use serde_derive::{Deserialize, Serialize};
 
 use crate::{Value, op::OpCode};
 
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Chunk {
     name: String,
@@ -30,8 +29,8 @@ impl Chunk {
         self.bytes.push(op.into())
     }
 
-    pub fn push_literal(&mut self, literal: Value) -> usize {
-        let offset = self.new_literal(literal);
+    pub fn push_literal(&mut self, literal: impl Into<Value>) -> usize {
+        let offset = self.new_literal(literal.into());
         self.push_op(OpCode::Literal);
         self.push_u64(offset as u64);
         offset
@@ -98,73 +97,110 @@ impl Display for Chunk {
 
             match OpCode::try_from_primitive(byte) {
                 Ok(code) => match code {
-                    OpCode::Invalid => inst.push("| invalid".to_owned()),
+                    OpCode::Invalid => inst.push(format!("{idx:<4x} | invalid")),
 
                     // Stack
                     OpCode::Literal => {
                         if let Some(offset) = self.read_u64(idx) {
                             if let Some(value) = self.get_literal(offset as usize) {
-                                inst.push(format!("| literal [0x{offset:x}] ({value})"));
+                                inst.push(format!("{idx:<4x} | literal [0x{offset:x}] ({value})"));
                                 idx += 8;
                             } else {
-                                inst.push(format!("| literal [0x{offset:x}] (UNKNOWN)"));
+                                inst.push(format!("{idx:<4x} | literal [0x{offset:x}] (UNKNOWN)"));
                             }
                         } else {
-                            inst.push("| literal [MALFORMED]".to_owned());
+                            inst.push(format!("{idx:<4x} | literal [MALFORMED]"));
                         }
                     },
 
                     OpCode::GetLocal => {
                         if let Some(offset) = self.read_u64(idx) {
-                            inst.push(format!("| getl [0x{offset:x}]"));
+                            inst.push(format!("{idx:<4x} | getl [0x{offset:x}]"));
                             idx += 8;
                         } else {
-                            inst.push("| getl [MALFORMED]".to_owned());
+                            inst.push(format!("{idx:<4x} | getl [MALFORMED]"));
                         }
                     },
 
                     OpCode::SetLocal => {
                         if let Some(offset) = self.read_u64(idx) {
-                            inst.push(format!("| setl [0x{offset:x}]"));
+                            inst.push(format!("{idx:<4x} | setl [0x{offset:x}]"));
                             idx += 8;
                         } else {
-                            inst.push("| setl [MALFORMED]".to_owned());
+                            inst.push(format!("{idx:<4x} | setl [MALFORMED]"));
                         }
                     },
 
                     OpCode::GetGlobal => {
                         if let Some(offset) = self.read_u64(idx) {
-                            inst.push(format!("| getg [{offset}]"));
-                            idx += 8;
+                            if let Some(value) = self.get_literal(offset as usize) {
+                                inst.push(format!("{idx:<4x} | getg [0x{offset:x}] ({value})"));
+                                idx += 8;
+                            } else {
+                                inst.push(format!("{idx:<4x} | getg [0x{offset:x}] (UNKNOWN)"));
+                            }
                         } else {
-                            inst.push("| getg [MALFORMED]".to_owned());
+                            inst.push(format!("{idx:<4x} | getg [MALFORMED]"));
                         }
                     },
 
                     OpCode::SetGlobal => {
                         if let Some(offset) = self.read_u64(idx) {
-                            inst.push(format!("| setg [{offset}]"));
-                            idx += 8;
+                            if let Some(value) = self.get_literal(offset as usize) {
+                                inst.push(format!("{idx:<4x} | setg [0x{offset:x}] ({value})"));
+                                idx += 8;
+                            } else {
+                                inst.push(format!("{idx:<4x} | setg [0x{offset:x}] (UNKNOWN)"));
+                            }
                         } else {
-                            inst.push("| setg [MALFORMED]".to_owned());
+                            inst.push(format!("{idx:<4x} | setg [MALFORMED]"));
                         }
                     },
 
-                    OpCode::Pop => inst.push("| pop".to_owned()),
+                    OpCode::Pop => inst.push(format!("{idx:<4x} | pop")),
                     
+                    // Object Manipulation
+
+                    OpCode::NewObject => inst.push(format!("{idx:<4x} | newobj")),
+
+                    OpCode::GetField => {
+                        if let Some(offset) = self.read_u64(idx) {
+                            if let Some(value) = self.get_literal(offset as usize) {
+                                inst.push(format!("{idx:<4x} | getf [0x{offset:x}] ({value})"));
+                                idx += 8;
+                            } else {
+                                inst.push(format!("{idx:<4x} | getf [0x{offset:x}] (UNKNOWN)"));
+                            }
+                        } else {
+                            inst.push(format!("{idx:<4x} | getf [MALFORMED]"));
+                        }
+                    },
+
+                    OpCode::SetField => {
+                        if let Some(offset) = self.read_u64(idx) {
+                            if let Some(value) = self.get_literal(offset as usize) {
+                                inst.push(format!("{idx:<4x} | setf [0x{offset:x}] ({value})"));
+                                idx += 8;
+                            } else {
+                                inst.push(format!("{idx:<4x} | setf [0x{offset:x}] (UNKNOWN)"));
+                            }
+                        } else {
+                            inst.push(format!("{idx:<4x} | setf [MALFORMED]"));
+                        }
+                    },
 
                     // Arithmetic
-                    OpCode::Add => inst.push("| add".to_owned()),
-                    OpCode::Sub => inst.push("| sub".to_owned()),
-                    OpCode::Mul => inst.push("| mul".to_owned()),
-                    OpCode::Div => inst.push("| div".to_owned()),
-                    OpCode::Mod => inst.push("| mod".to_owned()),
+                    OpCode::Add => inst.push(format!("{idx:<4x} | add")),
+                    OpCode::Sub => inst.push(format!("{idx:<4x} | sub")),
+                    OpCode::Mul => inst.push(format!("{idx:<4x} | mul")),
+                    OpCode::Div => inst.push(format!("{idx:<4x} | div")),
+                    OpCode::Mod => inst.push(format!("{idx:<4x} | mod")),
 
                     // Terminal
-                    OpCode::Poll => inst.push("| poll".to_owned()),
-                    OpCode::Render => inst.push("| render".to_owned()),
+                    OpCode::Poll => inst.push(format!("{idx:<4x} | poll")),
+                    OpCode::Render => inst.push(format!("{idx:<4x} | render")),
                 },
-                Err(_) => inst.push(format!("\tunknown [0x{:x}]", byte)),
+                Err(_) => inst.push(format!("{idx:<4x}| unknown [0x{:x}]", byte)),
             }
         }
 

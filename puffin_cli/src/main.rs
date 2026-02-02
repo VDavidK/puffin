@@ -9,7 +9,7 @@ enum Operation {
         input: PathBuf,
     },
     Compile {
-        output: PathBuf,
+        output: Option<PathBuf>,
     },
 }
 
@@ -37,7 +37,6 @@ fn main() -> color_eyre::Result<()> {
             let bar_name = chunk.new_literal(Value::String("bar".into()));
             chunk.push_op(OpCode::SetGlobal);
             chunk.push_u64(bar_name as u64);
-            chunk.push_op(OpCode::Pop);
 
             // foo = foo + 8 / bar;
             chunk.push_op(OpCode::GetLocal);
@@ -49,7 +48,6 @@ fn main() -> color_eyre::Result<()> {
             chunk.push_op(OpCode::Add);
             chunk.push_op(OpCode::SetLocal);
             chunk.push_u64(0);
-            chunk.push_op(OpCode::Pop);
 
             // render foo;
             chunk.push_op(OpCode::GetLocal);
@@ -59,7 +57,51 @@ fn main() -> color_eyre::Result<()> {
             // poll;
             chunk.push_op(OpCode::Poll);
 
-            let file = File::create(output)?;
+            // render foo * foo
+            chunk.push_op(OpCode::GetLocal);
+            chunk.push_u64(0);
+            chunk.push_op(OpCode::GetLocal);
+            chunk.push_u64(0);
+            chunk.push_op(OpCode::Mul);
+            chunk.push_op(OpCode::Render);
+
+            // poll;
+            chunk.push_op(OpCode::Poll);
+
+            // render "Hello";
+            chunk.push_literal("Hello");
+            chunk.push_op(OpCode::Render);
+
+            // poll;
+            chunk.push_op(OpCode::Poll);
+
+            // render "World";
+            chunk.push_literal("World");
+            chunk.push_op(OpCode::Render);
+
+            // poll;
+            chunk.push_op(OpCode::Poll);
+
+            // var baz = {};
+            chunk.push_op(OpCode::NewObject);
+
+            // baz.bar = "Hello!";
+            chunk.push_op(OpCode::GetLocal);
+            chunk.push_u64(1);
+            chunk.push_literal("Hello!");
+            chunk.push_op(OpCode::SetField);
+            chunk.push_u64(bar_name as u64);
+
+            // render baz.bar;
+            chunk.push_op(OpCode::GetField);
+            chunk.push_u64(bar_name as u64);
+            chunk.push_op(OpCode::Render);
+
+
+            // poll;
+            chunk.push_op(OpCode::Poll);
+
+            let file = File::create(output.unwrap_or("out.pfb".into()))?;
             ciborium::into_writer(&chunk, file)?;
         },
         Operation::Run { input } => {

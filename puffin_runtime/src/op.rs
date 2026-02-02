@@ -20,7 +20,7 @@ pub enum OpCode {
     GetLocal,
 
     /// : setl [offset:4B]
-    /// Pops the top of the stack and overwrites the value of a local stored at the offset with the new value
+    /// Overwrites the value of a local stored at the offset with the value at the top of the stack
     SetLocal,
 
     // : getg [offset:4B]
@@ -28,12 +28,28 @@ pub enum OpCode {
     GetGlobal,
 
     // : setg [offset:4B]
-    // Pops the top of the stack and overwrites the value of a global variable matching the name of the literal at the given offset with the new value
+    // Overwrites the value of a global variable matching the name of the literal at the given offset with the value at the top of the stack
     SetGlobal,
 
     // : pop
     // Pops the top value off the stack
     Pop,
+
+    // ----------------------------
+    // Object Manipulation Instructions
+    // ----------------------------
+
+    // : newobj
+    // Pushes a new object to the top of the stack
+    NewObject,
+
+    // : setf
+    // Sets the field of the object one below the top of the stack with the name matching the literal given to the value at the top of the stack
+    SetField,
+
+    // : getf
+    // Pushes the value of the field of the object on the top of the stack with the name matching the literal given
+    GetField,
 
     // ----------------------------
     // Arithmetic Instructions
