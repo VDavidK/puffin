@@ -1,4 +1,4 @@
-use std::{any::Any, cell::{Ref, RefCell, RefMut}, fmt::Display, sync::Arc};
+use std::{collections::HashMap, fmt::Display};
 
 
 #[derive(Debug, Clone)]
@@ -7,7 +7,7 @@ pub enum Value {
     Float(f64),
     Bool(bool),
     String(String),
-    UserValue(UserValueHandle),
+    Object(Object),
 }
 
 impl From<i64> for Value {
@@ -40,39 +40,39 @@ impl<'a> From<&'a str> for Value {
     }
 }
 
-impl From<UserValueHandle> for Value {
-    fn from(value: UserValueHandle) -> Self {
-        Self::UserValue(value)
+impl Display for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Value::Int(v) => f.write_fmt(format_args!("{v}")),
+            Value::Float(v) => f.write_fmt(format_args!("{v}")),
+            Value::Bool(v) => f.write_fmt(format_args!("{v}")),
+            Value::String(v) => f.write_fmt(format_args!("{v}")),
+            Value::Object(v) => f.write_fmt(format_args!("{v}")),
+        }
     }
 }
 
-pub trait UserValue: Any + Display + std::fmt::Debug + 'static { }
+#[derive(Debug, Clone, Default)]
+pub struct Object {
+    fields: HashMap<String, Value>,
+}
 
-#[derive(Debug, Clone)]
-pub struct UserValueHandle(Arc<RefCell<dyn UserValue>>);
-
-
-impl UserValueHandle {
-    pub fn new<T: UserValue>(value: T) -> Self {
-        Self(Arc::new(RefCell::new(value)))
+impl Object {
+    pub fn new() -> Self {
+        Self::default()
     }
 
-    pub fn get<'a, T: UserValue>(&'a self) -> Option<Ref<'a, T>> {
-        Ref::filter_map(self.0.borrow(), |inner| (inner as &dyn Any).downcast_ref::<T>().into())
-            .ok()
+    pub fn set_field(&mut self, name: String, value: Value) {
+        self.fields.insert(name, value);
     }
 
-    pub fn get_mut<'a, T: UserValue>(&'a self) -> Option<RefMut<'a, T>> {
-        RefMut::filter_map(self.0.borrow_mut(), |inner| (inner as &mut dyn Any).downcast_mut::<T>().into())
-            .ok()
-    }
-
-    pub fn unwrap<'a, T: UserValue>(&'a self) -> Ref<'a, T> {
-        Ref::map(self.0.borrow(), |inner| (inner as &dyn Any).downcast_ref::<T>().unwrap())
-    }
-
-    pub fn unwrap_mut<'a, T: UserValue>(&'a self) -> RefMut<'a, T> {
-        RefMut::map(self.0.borrow_mut(), |inner| (inner as &mut dyn Any).downcast_mut::<T>().unwrap())
+    pub fn get_field(&self, name: impl AsRef<str>) -> Option<&Value> {
+        self.fields.get(name.as_ref())
     }
 }
 
+impl Display for Object {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("[object Object]")
+    }
+}
