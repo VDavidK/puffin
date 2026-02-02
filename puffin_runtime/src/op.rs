@@ -7,13 +7,33 @@ pub enum OpCode {
     #[default]
     Invalid = 0,
 
+    // ----------------------------
+    // Stack Instructions
+    // ----------------------------
+
     // : literal [offset:4B]
     // Pushes a literal to the top of the stack
     Literal,
 
-    // : print
-    // Debug: Pops the top value off the stack and prints it
-    Print,
+    // : getl [offset:4B]
+    // Pushes the value of a local variable stored at the offset to the stack
+    GetLocal,
+
+    /// : setl [offset:4B]
+    /// Pops the top of the stack and overwrites the value of a local stored at the offset with the new value
+    SetLocal,
+
+    // : getg [offset:4B]
+    // Pushes the value of a global variable matching the name of the literal at the given offset to the stack
+    GetGlobal,
+
+    // : setg [offset:4B]
+    // Pops the top of the stack and overwrites the value of a global variable matching the name of the literal at the given offset with the new value
+    SetGlobal,
+
+    // : pop
+    // Pops the top value off the stack
+    Pop,
 
     // ----------------------------
     // Arithmetic Instructions
@@ -38,10 +58,21 @@ pub enum OpCode {
     // : mod
     // Pops the top two values from the stack and pushes the result
     Mod,
+    
+    // ----------------------------
+    // Terminal Instructions
+    // ----------------------------
 
+    // : poll
+    // Waits for user input and runs the corrisponding event handlers
+    Poll,
+
+    // : render
+    // Renders the current layout buffer to the terminal
+    Render,
 
     // ----------------------------
-    // Layout Codes
+    // Layout Instructions
     // ----------------------------
 
     

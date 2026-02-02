@@ -29,14 +29,35 @@ fn main() -> color_eyre::Result<()> {
         Operation::Compile { output } => {
             let mut chunk = puffin_runtime::Chunk::new("Test Program");
 
-            // 10 + 8 / 4
-
+            // var foo = 10;
             chunk.push_literal(Value::Int(10));
-            chunk.push_literal(Value::Int(8));
+
+            // static bar = 4;
             chunk.push_literal(Value::Int(4));
+            let bar_name = chunk.new_literal(Value::String("bar".into()));
+            chunk.push_op(OpCode::SetGlobal);
+            chunk.push_u64(bar_name as u64);
+            chunk.push_op(OpCode::Pop);
+
+            // foo = foo + 8 / bar;
+            chunk.push_op(OpCode::GetLocal);
+            chunk.push_u64(0);
+            chunk.push_literal(Value::Int(8));
+            chunk.push_op(OpCode::GetGlobal);
+            chunk.push_u64(bar_name as u64);
             chunk.push_op(OpCode::Div);
             chunk.push_op(OpCode::Add);
-            chunk.push_op(OpCode::Print);
+            chunk.push_op(OpCode::SetLocal);
+            chunk.push_u64(0);
+            chunk.push_op(OpCode::Pop);
+
+            // render foo;
+            chunk.push_op(OpCode::GetLocal);
+            chunk.push_u64(0);
+            chunk.push_op(OpCode::Render);
+
+            // poll;
+            chunk.push_op(OpCode::Poll);
 
             let file = File::create(output)?;
             ciborium::into_writer(&chunk, file)?;
@@ -47,7 +68,7 @@ fn main() -> color_eyre::Result<()> {
 
             println!("-- Running chunk --\n{chunk}");
 
-            run(&chunk).unwrap();
+            run(&chunk)?;
         }
     }
 

@@ -9,36 +9,44 @@ pub use chunk::Chunk;
 pub use value::Value;
 
 use vm::Vm;
-use ratatui::prelude::*;
 
 #[derive(Debug, thiserror::Error)]
 pub enum RuntimeError {
     #[error(transparent)]
     IoError(#[from] std::io::Error),
 
-    #[error("Unrecognized op code (0x{0:x}) at: 0x{1:x}")]
-    UnrecognizedOpCode(u8, usize),
+    #[error("Unrecognized op code (0x{op:x}) at: 0x{pc:x}")]
+    UnrecognizedOpCode { op: u8, pc: usize },
 
-    #[error("Use of invalid op code at: 0x{0:x}")]
-    InvalidOpCode(usize),
+    #[error("Use of invalid op code at: 0x{pc:x}")]
+    InvalidOpCode { pc: usize },
 
-    #[error("Trying to access out of bounds memory (0x{0:x}) at: 0x{1:x}")]
-    AccessOutOfBounds(usize, usize),
+    #[error("Trying to access out of bounds memory (0x{at:x}) at: 0x{pc:x}")]
+    AccessOutOfBounds { at: usize, pc: usize },
 
-    #[error("Trying to access out of bounds literal (0x{0:x}) at: 0x{1:x}")]
-    InvalidLiteralAccess(usize, usize),
+    #[error("Trying to access out of bounds values on the stack (0x{at:x}) at: 0x{pc:x}")]
+    StackOutOfBounds { at: usize, pc: usize },
 
-    #[error("Unable to perform binary {0} operation on {1} and {2}")]
-    InvalidBinaryOperation(String, String, String),
+    #[error("Trying to access out of bounds literal (0x{at:x}) at: 0x{pc:x}")]
+    InvalidLiteralAccess { at: usize, pc: usize },
 
-    #[error("Unable to perform unary {0} operation on {1}")]
-    InvalidUnaryOperation(String, String),
+    #[error("Unable to perform binary {op} operation on {lhs_type} and {rhs_type}")]
+    InvalidBinaryOperation { op: String, lhs_type: String, rhs_type: String },
+
+    #[error("Unable to perform unary {op} operation on {rhs_type}")]
+    InvalidUnaryOperation { op: String, rhs_type: String },
 
     #[error("Attempt to divide by zero")]
     DivideByZero,
 
     #[error("Expected value on the stack but the stack was empty")]
     StackEmpty,
+
+    #[error("Global variable of name '{name}' not found")]
+    GlobalNotFound { name: String },
+
+    #[error("Expected '{expected}' got {ty}")]
+    IncorrectType { ty: String, expected: String },
 }
 
 
@@ -49,20 +57,5 @@ pub fn run(program: &Chunk) -> Result<(), RuntimeError> {
         vm.execute()?;
     }
 
-    // let mut terminal = ratatui::init();
-
-    // loop {
-    //     terminal.draw(render)?;
-
-    //     if ratatui::crossterm::event::read()?.is_key_press() {
-    //         break;
-    //     }
-    // }
-
-    // ratatui::restore();
     Ok(())
-}
-
-fn render(frame: &mut Frame) {
-    frame.render_widget("Hello World", frame.area());
 }

@@ -1,45 +1,94 @@
+use std::collections::HashMap;
+
 use num_enum::TryFromPrimitive;
+use ratatui::DefaultTerminal;
 
-use crate::{RuntimeError, Value, op::OpCode, chunk::Chunk};
+use crate::{RuntimeError, Value, chunk::Chunk, op::OpCode};
 
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Vm<'a> {
     chunk: &'a Chunk,
     stack: Vec<Value>,
     pc: usize,
+    running: bool,
+    globals: HashMap<String, Value>,
+    term: DefaultTerminal,
 }
 
 impl<'a> Vm<'a> {
     pub fn new(chunk: &'a Chunk) -> Self {
+        let term = ratatui::init();
+
         Self {
             chunk,
             stack: vec![],
             pc: 0,
+            running: true,
+            globals: HashMap::new(),
+            term,
         }
     }
 
     pub fn is_running(&self) -> bool {
-        self.pc < self.chunk.byte_len()
+        self.running && self.pc < self.chunk.byte_len()
     }
 
     pub fn execute(&mut self) -> Result<(), RuntimeError> {
         match self.fetch_op()? {
-            OpCode::Invalid => return Err(RuntimeError::InvalidOpCode(self.pc)),
+            OpCode::Invalid => return Err(RuntimeError::InvalidOpCode { pc: self.pc }),
 
             OpCode::Literal => {
+                let literal = self.fetch_literal()?
+                    .to_owned();
+                self.push_value(literal);
+            },
+
+            OpCode::GetLocal => {
                 let offset = self.fetch_u64()? as usize;
-                let value = self.chunk.get_literal(offset)
-                    .ok_or(RuntimeError::InvalidLiteralAccess(offset, self.pc))?;
+                let value = self.stack.get(offset)
+                    .ok_or(RuntimeError::StackOutOfBounds { at: offset, pc: self.pc })?;
 
-                self.push_value(value.clone());
+                self.stack.push(value.clone());
             },
 
-            OpCode::Print => {
-                if let Some(value )= self.pop_value() {
-                    println!("{value}");
+            OpCode::SetLocal => {
+                let top = self.peek_value()
+                    .ok_or(RuntimeError::StackEmpty)?
+                    .to_owned();
+
+                let offset = self.fetch_u64()? as usize;
+                if offset >= self.stack.len() {
+                    return Err(RuntimeError::StackOutOfBounds { at: offset, pc: self.pc });
                 }
+
+                self.stack[offset] = top;
             },
+
+            OpCode::GetGlobal => {
+                let literal = self.fetch_literal()?
+                    .to_owned()
+                    .as_string()?;
+
+                let global = self.globals.get(&literal).ok_or(RuntimeError::GlobalNotFound { name: literal })?;
+                self.push_value(global.clone());
+            },
+
+            OpCode::SetGlobal => {
+                let literal = self.fetch_literal()?
+                    .to_owned()
+                    .as_string()?;
+
+                let top = self.peek_value()
+                    .ok_or(RuntimeError::StackEmpty)?
+                    .clone();
+
+                self.globals.insert(literal, top);
+            },
+
+            OpCode::Pop => {
+                self.pop_expecting()?;
+            }
 
             OpCode::Add => {
                 let rhs = self.pop_expecting()?;
@@ -71,6 +120,17 @@ impl<'a> Vm<'a> {
 
                 self.push_value(lhs.try_mod(rhs)?);
             },
+
+            OpCode::Poll => {
+                if ratatui::crossterm::event::read()?.is_key_press() {
+                    self.running = false;
+                }
+            },
+            
+            OpCode::Render => {
+                let value = self.pop_expecting()?;
+                self.term.draw(|frame| frame.render_widget(value.to_string(), frame.area()))?;
+            }
         }
 
         Ok(())
@@ -79,36 +139,44 @@ impl<'a> Vm<'a> {
     pub fn fetch_op(&mut self) -> Result<OpCode, RuntimeError> {
         let byte = self.chunk
             .read_u8(self.pc)
-            .ok_or(RuntimeError::AccessOutOfBounds(self.pc, self.pc))?;
+            .ok_or(RuntimeError::AccessOutOfBounds { at: self.pc, pc: self.pc })?;
 
         self.pc += 1;
 
         OpCode::try_from_primitive(byte)
-            .map_err(|_| RuntimeError::UnrecognizedOpCode(byte, self.pc))
+            .map_err(|_| RuntimeError::UnrecognizedOpCode { op: byte, pc: self.pc })
     }
 
     pub fn fetch_u8(&mut self) -> Result<u8, RuntimeError> {
-        let byte =  self.chunk.read_u8(self.pc).ok_or(RuntimeError::AccessOutOfBounds(self.pc, self.pc))?;
+        let byte =  self.chunk.read_u8(self.pc).ok_or(RuntimeError::AccessOutOfBounds { at: self.pc, pc: self.pc })?;
         self.pc += 1;
         Ok(byte)
     }
 
     pub fn fetch_u16(&mut self) -> Result<u16, RuntimeError> {
-        let val =  self.chunk.read_u16(self.pc).ok_or(RuntimeError::AccessOutOfBounds(self.pc, self.pc))?;
+        let val =  self.chunk.read_u16(self.pc).ok_or(RuntimeError::AccessOutOfBounds { at: self.pc, pc: self.pc })?;
         self.pc += 2;
         Ok(val)
     }
 
     pub fn fetch_u32(&mut self) -> Result<u32, RuntimeError> {
-        let val =  self.chunk.read_u32(self.pc).ok_or(RuntimeError::AccessOutOfBounds(self.pc, self.pc))?;
+        let val =  self.chunk.read_u32(self.pc).ok_or(RuntimeError::AccessOutOfBounds { at: self.pc, pc: self.pc })?;
         self.pc += 4;
         Ok(val)
     }
 
     pub fn fetch_u64(&mut self) -> Result<u64, RuntimeError> {
-        let val =  self.chunk.read_u64(self.pc).ok_or(RuntimeError::AccessOutOfBounds(self.pc, self.pc))?;
+        let val =  self.chunk.read_u64(self.pc).ok_or(RuntimeError::AccessOutOfBounds { at: self.pc, pc: self.pc })?;
         self.pc += 8;
         Ok(val)
+    }
+
+    pub fn fetch_literal(&mut self) -> Result<&Value, RuntimeError> {
+        let offset = self.fetch_u64()? as usize;
+        let value = self.chunk.get_literal(offset)
+            .ok_or(RuntimeError::InvalidLiteralAccess { at: offset, pc: self.pc })?;
+
+        Ok(value)
     }
 
     pub fn push_value<T: Into<Value>>(&mut self, value: T) {
@@ -119,8 +187,17 @@ impl<'a> Vm<'a> {
         self.stack.pop()
     }
 
+    pub fn peek_value(&mut self) -> Option<&Value> {
+        self.stack.last()
+    }
+
     pub fn pop_expecting(&mut self) -> Result<Value, RuntimeError> {
         self.stack.pop().ok_or(RuntimeError::StackEmpty)
     }
 }
 
+impl<'a> Drop for Vm<'a> {
+    fn drop(&mut self) {
+        ratatui::restore();
+    }
+}
