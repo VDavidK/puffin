@@ -16,17 +16,29 @@ pub enum RuntimeError {
     #[error(transparent)]
     IoError(#[from] std::io::Error),
 
-    #[error("Unrecognized op code ({0:x}) at: {1:x}")]
+    #[error("Unrecognized op code (0x{0:x}) at: 0x{1:x}")]
     UnrecognizedOpCode(u8, usize),
 
-    #[error("Use of invalid op code at: {0:x}")]
+    #[error("Use of invalid op code at: 0x{0:x}")]
     InvalidOpCode(usize),
 
-    #[error("Trying to access out of bounds memory (0:x) at: {1:x}")]
+    #[error("Trying to access out of bounds memory (0x{0:x}) at: 0x{1:x}")]
     AccessOutOfBounds(usize, usize),
 
-    #[error("Trying to access out of bounds literal (0:x) at: {1:x}")]
+    #[error("Trying to access out of bounds literal (0x{0:x}) at: 0x{1:x}")]
     InvalidLiteralAccess(usize, usize),
+
+    #[error("Unable to perform binary {0} operation on {1} and {2}")]
+    InvalidBinaryOperation(String, String, String),
+
+    #[error("Unable to perform unary {0} operation on {1}")]
+    InvalidUnaryOperation(String, String),
+
+    #[error("Attempt to divide by zero")]
+    DivideByZero,
+
+    #[error("Expected value on the stack but the stack was empty")]
+    StackEmpty,
 }
 
 

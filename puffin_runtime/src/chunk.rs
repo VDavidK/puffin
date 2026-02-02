@@ -1,9 +1,12 @@
 use std::fmt::Display;
 
+use num_enum::TryFromPrimitive;
+use serde_derive::{Deserialize, Serialize};
+
 use crate::{Value, op::OpCode};
 
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Chunk {
     name: String,
     bytes: Vec<u8>,
@@ -73,7 +76,46 @@ impl Chunk {
 
 impl Display for Chunk {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let string = format!("{}", self.name);
+        let mut idx = 0;
+
+        let mut string = format!("Chunk '{}'", self.name);
+        let mut lines = vec![];
+
+        while idx < self.byte_len() {
+            let byte = self.read_u8(idx).unwrap();
+            idx += 1;
+
+            match OpCode::try_from_primitive(byte) {
+                Ok(code) => match code {
+                    OpCode::Invalid => lines.push("\tinvalid".to_owned()),
+                    OpCode::Literal => {
+                        if let Some(offset) = self.read_u64(idx) {
+                            if let Some(value) = self.get_literal(offset as usize) {
+                                lines.push(format!("\tliteral [{value}]"));
+                                idx += 8;
+                            } else {
+                                lines.push(format!("\tliteral [UNKNOWN:0x{:x}]", offset));
+                            }
+                        } else {
+                            lines.push("\tliteral [MALFORMED]".to_owned());
+                        }
+                    },
+                    OpCode::Print => lines.push("\tprint".to_owned()),
+                    OpCode::Add => lines.push("\tadd".to_owned()),
+                    OpCode::Sub => lines.push("\tsub".to_owned()),
+                    OpCode::Mul => lines.push("\tmul".to_owned()),
+                    OpCode::Div => lines.push("\tdiv".to_owned()),
+                    OpCode::Mod => lines.push("\tmod".to_owned()),
+                },
+                Err(_) => lines.push(format!("\tunknown [0x{:x}]", byte)),
+            }
+        }
+
+        if lines.len() > 0 {
+            string.push('\n');
+            string.push_str(&lines.join("\n"));
+        }
+
         f.write_str(&string)
     }
 }

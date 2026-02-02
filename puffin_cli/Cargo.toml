@@ -10,3 +10,6 @@ workspace = true
 puffin_runtime = { path = "../puffin_runtime" }
 puffin_parser = { path = "../puffin_parser" }
 puffin_compiler = { path = "../puffin_compiler" }
+ciborium = "0.2.2"
+clap = { version = "4.5.56", features = ["derive"] }
+color-eyre = "0.6.5"

@@ -1,15 +1,55 @@
+use std::{fs::File, path::PathBuf};
+
+use clap::{Parser, Subcommand};
 use puffin_runtime::{Value, op::OpCode, run};
 
-fn main() {
-    let mut chunk = puffin_runtime::Chunk::new("Test Program");
+#[derive(Subcommand, Debug)]
+enum Operation {
+    Run {
+        input: PathBuf,
+    },
+    Compile {
+        output: PathBuf,
+    },
+}
 
-    chunk.push_literal(Value::Int(32));
-    chunk.push_literal(Value::Int(64));
-    // chunk.push_op(OpCode::Add);
-    chunk.push_op(OpCode::Print);
-    chunk.push_op(OpCode::Print);
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    #[command(subcommand)]
+    op: Operation
+}
 
-    run(&chunk).unwrap();
+fn main() -> color_eyre::Result<()> {
+    color_eyre::install()?;
 
-    println!("{chunk}");
+    let args = Args::parse();
+
+    match args.op {
+        Operation::Compile { output } => {
+            let mut chunk = puffin_runtime::Chunk::new("Test Program");
+
+            // 10 + 8 / 4
+
+            chunk.push_literal(Value::Int(10));
+            chunk.push_literal(Value::Int(8));
+            chunk.push_literal(Value::Int(4));
+            chunk.push_op(OpCode::Div);
+            chunk.push_op(OpCode::Add);
+            chunk.push_op(OpCode::Print);
+
+            let file = File::create(output)?;
+            ciborium::into_writer(&chunk, file)?;
+        },
+        Operation::Run { input } => {
+            let file = File::open(input)?;
+            let chunk = ciborium::from_reader::<puffin_runtime::Chunk, File>(file)?;
+
+            println!("-- Running chunk --\n{chunk}");
+
+            run(&chunk).unwrap();
+        }
+    }
+
+    Ok(())
 }

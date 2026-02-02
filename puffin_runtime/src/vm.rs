@@ -41,11 +41,36 @@ impl<'a> Vm<'a> {
                 }
             },
 
-            OpCode::Add => todo!(),
-            OpCode::Sub => todo!(),
-            OpCode::Mul => todo!(),
-            OpCode::Div => todo!(),
-            OpCode::Mod => todo!(),
+            OpCode::Add => {
+                let rhs = self.pop_expecting()?;
+                let lhs = self.pop_expecting()?;
+
+                self.push_value(lhs.try_add(rhs)?);
+            },
+            OpCode::Sub => {
+                let rhs = self.pop_expecting()?;
+                let lhs = self.pop_expecting()?;
+
+                self.push_value(lhs.try_sub(rhs)?);
+            },
+            OpCode::Mul => {
+                let rhs = self.pop_expecting()?;
+                let lhs = self.pop_expecting()?;
+
+                self.push_value(lhs.try_mul(rhs)?);
+            },
+            OpCode::Div => {
+                let rhs = self.pop_expecting()?;
+                let lhs = self.pop_expecting()?;
+
+                self.push_value(lhs.try_div(rhs)?);
+            },
+            OpCode::Mod => {
+                let rhs = self.pop_expecting()?;
+                let lhs = self.pop_expecting()?;
+
+                self.push_value(lhs.try_mod(rhs)?);
+            },
         }
 
         Ok(())
@@ -92,6 +117,10 @@ impl<'a> Vm<'a> {
 
     pub fn pop_value(&mut self) -> Option<Value> {
         self.stack.pop()
+    }
+
+    pub fn pop_expecting(&mut self) -> Result<Value, RuntimeError> {
+        self.stack.pop().ok_or(RuntimeError::StackEmpty)
     }
 }
 
