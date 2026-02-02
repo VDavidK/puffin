@@ -4,7 +4,7 @@ mod snippet;
 
 use crate::span::Span;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum TokenType {
     KwAnd, // "and"
     KwOr, // "or"
@@ -69,8 +69,8 @@ pub enum TokenType {
 #[derive(Debug, Clone)]
 pub struct Token {
     lexeme: String,
-    pub(crate) span: Span,
-    ty: TokenType,
+    pub span: Span,
+    pub ty: TokenType,
 }
 
 impl Token {
@@ -83,15 +83,64 @@ impl Token {
     }
 }
 
+impl std::fmt::Display for TokenType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("{:?}", self))
+    }
+}
+
 impl std::fmt::Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_fmt(format_args!("Token {:?} '{}' at {}", self.ty, self.lexeme, self.span))
     }
 }
 
-pub(crate) enum Statement {
-    BlockStatement { statements: Vec<Box<Statement>> },
-    ComponentDeclarationStatement { name: Box<Token>, block: Box<Statement> },
+#[derive(Debug)]
+pub enum VarType {
+    Let,
+    Const,
 }
 
-pub(crate) enum Expression {}
+#[derive(Debug)]
+pub enum Statement {
+    BlockStatement { statements: Vec<Box<Statement>> },
+    ComponentDeclarationStatement { name: Box<Token>, parameters: Vec<Box<Token>>, block: Box<Statement> },
+    ComponentBodyDeclaration { statements: Vec<Box<Statement>>, layout: Box<Statement> },
+    AssignStatement { name: Box<Token>, expression: Box<Expression> },
+    VarDeclarationStatement { name: Box<Token>, expression: Box<Expression>, var_type: VarType },
+    BreakStatement {},
+    ContinueStatement {},
+    LayoutStatement { name: Box<Token>, block: Box<Statement> },
+    MethodDeclaration { name: Box<Token>, parameters: Vec<Box<Token>>, block: Box<Statement> },
+    Decorator { name: Box<Token>, args: Vec<Box<Token>> },
+    DecoratedMethodDeclaration { decorator: Box<Statement>, method: Box<Statement> },
+    ForGeneric { var_name: Box<Token>, iter_name: Box<Token>, iterable: Box<Expression>, block: Box<Statement> },
+    IfStatement { condition: Box<Expression>, if_block: Box<Statement>, else_stat: Option<Box<Statement>> },
+}
+
+#[derive(Debug)]
+pub enum Expression {
+    Literal { token: Box<Token> },
+    Binary { lhs: Box<Expression>, op: Box<Token>, rhs: Box<Expression> },
+    Unary { op: Box<Token>, rhs: Box<Expression> },
+    FunctionCall { name: Box<Token>, arguments: Vec<Box<Expression>> },
+}
+
+#[derive(Debug)]
+pub struct Ast {
+    pub statements: Vec<Box<Statement>>,
+}
+
+impl Ast {
+    pub fn new() -> Self {
+        Self {
+            statements: Vec::new(),
+        }
+    }
+}
+
+impl std::fmt::Display for Ast {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("{:?}", self))
+    }
+}

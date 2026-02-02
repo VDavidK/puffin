@@ -1,7 +1,7 @@
 use crate::snippet::Snippet;
 use crate::position::Position;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Span {
     start: Position,
     end: Position,
