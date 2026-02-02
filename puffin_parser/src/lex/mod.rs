@@ -66,7 +66,7 @@ impl<'a> Iterator for PuffinLexer<'a> {
             '<' if self.match_while("<=") => self.simple_token(TokenType::LessOrEqual),
             '<' => self.simple_token(TokenType::LessThan),
             c if c.is_alphabetic() => {
-                while let Some(c) = self.peek(0) && c.is_ascii_alphanumeric() {
+                while let Some(c) = self.peek(0) && (c.is_ascii_alphanumeric() || c == '_') {
                     self.next_char();
                 }
                 match self.lexeme() {

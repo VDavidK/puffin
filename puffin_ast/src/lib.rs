@@ -96,26 +96,37 @@ impl std::fmt::Display for Token {
 }
 
 #[derive(Debug)]
+pub struct Decorator {
+    name: Box<Token>,
+    parameters: Vec<Token>,
+}
+
+#[derive(Debug)]
 pub enum VarType {
     Let,
     Const,
 }
 
 #[derive(Debug)]
+pub enum Declaration {
+    Component { name: Option<Token>, parameters: Vec<Token>, declarations: Vec<Declaration> },
+    Var { name: Token, value: Expression, var_type: VarType },
+    Layout { /* TODO: Figure out what layout members are exactly */},
+    Signal { name: Token, parameters: Vec<Token> },
+    Method { decorator: Option<Decorator>, method: Statement, parameters: Vec<Token>, block: Statement },
+}
+
+#[derive(Debug)]
 pub enum Statement {
-    BlockStatement { statements: Vec<Box<Statement>> },
-    ComponentDeclarationStatement { name: Box<Token>, parameters: Vec<Box<Token>>, block: Box<Statement> },
-    ComponentBodyDeclaration { statements: Vec<Box<Statement>>, layout: Box<Statement> },
-    AssignStatement { name: Box<Token>, expression: Box<Expression> },
-    VarDeclarationStatement { name: Box<Token>, expression: Box<Expression>, var_type: VarType },
-    BreakStatement {},
-    ContinueStatement {},
-    LayoutStatement { name: Box<Token>, block: Box<Statement> },
-    MethodDeclaration { name: Box<Token>, parameters: Vec<Box<Token>>, block: Box<Statement> },
-    Decorator { name: Box<Token>, args: Vec<Box<Token>> },
-    DecoratedMethodDeclaration { decorator: Box<Statement>, method: Box<Statement> },
+    Block { statements: Vec<Statement> },
+    Assign { name: Box<Token>, expression: Box<Expression> },
+    Var { name: Box<Token>, expression: Box<Expression>, var_type: VarType },
+    Break {},
+    Continue {},
+    /* FunctionDeclaration { name: Box<Token>, parameters: Vec<Token> }, */
     ForGeneric { var_name: Box<Token>, iter_name: Box<Token>, iterable: Box<Expression>, block: Box<Statement> },
-    IfStatement { condition: Box<Expression>, if_block: Box<Statement>, else_stat: Option<Box<Statement>> },
+    If { condition: Box<Expression>, if_block: Box<Statement>, else_stat: Option<Box<Statement>> },
+    Expression { expression: Box<Expression> }
 }
 
 #[derive(Debug)]
@@ -123,18 +134,18 @@ pub enum Expression {
     Literal { token: Box<Token> },
     Binary { lhs: Box<Expression>, op: Box<Token>, rhs: Box<Expression> },
     Unary { op: Box<Token>, rhs: Box<Expression> },
-    FunctionCall { name: Box<Token>, arguments: Vec<Box<Expression>> },
+    FunctionCall { name: Box<Token>, arguments: Vec<Expression> },
 }
 
 #[derive(Debug)]
 pub struct Ast {
-    pub statements: Vec<Box<Statement>>,
+    pub declarations: Vec<Declaration>,
 }
 
 impl Ast {
-    pub fn new() -> Self {
+    pub fn new(declarations: Vec<Declaration>) -> Self {
         Self {
-            statements: Vec::new(),
+            declarations,
         }
     }
 }

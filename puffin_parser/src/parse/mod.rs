@@ -1,6 +1,5 @@
-use puffin_ast::{Ast, Token, TokenType, Statement, Expression};
+use puffin_ast::{Ast, Token, TokenType, Statement, Expression, Declaration, VarType};
 use puffin_ast::span::Span;
-use puffin_ast::Statement::BreakStatement;
 use crate::lex::{PuffinLexer, LexerError };
 
 fn get_op_precedence(ty: TokenType) -> usize {
@@ -25,6 +24,8 @@ pub enum ParserError {
     ExpectedBinaryOperatorError(Span),
     #[error("Expected literal at {0}")]
     ExpectedLiteralError(Span),
+    #[error("Expected literal or parenthesis expression at {0}")]
+    ExpectedLiteralOrParenError(Span),
     #[error("Expected unary operator at {0}")]
     ExpectedUnaryOperatorError(Span),
     #[error("Expected one of {expected:?} at {span} found '{received}'")]
@@ -35,6 +36,12 @@ pub enum ParserError {
     },
     #[error("Unexpected end of file")]
     UnexpectedEofError(),
+    #[error("Expected declaration at {0}")]
+    ExpectedDeclarationError(Span),
+    #[error("Expected identifier at {0}")]
+    ExpectedIdentifierError(Span),
+    #[error("Expected statement at {0}")]
+    ExpectedStatementError(Span),
 }
 
 #[cfg(test)]
@@ -72,39 +79,138 @@ impl<'a> PuffinParser<'a> {
     }
 
     fn next_token(&mut self) -> Result<Option<Token>, ParserError> {
+        self.peek()?;
         if self.current_token.is_some() {
             let tok = self.current_token.take().unwrap();
             self.current_token = None;
             Ok(Some(tok))
         } else {
-            if let Some(tok) = self.lexer.next() {
-                Ok(Some(tok?))
-            } else {
-                Ok(None)
-            }
+            Ok(None)
         }
     }
 
-    pub fn expect(&mut self, types: &[TokenType]) -> Result<Option<&Token>, ParserError> {
+    pub fn expect(&mut self, types: &[TokenType]) -> Result<Token, ParserError> {
         let res = self.next_token()?.ok_or(ParserError::UnexpectedEofError())?;
         if types.contains(&res.ty) {
-            Ok(self.current_token.as_ref())
+            Ok(res)
         } else {
-            Err(ParserError::UnexpectedTokenError{ span: res.span.to_owned(), expected: types.iter().cloned().collect::<Vec<_>>(), received: res.ty })
+            Err(ParserError::UnexpectedTokenError{
+                span: res.span.to_owned(),
+                expected: types.iter().cloned().collect::<Vec<_>>(),
+                received: res.ty
+            })
         }
     }
 
     pub(crate) fn run(mut self) -> Result<Ast, ParserError> {
-        let mut ast = Ast::new();
-        while let Some(token) = self.peek()? {
-            let stat = match token.ty {
-                TokenType::KwIf => self.if_stat(),
-                _ => Ok(BreakStatement {})
-            };
-            ast.statements.push(Box::new(stat?));
-        }
+        let decls = self.decls()?;
+        let ast = Ast::new(decls);
         dbg!(&ast);
         Ok(ast)
+    }
+
+    fn decl(&mut self) -> Result<Declaration, ParserError> {
+        let pos = self.pos();
+        let tok = self.expect(&[
+            TokenType::KwLet, TokenType::KwConst, TokenType::KwSignal,
+            TokenType::At, TokenType::KwFn, TokenType::KwComponent
+        ])?;
+        let decl = match tok.ty {
+            TokenType::KwLet => self.var_decl(VarType::Let)?,
+            TokenType::KwConst => self.var_decl(VarType::Const)?,
+            TokenType::KwSignal => self.signal()?,
+            TokenType::At => todo!(),
+            TokenType::KwFn => todo!(),
+            TokenType::KwComponent => self.component()?,
+            _ => return Err(ParserError::ExpectedDeclarationError(pos)),
+        };
+        Ok(decl)
+    }
+
+    fn decls(&mut self) -> Result<Vec<Declaration>, ParserError> {
+        let mut decls = Vec::new();
+        while let Ok(decl) = self.decl() {
+            decls.push(decl);
+        }
+        Ok(decls)
+    }
+
+    fn component(&mut self) -> Result<Declaration, ParserError> {
+        let name = self.expect(&[TokenType::Identifier])?;
+        let params = self.parameters()?.ok_or(Vec::<Token>::new()).unwrap();
+        self.expect(&[TokenType::LeftBrace])?;
+        let decls = self.decls()?;
+        self.expect(&[TokenType::RightBrace])?;
+
+        let decl = Declaration::Component {
+            name: Some(name),
+            parameters: params,
+            declarations: decls,
+        };
+        Ok(decl)
+    }
+
+    fn parameters(&mut self) -> Result<Option<Vec<Token>>, ParserError> {
+        if self.peek()?.is_some_and(|f| f.ty == TokenType::LeftParen) {
+            self.next_token()?;
+            let params = self.name_list()?;
+            self.expect(&[TokenType::RightParen])?;
+            Ok(Some(params))
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn var_decl(&mut self, ty: VarType) -> Result<Declaration, ParserError> {
+        let name = self
+            .expect(&[TokenType::Identifier])?
+            .clone();
+        self.expect(&[TokenType::Assign])?;
+        let decl = Declaration::Var {
+            name,
+            value: self.expression()?,
+            var_type: ty,
+        };
+        self.expect(&[TokenType::Semicolon])?;
+        Ok(decl)
+    }
+
+    fn signal(&mut self) -> Result<Declaration, ParserError> {
+        let pos = self.pos();
+        let name = self.next_token()?.ok_or(ParserError::ExpectedIdentifierError(pos))?;
+        let params = self.parameters()?.ok_or(Vec::<Token>::new()).unwrap();
+        let decl = Declaration::Signal {
+            name,
+            parameters: params,
+        };
+        self.expect(&[TokenType::Semicolon])?;
+        Ok(decl)
+    }
+
+    fn name_list(&mut self) -> Result<Vec<Token>, ParserError> {
+        let mut names: Vec<Token> = Vec::new();
+        while let Some(tok) = self.peek()? && tok.ty == TokenType::Identifier {
+            names.push(tok.clone());
+            self.next_token()?;
+            if self.peek()?.is_some_and(|t| t.ty != TokenType::Comma) {
+                break;
+            } else {
+                self.next_token()?;
+            }
+        }
+        Ok(names)
+    }
+
+    fn statement(&mut self) -> Result<Statement, ParserError> {
+        let pos = self.pos();
+        let tok = self
+            .next_token()?
+            .ok_or(ParserError::ExpectedDeclarationError(pos.clone()))?;
+        let stat = match tok.ty {
+            TokenType::KwIf => self.if_stat(),
+            _ => return Err(ParserError::ExpectedStatementError(pos)),
+        }?;
+        Ok(stat)
     }
 
     fn if_stat(&mut self) -> Result<Statement, ParserError> {
@@ -113,7 +219,7 @@ impl<'a> PuffinParser<'a> {
         self.expect(&[TokenType::LeftBrace])?;
         let if_block = self.block()?;
         self.expect(&[TokenType::RightBrace])?;
-        let stat = Statement::IfStatement {
+        let stat = Statement::If {
             condition: Box::new(condition),
             if_block: Box::new(if_block),
             else_stat: None,
@@ -122,10 +228,10 @@ impl<'a> PuffinParser<'a> {
     }
 
     fn expression(&mut self) -> Result<Expression, ParserError> {
-        Ok(self.binary_expression(0)?)
+        Ok(self.binary(0)?)
     }
 
-    fn binary_expression(&mut self, precedence: usize) -> Result<Expression, ParserError> {
+    fn binary(&mut self, precedence: usize) -> Result<Expression, ParserError> {
         let mut expr: Expression = self.unary()?;
         loop {
             let pos = self.pos();
@@ -137,7 +243,7 @@ impl<'a> PuffinParser<'a> {
             // Consume the peeked token
             self.next_token()?;
 
-            let rhs = self.binary_expression(prec)?;
+            let rhs = self.binary(prec)?;
             expr = Expression::Binary {  lhs: Box::new(expr), op: Box::new(op), rhs: Box::new(rhs) };
         }
     }
@@ -145,32 +251,43 @@ impl<'a> PuffinParser<'a> {
     fn unary(&mut self) -> Result<Expression, ParserError> {
         let pos = self.pos();
         if let Some(tok) = self.peek()? {
-            if matches!(tok.ty, TokenType::Plus | TokenType::Minus | TokenType::KwNot) {
-                let expr = Expression::Unary {
-                    op: Box::new(tok.clone()),
-                    rhs: Box::new(self.unary()?),
-                };
-                Ok(expr)
-            } else {
-                self.literal()
+            match tok.ty {
+                TokenType::Plus | TokenType::Minus | TokenType::KwNot => {
+                    let expr = Expression::Unary {
+                        op: Box::new(tok.clone()),
+                        rhs: Box::new(self.unary()?),
+                    };
+                    Ok(expr)
+                },
+                _ => self.primary(),
             }
         } else {
             Err(ParserError::ExpectedUnaryOperatorError(pos))
         }
     }
 
-    fn literal(&mut self) -> Result<Expression, ParserError> {
-        let pos = self.pos();
-        let tok = self.next_token()?.as_ref().ok_or(ParserError::ExpectedLiteralError(pos))?.clone();
-        let expr = Expression::Literal {
-            token: Box::new(tok)
-        };
+    fn call_expression(&mut self) -> Result<Expression, ParserError> {
+        todo!()
+    }
 
-        Ok(expr)
+    fn primary(&mut self) -> Result<Expression, ParserError> {
+        let pos = self.pos();
+        let tok = self.next_token()?.as_ref().ok_or(ParserError::ExpectedLiteralOrParenError(pos))?.clone();
+        if let Some(par) = self.peek()? && par.ty == TokenType::LeftParen {
+            self.next_token()?;
+            let expr = self.expression()?;
+            self.expect(&[TokenType::RightParen])?;
+            Ok(expr)
+        } else {
+            let expr = Expression::Literal {
+                token: Box::new(tok)
+            };
+            Ok(expr)
+        }
     }
 
     fn block(&mut self) -> Result<Statement, ParserError> {
-        let stat = Statement::BlockStatement { statements: vec![] };
+        let stat = Statement::Block { statements: vec![] };
         Ok(stat)
     }
 }
