@@ -95,10 +95,13 @@ impl std::fmt::Display for Token {
     }
 }
 
-#[derive(Debug)]
-pub struct Decorator {
-    name: Box<Token>,
-    parameters: Vec<Token>,
+impl Decorator {
+    pub fn new(name: Token, parameters: Vec<Token>) -> Self {
+        Self {
+            name,
+            parameters,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -108,12 +111,50 @@ pub enum VarType {
 }
 
 #[derive(Debug)]
+pub struct Component {
+    pub name: Option<Token>,
+    pub parameters: Vec<Token>,
+    pub declarations: Vec<Declaration>,
+}
+
+#[derive(Debug)]
+pub struct Var {
+    pub name: Token,
+    pub value: Expression,
+    pub var_type: VarType,
+}
+
+#[derive(Debug)]
+pub struct Layout {
+}
+
+#[derive(Debug)]
+pub struct Signal {
+    pub name: Token,
+    pub parameters: Vec<Token>,
+}
+
+#[derive(Debug)]
+pub struct Method {
+    pub decorator: Option<Decorator>,
+    pub name: Token,
+    pub parameters: Vec<Token>,
+    pub block: Statement,
+}
+
+#[derive(Debug)]
+pub struct Decorator {
+    pub name: Token,
+    pub parameters: Vec<Token>,
+}
+
+#[derive(Debug)]
 pub enum Declaration {
-    Component { name: Option<Token>, parameters: Vec<Token>, declarations: Vec<Declaration> },
-    Var { name: Token, value: Expression, var_type: VarType },
+    Component(Component),
+    Var(Var),
     Layout { /* TODO: Figure out what layout members are exactly */},
-    Signal { name: Token, parameters: Vec<Token> },
-    Method { decorator: Option<Decorator>, method: Statement, parameters: Vec<Token>, block: Statement },
+    Signal(Signal),
+    Method(Method),
 }
 
 #[derive(Debug)]

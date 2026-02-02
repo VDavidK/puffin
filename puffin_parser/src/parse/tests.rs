@@ -9,6 +9,13 @@ fn test_parse() {
 
         component MyComponent(foo, bar, baz) {
             let my_let = 10;
+
+            fn foo(one, two, three) {
+            }
+
+            @onclick(Lmb)
+            fn bar(four, five, six) {
+            }
         }
     ");
     if let Err(e) = &foo {

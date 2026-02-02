@@ -1,6 +1,7 @@
-use puffin_ast::{Ast, Token, TokenType, Statement, Expression, Declaration, VarType};
+use puffin_ast::{Ast, Token, TokenType, Statement, Expression, Declaration, VarType, Decorator, Component, Method, Var, Signal};
 use puffin_ast::span::Span;
 use crate::lex::{PuffinLexer, LexerError };
+use crate::parse::ParserError::ExpectedDeclarationError;
 
 fn get_op_precedence(ty: TokenType) -> usize {
     match ty {
@@ -42,6 +43,10 @@ pub enum ParserError {
     ExpectedIdentifierError(Span),
     #[error("Expected statement at {0}")]
     ExpectedStatementError(Span),
+    #[error("Expected method declaration at {0}")]
+    ExpectedMethodError(Span),
+    #[error("Expected let/const at {0}, received {1}")]
+    ExpectedVarTypeError(Span, TokenType),
 }
 
 #[cfg(test)]
@@ -103,7 +108,10 @@ impl<'a> PuffinParser<'a> {
     }
 
     pub(crate) fn run(mut self) -> Result<Ast, ParserError> {
-        let decls = self.decls()?;
+        let mut decls = Vec::new();
+        while self.peek()?.is_some() {
+            decls.push(self.decl()?);
+        }
         let ast = Ast::new(decls);
         dbg!(&ast);
         Ok(ast)
@@ -111,18 +119,13 @@ impl<'a> PuffinParser<'a> {
 
     fn decl(&mut self) -> Result<Declaration, ParserError> {
         let pos = self.pos();
-        let tok = self.expect(&[
-            TokenType::KwLet, TokenType::KwConst, TokenType::KwSignal,
-            TokenType::At, TokenType::KwFn, TokenType::KwComponent
-        ])?;
-        let decl = match tok.ty {
-            TokenType::KwLet => self.var_decl(VarType::Let)?,
-            TokenType::KwConst => self.var_decl(VarType::Const)?,
+        let decl  = match self.peek()?.ok_or(ExpectedDeclarationError(pos))?.ty {
+            TokenType::KwLet | TokenType::KwConst => self.var_decl()?,
             TokenType::KwSignal => self.signal()?,
-            TokenType::At => todo!(),
-            TokenType::KwFn => todo!(),
+            TokenType::At => self.decorated_method()?,
+            TokenType::KwFn => self.method()?,
             TokenType::KwComponent => self.component()?,
-            _ => return Err(ParserError::ExpectedDeclarationError(pos)),
+            _ => return Err(ParserError::ExpectedDeclarationError(self.pos()))
         };
         Ok(decl)
     }
@@ -136,17 +139,49 @@ impl<'a> PuffinParser<'a> {
     }
 
     fn component(&mut self) -> Result<Declaration, ParserError> {
+        self.expect(&[TokenType::KwComponent])?;
         let name = self.expect(&[TokenType::Identifier])?;
         let params = self.parameters()?.ok_or(Vec::<Token>::new()).unwrap();
         self.expect(&[TokenType::LeftBrace])?;
         let decls = self.decls()?;
         self.expect(&[TokenType::RightBrace])?;
 
-        let decl = Declaration::Component {
+        let decl = Declaration::Component(Component {
             name: Some(name),
             parameters: params,
             declarations: decls,
-        };
+        });
+        Ok(decl)
+    }
+
+    fn decorated_method(&mut self) -> Result<Declaration, ParserError> {
+        self.expect(&[TokenType::At])?;
+        let decorator_name = self.expect(&[TokenType::Identifier])?;
+        let params = self.parameters()?.ok_or(Vec::<Token>::new()).unwrap();
+        let mut method = self.method()?;
+        if let Declaration::Method(m) = &mut method {
+            m.decorator = Some(Decorator {
+                name: decorator_name,
+                parameters: params,
+            });
+            Ok(method)
+        } else {
+            Err(ParserError::ExpectedMethodError(self.pos().clone()))
+        }
+    }
+
+    fn method(&mut self) -> Result<Declaration, ParserError> {
+        self.expect(&[TokenType::KwFn])?;
+        let name = self.expect(&[TokenType::Identifier])?;
+        let params = self.parameters()?.ok_or(Vec::<Token>::new()).unwrap();
+        self.expect(&[TokenType::LeftBrace])?;
+        let decl = Declaration::Method(Method {
+            name,
+            parameters: params,
+            decorator: None,
+            block: self.block()?,
+        });
+        self.expect(&[TokenType::RightBrace])?;
         Ok(decl)
     }
 
@@ -157,32 +192,38 @@ impl<'a> PuffinParser<'a> {
             self.expect(&[TokenType::RightParen])?;
             Ok(Some(params))
         } else {
-            Ok(None)
+            Ok(Some(Vec::new()))
         }
     }
 
-    fn var_decl(&mut self, ty: VarType) -> Result<Declaration, ParserError> {
+    fn var_decl(&mut self) -> Result<Declaration, ParserError> {
+        let ty = match self.expect(&[TokenType::KwConst, TokenType::KwLet])?.ty {
+            TokenType::KwConst => VarType::Const,
+            TokenType::KwLet => VarType::Let,
+            t => return Err(ParserError::ExpectedVarTypeError(self.pos(), t))
+        };
         let name = self
             .expect(&[TokenType::Identifier])?
             .clone();
         self.expect(&[TokenType::Assign])?;
-        let decl = Declaration::Var {
+        let decl = Declaration::Var(Var {
             name,
             value: self.expression()?,
             var_type: ty,
-        };
+        });
         self.expect(&[TokenType::Semicolon])?;
         Ok(decl)
     }
 
     fn signal(&mut self) -> Result<Declaration, ParserError> {
+        self.expect(&[TokenType::KwSignal])?;
         let pos = self.pos();
         let name = self.next_token()?.ok_or(ParserError::ExpectedIdentifierError(pos))?;
         let params = self.parameters()?.ok_or(Vec::<Token>::new()).unwrap();
-        let decl = Declaration::Signal {
+        let decl = Declaration::Signal(Signal {
             name,
             parameters: params,
-        };
+        });
         self.expect(&[TokenType::Semicolon])?;
         Ok(decl)
     }
