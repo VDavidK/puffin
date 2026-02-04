@@ -132,10 +132,10 @@ impl<'a> PuffinParser<'a> {
         Ok(ast)
     }
 
-    /// decl ::= \<var_decl\>
-    /// decl ::= \<signal_decl\>
-    /// decl ::= \<decorated_method_decl\>
-    /// decl ::= \<method_decl\>
+    /// decl ::= \<var_decl\><br>
+    /// decl ::= \<signal_decl\><br>
+    /// decl ::= \<decorated_method_decl\><br>
+    /// decl ::= \<method_decl\><br>
     /// decl ::= \<component_decl\>
     fn decl(&mut self) -> Result<Declaration, ParserError> {
         let pos = self.pos();
@@ -264,7 +264,7 @@ impl<'a> PuffinParser<'a> {
         Ok(names)
     }
 
-    /// \<statement\> ::= \<if_statement\>
+    /// \<statement\> ::= \<if_statement\><br>
     /// \<statement\> ::= \<expr_statement\>
     fn statement(&mut self) -> Result<Statement, ParserError> {
         let pos = self.pos();

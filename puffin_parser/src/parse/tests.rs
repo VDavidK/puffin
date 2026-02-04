@@ -5,8 +5,8 @@ use colored::Colorize;
 fn test_component_methods() {
     let foo = run_parser_str("
         component MyComponent(foo, bar, baz) {
-            // fn foo(one, two, three) {
-            // }
+            fn foo(one, two, three) {
+            }
 
             @onclick(Lmb)
             fn bar(four, five, six) {
