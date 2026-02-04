@@ -126,6 +126,7 @@ pub struct Var {
 
 #[derive(Debug)]
 pub struct Layout {
+    /* TODO: Figure out what layout members are exactly */
 }
 
 #[derive(Debug)]
@@ -152,30 +153,80 @@ pub struct Decorator {
 pub enum Declaration {
     Component(Component),
     Var(Var),
-    Layout { /* TODO: Figure out what layout members are exactly */},
+    Layout(Layout),
     Signal(Signal),
     Method(Method),
 }
 
 #[derive(Debug)]
+pub struct BlockStatement {
+    pub statements: Vec<Statement>
+}
+
+#[derive(Debug)]
+pub struct AssignStatement {
+    pub name: Token,
+    pub expression: Box<Expression>
+}
+
+#[derive(Debug)]
+pub struct VarStatement {
+    pub name: Token,
+    pub expression: Box<Expression>,
+    pub var_type: VarType
+}
+
+#[derive(Debug)]
+pub struct BreakStatement {}
+
+#[derive(Debug)]
+pub struct ContinueStatement {}
+
+/*
+#[derive(Debug)]
+pub struct FunctionDeclaration
+ { name: Box<Token>, parameters: Vec<Token> }
+*/
+
+#[derive(Debug)]
+pub struct ForGenericStatement {
+    pub var_name: Token,
+    pub iter_name: Token,
+    pub iterable: Box<Expression>,
+    pub block: Box<Statement>
+}
+
+#[derive(Debug)]
+pub struct IfStatement {
+    pub condition: Box<Expression>,
+    pub if_block: Box<Statement>,
+    pub else_stat: Option<Box<Statement>>,
+}
+
+#[derive(Debug)]
+pub struct ExpressionStatement {
+    pub expression: Box<Expression>,
+}
+
+#[derive(Debug)]
 pub enum Statement {
-    Block { statements: Vec<Statement> },
-    Assign { name: Box<Token>, expression: Box<Expression> },
-    Var { name: Box<Token>, expression: Box<Expression>, var_type: VarType },
-    Break {},
-    Continue {},
+    Block(BlockStatement),
+    Assign(AssignStatement),
+    Var(VarStatement),
+    Break(BreakStatement),
+    Continue(ContinueStatement),
     /* FunctionDeclaration { name: Box<Token>, parameters: Vec<Token> }, */
-    ForGeneric { var_name: Box<Token>, iter_name: Box<Token>, iterable: Box<Expression>, block: Box<Statement> },
-    If { condition: Box<Expression>, if_block: Box<Statement>, else_stat: Option<Box<Statement>> },
-    Expression { expression: Box<Expression> }
+    ForGeneric(ForGenericStatement),
+    If(IfStatement),
+    Expression(ExpressionStatement),
 }
 
 #[derive(Debug)]
 pub enum Expression {
-    Literal { token: Box<Token> },
-    Binary { lhs: Box<Expression>, op: Box<Token>, rhs: Box<Expression> },
-    Unary { op: Box<Token>, rhs: Box<Expression> },
-    FunctionCall { name: Box<Token>, arguments: Vec<Expression> },
+    Literal { token: Token },
+    Binary { lhs: Box<Expression>, op: Token, rhs: Box<Expression> },
+    Unary { op: Token, rhs: Box<Expression> },
+    FunctionCall { name: Token, arguments: Vec<Expression> },
 }
 
 #[derive(Debug)]

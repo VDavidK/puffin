@@ -40,6 +40,12 @@ impl<'a> Iterator for PuffinLexer<'a> {
             ']' => self.simple_token(TokenType::RightBracket),
             '*' if self.match_while("*=") => self.token(TokenType::MulAssign),
             '*' => self.simple_token(TokenType::Star),
+            '/' if self.match_while("//") => {
+                while let Some(c) = self.peek(0) && c != '\n' {
+                    self.skip();
+                }
+                self.next()?
+            }
             '/' if self.match_while("/=") => self.token(TokenType::DivAssign),
             '/' => self.simple_token(TokenType::Slash),
             '.' => self.simple_token(TokenType::Dot),
@@ -126,6 +132,14 @@ impl<'a> PuffinLexer<'a> {
         }
     }
 
+    /// Moves the start and end pointers forward by one.
+    /// This is not intended for skipping in the middle of a lexeme,
+    /// but rather for skipping comments.
+    fn skip(&mut self) {
+        self.start.move_forward(self.src);
+        self.end.move_forward(self.src);
+    }
+
     fn advance(&mut self) {
         self.start = self.end.clone();
     }
@@ -165,8 +179,8 @@ impl<'a> PuffinLexer<'a> {
     fn token(&mut self, ty: TokenType) -> Result<Token, LexerError> {
         let tok = Token::new(
             self.lexeme().to_string(),
-            Span::from_positions(self.start.clone(), self.end.clone())
-                .with_snippet(&self.src.to_owned(), &self.src_name.to_owned(), 1),
+            Span::from_positions(self.start.clone(), self.end.clone()),
+                /*.with_snippet(&self.src.to_owned(), &self.src_name.to_owned(), 1),*/
             ty
         );
         self.advance();
