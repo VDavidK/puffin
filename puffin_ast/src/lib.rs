@@ -22,11 +22,17 @@ pub enum TokenType {
     KwLet, // "let"
     KwConst, // "const"
     KwExport, // "export"
+    KwRequire, // "require"
+    KwUse, // "use"
     KwFn, // "fn"
     KwDo, // "do"
     KwWhile, // "while"
     KwBreak, // "break"
     KwContinue, // "continue"
+    KwThrow, // "throw"
+    KwReturn, // "return"
+    KwStyle, // "style"
+    KwWith, // "with"
 
     LeftBrace, // "{"
     RightBrace, // "}"
@@ -127,6 +133,21 @@ pub struct Var {
 #[derive(Debug)]
 pub struct Layout {
     /* TODO: Figure out what layout members are exactly */
+    pub declarations: Vec<Declaration>,
+}
+
+#[derive(Debug)]
+pub struct LayoutItemEventBinding {
+    pub event_name: Token,
+    pub action: Expression,
+}
+
+#[derive(Debug)]
+pub struct LayoutItem {
+    pub name: Token,
+    pub events: Vec<LayoutItemEventBinding>,
+    pub args: Vec<Expression>,
+    pub declarations: Vec<Declaration>,
 }
 
 #[derive(Debug)]
@@ -154,6 +175,7 @@ pub enum Declaration {
     Component(Component),
     Var(Var),
     Layout(Layout),
+    LayoutItem(LayoutItem),
     Signal(Signal),
     Method(Method),
 }
@@ -189,10 +211,10 @@ pub struct FunctionDeclaration
 */
 
 #[derive(Debug)]
-pub struct ForGenericStatement {
+pub struct ForStatement {
     pub var_name: Token,
-    pub iter_name: Token,
     pub iterable: Box<Expression>,
+    pub end_range: Option<Box<Expression>>,
     pub block: Box<Statement>
 }
 
@@ -209,6 +231,11 @@ pub struct ExpressionStatement {
 }
 
 #[derive(Debug)]
+pub struct ReturnStatement {
+    pub expression: Option<Box<Expression>>,
+}
+
+#[derive(Debug)]
 pub enum Statement {
     Block(BlockStatement),
     Assign(AssignStatement),
@@ -216,9 +243,10 @@ pub enum Statement {
     Break(BreakStatement),
     Continue(ContinueStatement),
     /* FunctionDeclaration { name: Box<Token>, parameters: Vec<Token> }, */
-    ForGeneric(ForGenericStatement),
+    For(ForStatement),
     If(IfStatement),
     Expression(ExpressionStatement),
+    Return(ReturnStatement),
 }
 
 #[derive(Debug)]

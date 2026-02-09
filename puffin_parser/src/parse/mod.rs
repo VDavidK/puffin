@@ -1,7 +1,7 @@
-use puffin_ast::{Ast, Token, TokenType, Statement, Expression, Declaration, VarType, Decorator, Component, Method, Var, Signal, ExpressionStatement, IfStatement, BlockStatement, AssignStatement};
-use puffin_ast::Expression::{Binary, FunctionCall, Literal};
+use puffin_ast::{Ast, Token, TokenType, Statement, Expression, Declaration, VarType, Decorator, Component, Method, Var, Signal, ExpressionStatement, IfStatement, BlockStatement, AssignStatement, Layout, LayoutItem, LayoutItemEventBinding, ReturnStatement, BreakStatement, ContinueStatement, ForStatement};
 use puffin_ast::span::Span;
-use crate::lex::{PuffinLexer, LexerError };
+use crate::lex::{PuffinLexer, LexerError};
+use crate::parse::ParserError::{ExpectedLiteralError, ExpectedLiteralOrExpressionError};
 
 fn get_op_precedence(ty: TokenType) -> usize {
     match ty {
@@ -12,6 +12,14 @@ fn get_op_precedence(ty: TokenType) -> usize {
         TokenType::KwAnd => 5,
         TokenType::KwOr => 6,
         _ => 0,
+    }
+}
+
+fn is_literal(token: &Token) -> bool {
+    match token.ty {
+        TokenType::Identifier | TokenType::String | TokenType::Integer
+        | TokenType::Float    | TokenType::KwTrue | TokenType::KwFalse => true,
+        _ => false,
     }
 }
 
@@ -47,6 +55,10 @@ pub enum ParserError {
     ExpectedMethodError(Span),
     #[error("Expected let/const at {0}, received {1}")]
     ExpectedVarTypeError(Span, TokenType),
+    #[error("Expected literal or event binding at {0}")]
+    ExpectedLiteralOrEventBindingError(Span),
+    #[error("Expected literal or expression at {0}")]
+    ExpectedLiteralOrExpressionError(Span),
 }
 
 #[cfg(test)]
@@ -95,7 +107,11 @@ impl<'a> PuffinParser<'a> {
         Ok(self.peek()?.is_some_and(|f| f.ty == expected))
     }
 
-    fn next_token(&mut self) -> Result<Option<Token>, ParserError> {
+    fn next_token(&mut self) -> Result<Token, ParserError> {
+        self.next_token_or_none()?.ok_or(ParserError::UnexpectedEofError())
+    }
+
+    fn next_token_or_none(&mut self) -> Result<Option<Token>, ParserError> {
         self.peek()?;
         if self.current_token.is_some() {
             let tok = self.current_token.take().unwrap();
@@ -109,7 +125,7 @@ impl<'a> PuffinParser<'a> {
     /// Fetches the next token and errors if the token is ```None``` or if
     /// its type is not in ```types```, returning it otherwise.
     pub fn expect(&mut self, types: &[TokenType]) -> Result<Token, ParserError> {
-        let res = self.next_token()?.ok_or(ParserError::UnexpectedEofError())?;
+        let res = self.next_token_or_none()?.ok_or(ParserError::UnexpectedEofError())?;
         if types.contains(&res.ty) {
             Ok(res)
         } else {
@@ -145,6 +161,7 @@ impl<'a> PuffinParser<'a> {
             TokenType::At => self.decorated_method()?,
             TokenType::KwFn => self.method()?,
             TokenType::KwComponent => self.component()?,
+            TokenType::KwLayout => self.layout_decl()?,
             _ => return Err(ParserError::ExpectedDeclarationError(self.pos()))
         };
         Ok(decl)
@@ -154,7 +171,7 @@ impl<'a> PuffinParser<'a> {
     fn component(&mut self) -> Result<Declaration, ParserError> {
         self.expect(&[TokenType::KwComponent])?;
         let name = self.expect(&[TokenType::Identifier])?;
-        let params = self.parameters()?.ok_or(Vec::<Token>::new()).unwrap();
+        let params = self.parameters()?;
         self.expect(&[TokenType::LeftBrace])?;
         let mut decls = Vec::new();
         while !self.peek_is(TokenType::RightBrace)? {
@@ -174,7 +191,7 @@ impl<'a> PuffinParser<'a> {
     fn decorated_method(&mut self) -> Result<Declaration, ParserError> {
         self.expect(&[TokenType::At])?;
         let decorator_name = self.expect(&[TokenType::Identifier])?;
-        let params = self.parameters()?.ok_or(Vec::<Token>::new()).unwrap();
+        let params = self.parameters()?;
         let mut method = self.method()?;
         if let Declaration::Method(m) = &mut method {
             m.decorator = Some(Decorator {
@@ -190,7 +207,7 @@ impl<'a> PuffinParser<'a> {
     fn method(&mut self) -> Result<Declaration, ParserError> {
         self.expect(&[TokenType::KwFn])?;
         let name = self.expect(&[TokenType::Identifier])?;
-        let params = self.parameters()?.ok_or(Vec::<Token>::new()).unwrap();
+        let params = self.parameters()?;
         self.expect(&[TokenType::LeftBrace])?;
         let decl = Declaration::Method(Method {
             name,
@@ -203,15 +220,16 @@ impl<'a> PuffinParser<'a> {
     }
 
     /// \<parameters\> ::= "(", {\<identifier\>}, ")"
-    fn parameters(&mut self) -> Result<Option<Vec<Token>>, ParserError> {
-        if self.peek_is(TokenType::LeftParen)? {
+    fn parameters(&mut self) -> Result<Vec<Token>, ParserError> {
+        let params = if self.peek_is(TokenType::LeftParen)? {
             self.next_token()?;
             let params = self.name_list()?;
             self.expect(&[TokenType::RightParen])?;
-            Ok(Some(params))
+            params
         } else {
-            Ok(Some(Vec::new()))
-        }
+            Vec::new()
+        };
+        Ok(params)
     }
 
     /// \<var_decl\> ::= "const" | "let", \<identifier\>, "=", \<expression\>, ";"
@@ -238,8 +256,8 @@ impl<'a> PuffinParser<'a> {
     fn signal(&mut self) -> Result<Declaration, ParserError> {
         self.expect(&[TokenType::KwSignal])?;
         let pos = self.pos();
-        let name = self.next_token()?.ok_or(ParserError::ExpectedIdentifierError(pos))?;
-        let params = self.parameters()?.ok_or(Vec::<Token>::new()).unwrap();
+        let name = self.next_token_or_none()?.ok_or(ParserError::ExpectedIdentifierError(pos))?;
+        let params = self.parameters()?;
         let decl = Declaration::Signal(Signal {
             name,
             parameters: params,
@@ -253,12 +271,28 @@ impl<'a> PuffinParser<'a> {
         let mut names: Vec<Token> = Vec::new();
         while self.peek_is(TokenType::Identifier)? {
             // Safe unwrap, as peek_is has verified the token's existence.
-            names.push(self.next_token()?.unwrap().clone());
+            names.push(self.next_token_or_none()?.unwrap().clone());
             // A comma indicates another identifier. Trailing commas are currently not allowed.
             if !self.peek_is(TokenType::Comma)? {
                 break;
             } else {
-                self.next_token()?;
+                self.next_token_or_none()?;
+            }
+        }
+        Ok(names)
+    }
+
+    /// \<args\> ::= \<literal\>, {",", \<literal\>}
+    fn args(&mut self) -> Result<Vec<Token>, ParserError> {
+        let mut names: Vec<Token> = Vec::new();
+        let pos = self.pos();
+        while is_literal(self.peek()?.ok_or(ExpectedLiteralError(pos.clone()))?) {
+            names.push(self.next_token()?);
+            // A comma indicates another literal. Trailing commas are currently not allowed.
+            if !self.peek_is(TokenType::Comma)? {
+                break;
+            } else {
+                self.next_token_or_none()?;
             }
         }
         Ok(names)
@@ -269,14 +303,76 @@ impl<'a> PuffinParser<'a> {
     fn statement(&mut self) -> Result<Statement, ParserError> {
         let pos = self.pos();
         let stat = match self.peek()?.ok_or(ParserError::ExpectedDeclarationError(pos.clone()))?.ty {
-            TokenType::KwIf => self.if_stat()?,
-            TokenType::Identifier => self.expr_statement()?,
-            _ => return Err(ParserError::ExpectedStatementError(pos))
-        };
+            TokenType::KwIf => self.if_stat(),
+            TokenType::KwFor => self.for_stat(),
+            TokenType::KwReturn => self.return_stat(),
+            TokenType::KwBreak => self.break_stat(),
+            TokenType::KwThrow => self.throw_stat(),
+            TokenType::KwContinue => self.continue_stat(),
+            TokenType::KwMatch => self.match_stat(),
+            _ => self.expr_statement()
+        }?;
         Ok(stat)
     }
 
-    /// \<if_statement\> ::= "if", \<expression\>, "{", \<block\>, "}", {"else", \<if_statement}>}, \[\"else\", \<block\>\]
+    fn match_stat(&mut self) -> Result<Statement, ParserError> {
+        todo!();
+    }
+
+    fn break_stat(&mut self) -> Result<Statement, ParserError> {
+        self.expect(&[TokenType::KwBreak])?;
+        self.expect(&[TokenType::Semicolon])?;
+        Ok(Statement::Break(BreakStatement {}))
+    }
+
+    fn continue_stat(&mut self) -> Result<Statement, ParserError> {
+        self.expect(&[TokenType::KwContinue])?;
+        self.expect(&[TokenType::Semicolon])?;
+        Ok(Statement::Continue(ContinueStatement {}))
+    }
+
+    fn throw_stat(&mut self) -> Result<Statement, ParserError> {
+        todo!();
+    }
+
+    fn for_stat(&mut self) -> Result<Statement, ParserError> {
+        self.expect(&[TokenType::KwFor])?;
+        let var_name = self.expect(&[TokenType::Identifier])?;
+        self.expect(&[TokenType::KwIn])?;
+        let iterable = Box::new(self.expression()?);
+        let end_range = if self.peek_is(TokenType::Colon)? {
+            self.next_token()?;
+            Some(Box::new(self.expression()?))
+        } else {
+            None
+        };
+        self.expect(&[TokenType::LeftBrace])?;
+        let block = Box::new(self.block()?);
+        self.expect(&[TokenType::RightBrace])?;
+        let stat = Statement::For(ForStatement {
+            var_name,
+            iterable,
+            end_range,
+            block,
+        });
+        Ok(stat)
+    }
+
+    fn return_stat(&mut self) -> Result<Statement, ParserError> {
+        self.expect(&[TokenType::KwReturn])?;
+        let expr: Option<Box<Expression>> = if !self.peek_is(TokenType::Semicolon)? {
+            Some(Box::new(self.expression()?))
+        } else {
+            None
+        };
+        let stat = Statement::Return(ReturnStatement {
+            expression: expr,
+        });
+        self.expect(&[TokenType::Semicolon])?;
+        Ok(stat)
+    }
+
+    /// \<if_stat\> ::= "if", \<expression\>, "{", \<block\>, "}", {"else", \<if_stat}>}, \[\"else\", \<block\>\]
     fn if_stat(&mut self) -> Result<Statement, ParserError> {
         self.expect(&[TokenType::KwIf])?;
         let condition = self.expression()?;
@@ -285,7 +381,7 @@ impl<'a> PuffinParser<'a> {
         self.expect(&[TokenType::RightBrace])?;
         let else_block: Option<Box<Statement>> = match self.peek()?.ok_or(ParserError::UnexpectedEofError())?.ty {
             TokenType::KwElse => {
-                self.next_token()?;
+                self.next_token_or_none()?;
                 match self.peek()?.ok_or(ParserError::UnexpectedEofError())?.ty {
                     TokenType::KwIf => Some(Box::new(self.if_stat()?)),
                     _ => {
@@ -318,7 +414,7 @@ impl<'a> PuffinParser<'a> {
                 let tok = self.expect(&[TokenType::LeftParen, TokenType::Assign])?;
                 match tok.ty {
                     TokenType::LeftParen => {
-                        let expr = FunctionCall {
+                        let expr = Expression::FunctionCall {
                             name,
                             arguments: {
                                 let mut args = Vec::new();
@@ -331,8 +427,8 @@ impl<'a> PuffinParser<'a> {
                         self.expect(&[TokenType::RightParen])?;
                         expr
                     },
-                    TokenType::Assign => Binary {
-                        lhs: Box::new(Literal { token: name }),
+                    TokenType::Assign => Expression::Binary {
+                        lhs: Box::new(Expression::Literal { token: name }),
                         op: tok.clone(),
                         rhs: Box::new(self.expression()?),
                     },
@@ -413,9 +509,15 @@ impl<'a> PuffinParser<'a> {
     }
 
     fn primary(&mut self) -> Result<Expression, ParserError> {
-        let pos = self.pos();
-        let tok = self.next_token()?.as_ref().ok_or(ParserError::ExpectedLiteralOrParenError(pos))?.clone();
-        if let Some(par) = self.peek()? && par.ty == TokenType::LeftParen {
+        let tok = self.expect(&[
+            TokenType::String,
+            TokenType::Integer,
+            TokenType::Float,
+            TokenType::KwTrue,
+            TokenType::KwFalse/*,
+            TokenType::LeftParen*/
+        ])?.clone();
+        if self.peek_is(TokenType::LeftParen)? {
             self.next_token()?;
             let expr = self.expression()?;
             self.expect(&[TokenType::RightParen])?;
@@ -437,4 +539,77 @@ impl<'a> PuffinParser<'a> {
         let stat = Statement::Block(BlockStatement{ statements: stats });
         Ok(stat)
     }
+
+    fn layout_decl(&mut self) -> Result<Declaration, ParserError> {
+        self.expect(&[TokenType::KwLayout])?;
+        self.expect(&[TokenType::LeftBrace])?;
+        let mut components = Vec::new();
+        while !self.peek_is(TokenType::RightBrace)? {
+            components.push(self.layout_item()?);
+        }
+        self.expect(&[TokenType::RightBrace])?;
+        let decl = Declaration::Layout(Layout{
+            declarations: components,
+        });
+        Ok(decl)
+    }
+
+    /// <layout_item> ::= \<identifier\>, {(\<event_name\>, "=", \<identifier\>\) | \<string_literal\>}, ";"<br>
+    /// <layout_item> ::= \<identifier\>, {\<event_name}>, "=", \<identifier\>\}, "{", \{<layout_item>\} "}"
+    /// <layout_item> ::= \<identifier\>, {\<prop\>, "=", \<primary_expression\>}, "{", {\<layout_item\>}, "}"
+    fn layout_item(&mut self) -> Result<Declaration, ParserError> {
+        todo!();
+    }
+
+    /*fn layout_item(&mut self) -> Result<Declaration, ParserError> {
+        let name = self.expect(&[TokenType::Identifier])?;
+        let mut args = Vec::new();
+        let mut events = Vec::new();
+        let pos = self.pos();
+        while !self.peek_is(TokenType::Semicolon)? && !self.peek_is(TokenType::LeftBrace)? {
+            match self.peek()?.ok_or(ExpectedLiteralError(pos.clone()))?.ty {
+                TokenType::Identifier => {
+                    // Safe unwrap. Existence already confirmed.
+                    let event_name = self.next_token_or_none()?.unwrap();
+                    self.expect(&[TokenType::Assign])?;
+                    let expr = match self.peek()?.ok_or(ExpectedLiteralOrExpressionError(pos.clone()))?.ty {
+                        TokenType::LeftBrace => {
+                            self.next_token_or_none()?;
+                            let exp = self.expression()?;
+                        self.expect(&[TokenType::RightBrace])?;
+                            exp
+                        },
+                        // Safe unwrap. Existence already confirmed.
+                        TokenType::Identifier => Expression::Literal{ token: self.next_token_or_none()?.unwrap() },
+                        _ => return Err(ParserError::ExpectedLiteralOrExpressionError(self.pos()))
+                    };
+                    events.push(LayoutItemEventBinding{ event_name, action: expr });
+                },
+                TokenType::String | TokenType::Integer | TokenType::KwTrue | TokenType::KwFalse => {
+                    args.push(Expression::Literal{
+                        // Safe unwrap. Existence already confirmed.
+                        token: self.next_token_or_none()?.unwrap(),
+                    });
+                }
+                _ => return Err(ParserError::ExpectedLiteralOrEventBindingError(self.pos()))
+            };
+        }
+        let mut decls = Vec::new();
+        if self.peek_is(TokenType::Semicolon)? {
+            self.next_token_or_none()?;
+        } else {
+            self.expect(&[TokenType::LeftBrace])?;
+            while !self.peek_is(TokenType::RightBrace)? {
+                decls.push(self.layout_item()?);
+            }
+            self.expect(&[TokenType::RightBrace])?;
+        }
+        let item = Declaration::LayoutItem(LayoutItem {
+            name,
+            args,
+            events,
+            declarations: decls,
+        });
+        Ok(item)
+    }*/
 }

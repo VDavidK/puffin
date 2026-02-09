@@ -40,3 +40,57 @@ fn test_if() {
     }
     assert!(foo.is_ok())
 }
+
+#[test]
+fn test_layout() {
+    let foo = run_parser_str("
+        component MyComponent(foo, bar, baz) {
+            layout {
+                vbox {
+                    text \"hello, world!\";
+                    hbox {
+                        button onclick=foo \"click me!\";
+                        button onclick={foo(); bar()} \"hello\";
+                        button onclick={exit()} \"quit\";
+                    }
+                }
+            }
+        }
+    ");
+    if let Err(e) = &foo {
+        println!("{}", format!("parse error: {:}", e).red());
+    }
+    assert!(foo.is_ok())
+}
+
+#[test]
+fn test_for() {
+    let foo = run_parser_str(r#"
+        fn func() {
+            for i in foo {
+                for j in 0:10 {
+                    print("Hello, world!");
+                }
+            }
+        }
+    "#);
+    if let Err(e) = &foo {
+        println!("{}", format!("parse error: {:}", e).red());
+    }
+    assert!(foo.is_ok())
+}
+#[test]
+fn test_return() {
+    let foo = run_parser_str(r#"
+        fn func() {
+            return 1 > 2;
+        }
+        fn other() {
+            return;
+        }
+    "#);
+    if let Err(e) = &foo {
+        println!("{}", format!("parse error: {:}", e).red());
+    }
+    assert!(foo.is_ok())
+}

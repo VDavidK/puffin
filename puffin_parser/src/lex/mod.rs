@@ -97,6 +97,12 @@ impl<'a> Iterator for PuffinLexer<'a> {
                     "while" => self.token(TokenType::KwWhile),
                     "break" => self.token(TokenType::KwBreak),
                     "continue" => self.token(TokenType::KwContinue),
+                    "throw" => self.token(TokenType::KwThrow),
+                    "return" => self.token(TokenType::KwReturn),
+                    "require" => self.token(TokenType::KwRequire),
+                    "use" => self.token(TokenType::KwUse),
+                    "style" => self.token(TokenType::KwStyle),
+                    "with" => self.token(TokenType::KwWith),
                     _ => self.token(TokenType::Identifier),
                 }
             },
