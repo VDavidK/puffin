@@ -32,7 +32,7 @@ impl Chunk {
     pub fn push_literal(&mut self, literal: impl Into<Value>) -> usize {
         let offset = self.new_literal(literal.into());
         self.push_op(OpCode::Literal);
-        self.push_u64(offset as u64);
+        self.push_u32(offset as u32);
         offset
     }
 
@@ -68,9 +68,13 @@ impl Chunk {
         Some(u64::from_le_bytes(<[u8;8]>::try_from(&self.bytes[idx..idx+8]).ok()?))
     }
 
-    pub fn new_literal(&mut self, literal: Value) -> usize {
+    pub fn addr(&self) -> usize {
+        self.bytes.len() - 1
+    }
+
+    pub fn new_literal(&mut self, literal: impl Into<Value>) -> usize {
         let offset = self.literals.len();
-        self.literals.push(literal);
+        self.literals.push(literal.into());
         offset
     }
 
@@ -101,7 +105,7 @@ impl Display for Chunk {
 
                     // Stack
                     OpCode::Literal => {
-                        if let Some(offset) = self.read_u64(idx) {
+                        if let Some(offset) = self.read_u32(idx) {
                             if let Some(value) = self.get_literal(offset as usize) {
                                 inst.push(format!("{idx:<4x} | literal [0x{offset:x}] ({value})"));
                                 idx += 8;
@@ -114,7 +118,7 @@ impl Display for Chunk {
                     },
 
                     OpCode::GetLocal => {
-                        if let Some(offset) = self.read_u64(idx) {
+                        if let Some(offset) = self.read_u32(idx) {
                             inst.push(format!("{idx:<4x} | getl [0x{offset:x}]"));
                             idx += 8;
                         } else {
@@ -123,7 +127,7 @@ impl Display for Chunk {
                     },
 
                     OpCode::SetLocal => {
-                        if let Some(offset) = self.read_u64(idx) {
+                        if let Some(offset) = self.read_u32(idx) {
                             inst.push(format!("{idx:<4x} | setl [0x{offset:x}]"));
                             idx += 8;
                         } else {
@@ -132,7 +136,7 @@ impl Display for Chunk {
                     },
 
                     OpCode::GetGlobal => {
-                        if let Some(offset) = self.read_u64(idx) {
+                        if let Some(offset) = self.read_u32(idx) {
                             if let Some(value) = self.get_literal(offset as usize) {
                                 inst.push(format!("{idx:<4x} | getg [0x{offset:x}] ({value})"));
                                 idx += 8;
@@ -145,7 +149,7 @@ impl Display for Chunk {
                     },
 
                     OpCode::SetGlobal => {
-                        if let Some(offset) = self.read_u64(idx) {
+                        if let Some(offset) = self.read_u32(idx) {
                             if let Some(value) = self.get_literal(offset as usize) {
                                 inst.push(format!("{idx:<4x} | setg [0x{offset:x}] ({value})"));
                                 idx += 8;
@@ -164,7 +168,7 @@ impl Display for Chunk {
                     OpCode::NewObject => inst.push(format!("{idx:<4x} | newobj")),
 
                     OpCode::GetField => {
-                        if let Some(offset) = self.read_u64(idx) {
+                        if let Some(offset) = self.read_u32(idx) {
                             if let Some(value) = self.get_literal(offset as usize) {
                                 inst.push(format!("{idx:<4x} | getf [0x{offset:x}] ({value})"));
                                 idx += 8;
@@ -177,7 +181,7 @@ impl Display for Chunk {
                     },
 
                     OpCode::SetField => {
-                        if let Some(offset) = self.read_u64(idx) {
+                        if let Some(offset) = self.read_u32(idx) {
                             if let Some(value) = self.get_literal(offset as usize) {
                                 inst.push(format!("{idx:<4x} | setf [0x{offset:x}] ({value})"));
                                 idx += 8;
@@ -195,6 +199,26 @@ impl Display for Chunk {
                     OpCode::Mul => inst.push(format!("{idx:<4x} | mul")),
                     OpCode::Div => inst.push(format!("{idx:<4x} | div")),
                     OpCode::Mod => inst.push(format!("{idx:<4x} | mod")),
+                    OpCode::Neg => inst.push(format!("{idx:<4x} | neg")),
+                    OpCode::Not => inst.push(format!("{idx:<4x} | not")),
+
+                    // Branching
+                    OpCode::Jump => {
+                        if let Some(addr) = self.read_u64(idx) {
+                            inst.push(format!("{idx:<4x} | jmp [0x{addr:x}]"));
+                            idx += 8;
+                        } else {
+                            inst.push(format!("{idx:<4x} | jmp [MALFORMED]"));
+                        }
+                    },
+                    OpCode::JumpIf => {
+                        if let Some(addr) = self.read_u64(idx) {
+                            inst.push(format!("{idx:<4x} | jmpi [0x{addr:x}]"));
+                            idx += 8;
+                        } else {
+                            inst.push(format!("{idx:<4x} | jmpi [MALFORMED]"));
+                        }
+                    },
 
                     // Terminal
                     OpCode::Poll => inst.push(format!("{idx:<4x} | poll")),

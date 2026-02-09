@@ -45,7 +45,7 @@ impl<'a> Vm<'a> {
             },
 
             OpCode::GetLocal => {
-                let offset = self.fetch_u64()? as usize;
+                let offset = self.fetch_u32()? as usize;
                 let value = self.stack.get(offset)
                     .ok_or(RuntimeError::StackOutOfBounds { at: offset, pc: self.pc })?;
 
@@ -55,7 +55,7 @@ impl<'a> Vm<'a> {
             OpCode::SetLocal => {
                 let top = self.pop_expecting()?;
 
-                let offset = self.fetch_u64()? as usize;
+                let offset = self.fetch_u32()? as usize;
                 if offset >= self.stack.len() {
                     return Err(RuntimeError::StackOutOfBounds { at: offset, pc: self.pc });
                 }
@@ -149,6 +149,31 @@ impl<'a> Vm<'a> {
 
                 self.push_value(lhs.try_mod(&rhs)?);
             },
+            OpCode::Neg => {
+                let rhs = self.pop_expecting()?;
+
+                self.push_value(rhs.try_negate()?);
+            },
+            OpCode::Not => {
+                let rhs = self.pop_expecting()?;
+
+                self.push_value(rhs.not());
+            },
+
+            OpCode::Jump => {
+                let addr = self.fetch_u64()?;
+
+                self.pc = addr as usize;
+            },
+
+            OpCode::JumpIf => {
+                let addr = self.fetch_u64()?;
+                let val = self.pop_expecting()?;
+
+                if val.truthy() {
+                    self.pc = addr as usize;
+                }
+            },
 
             OpCode::Poll => {
                 if ratatui::crossterm::event::read()?.is_key_press() {
@@ -201,7 +226,7 @@ impl<'a> Vm<'a> {
     }
 
     pub fn fetch_literal(&mut self) -> Result<&Value, RuntimeError> {
-        let offset = self.fetch_u64()? as usize;
+        let offset = self.fetch_u32()? as usize;
         let value = self.chunk.get_literal(offset)
             .ok_or(RuntimeError::InvalidLiteralAccess { at: offset, pc: self.pc })?;
 

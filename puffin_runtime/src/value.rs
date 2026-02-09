@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap, fmt::Display, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, fmt::Display, hash::Hash, rc::Rc};
 
 use serde_derive::{Deserialize, Serialize};
 
@@ -19,6 +19,27 @@ pub enum Value {
 
     #[serde(skip)]
     Object(ObjectType),
+}
+
+impl PartialEq for Value {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Int(l0), Self::Int(r0)) => l0 == r0,
+            (Self::Float(l0), Self::Float(r0)) => l0 == r0,
+            (Self::Bool(l0), Self::Bool(r0)) => l0 == r0,
+            (Self::String(l0), Self::String(r0)) => l0 == r0,
+            (Self::Object(l0), Self::Object(r0)) => l0.as_ptr() == r0.as_ptr(),
+            _ => false,
+        }
+    }
+}
+
+impl Eq for Value { }
+
+impl Hash for Value {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        core::mem::discriminant(self).hash(state);
+    }
 }
 
 impl From<IntType> for Value {
@@ -98,6 +119,18 @@ impl<'a> From<&'a str> for Value {
 impl From<ObjectType> for Value {
     fn from(value: ObjectType) -> Self {
         Value::Object(value)
+    }
+}
+
+impl From<usize> for Value {
+    fn from(value: usize) -> Self {
+        Value::Int(value as IntType)
+    }
+}
+
+impl From<i32> for Value {
+    fn from(value: i32) -> Self {
+        Value::Int(value as IntType)
     }
 }
 
@@ -228,12 +261,17 @@ impl Value {
         }
     }
 
-    pub fn try_not(&self) -> Result<Value, RuntimeError> {
+    pub fn not(&self) -> Value {
+        Value::Bool(!self.truthy())
+    }
+
+    pub fn truthy(&self) -> bool {
         match self {
-            Value::Int(lhs) => Ok(Value::Bool(*lhs != 0)),
-            Value::Float(lhs) => Ok(Value::Bool(*lhs != 0.0)),
-            Value::Bool(lhs) => Ok(Value::Bool(!lhs)),
-            _ => Err(RuntimeError::InvalidUnaryOperation { op: "not".to_owned(), rhs_type: self.type_name().to_owned() }),
+            Value::Int(val) => *val != 0,
+            Value::Float(val) => *val != 0.0,
+            Value::Bool(val) => *val,
+            Value::String(val) => !val.is_empty(),
+            Value::Object(_) => true,
         }
     }
 

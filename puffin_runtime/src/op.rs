@@ -74,6 +74,28 @@ pub enum OpCode {
     // : mod
     // Pops the top two values from the stack and pushes the result
     Mod,
+
+    // : neg
+    // Pops the top value off the stack and pushes the negated value
+    Neg,
+
+    // : not
+    // Pops the top value off the stack and pushes the negated truthy value
+    Not,
+
+
+    // ----------------------------
+    // Branch Instructions
+    // ----------------------------
+    
+    // : jmp [addr:8B]
+    // Sets the program counter to the specified address
+    Jump,
+
+    // : jmpi [addr:8B]
+    // Pops the top of the stack and if the value is truthy, then sets the program counter to the specified address
+    JumpIf,
+
     
     // ----------------------------
     // Terminal Instructions
