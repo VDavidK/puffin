@@ -3,7 +3,7 @@ use colored::Colorize;
 
 #[test]
 fn test_component_methods() {
-    let foo = run_parser_str("
+    let foo = run_parser_str(r#"
         component MyComponent(foo, bar, baz) {
             fn foo(one, two, three) {
             }
@@ -13,7 +13,7 @@ fn test_component_methods() {
                 one = two + three;
             }
         }
-    ");
+    "#);
     if let Err(e) = &foo {
         println!("{}", format!("parse error: {:}", e).red());
     }
@@ -22,19 +22,19 @@ fn test_component_methods() {
 
 #[test]
 fn test_if() {
-    let foo = run_parser_str("
+    let foo = run_parser_str(r#"
         component MyComponent(foo, bar, baz) {
             fn foo(one, two, three) {
                 if one == two {
-                    print(\"One is two\");
+                    print("One is two");
                 } else if two == three {
-                    print(\"Two is three\");
+                    print("Two is three");
                 } else {
-                    print(\"Oh well\");
+                    print("Oh well");
                 }
             }
         }
-    ");
+    "#);
     if let Err(e) = &foo {
         println!("{}", format!("parse error: {:}", e).red());
     }
@@ -89,6 +89,20 @@ fn test_return() {
         }
         fn other_other() {
             return 1;
+        }
+    "#);
+    if let Err(e) = &foo {
+        println!("{}", format!("parse error: {:}", e).red());
+    }
+    assert!(foo.is_ok())
+}
+#[test]
+fn test_comments() {
+    let foo = run_parser_str(r#"
+        /* This method does stuff */
+        fn foo() {
+            // TODO: Make this do stuff.
+            return;
         }
     "#);
     if let Err(e) = &foo {

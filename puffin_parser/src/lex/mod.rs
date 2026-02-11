@@ -1,4 +1,4 @@
-use crate::lex::LexerError::UnterminatedStringLiteral;
+use crate::lex::LexerError::{UnterminatedBlockComment, UnterminatedStringLiteral};
 use puffin_ast::{span::Span, Token, TokenType, position::Position};
 
 #[derive(Debug, thiserror::Error)]
@@ -45,6 +45,13 @@ impl<'a> Iterator for PuffinLexer<'a> {
                     self.skip();
                 }
                 self.next()?
+            }
+            '/' if self.match_while("/*") => {
+                if let Err(err) = self.find_and_skip("*/", UnterminatedBlockComment(self.start.clone())) {
+                    Err(err)
+                } else {
+                self.next()?
+                }
             }
             '/' if self.match_while("/=") => self.token(TokenType::DivAssign),
             '/' => self.simple_token(TokenType::Slash),
@@ -175,6 +182,13 @@ impl<'a> PuffinLexer<'a> {
             }
         }
         Err(err)
+    }
+
+    fn find_and_skip<T>(&mut self, predicate: impl AsRef<str>, err: T) -> Result<(), T> {
+        let pred = predicate.as_ref();
+        let idx = self.src[self.start.idx()..].find(pred).ok_or(err)?;
+        self.end.move_forward_by(self.src, idx);
+        Ok(())
     }
 
     fn simple_token(&mut self, ty: TokenType) -> Result<Token, LexerError> {
