@@ -132,157 +132,135 @@ impl Chunk {
 
 impl Display for Chunk {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut idx = 0;
+        f.write_str(&ChunkFormatter::from(self).format_string())
+    }
+}
 
-        let mut string = format!("Chunk '{}'", self.name);
-        let mut literals = vec![];
-        let mut inst = vec![];
+struct ChunkFormatter<'a> {
+    chunk: &'a Chunk,
+    inst: Vec<String>,
+    idx: usize,
+}
 
-        for (i, literal) in self.literals.iter().enumerate() {
-            literals.push(format!("0x{i:x} {literal}"));
+impl<'a> From<&'a Chunk> for ChunkFormatter<'a> {
+    fn from(value: &'a Chunk) -> Self {
+        ChunkFormatter {
+            chunk: value,
+            inst: vec![],
+            idx: 0,
         }
+    }
+}
 
-        while idx < self.byte_len() {
-            let byte = self.bytes[idx];
-            idx += 1;
+impl<'a> ChunkFormatter<'a> {
+    fn format_string(mut self) -> String {
+        while self.idx < self.chunk.byte_len() {
+            let byte = self.chunk.bytes[self.idx];
+            self.idx += 1;
 
             match OpCode::try_from_primitive(byte) {
                 Ok(code) => match code {
-                    OpCode::Invalid => inst.push(format!("{idx:<4x} | invalid")),
+                    OpCode::Invalid => self.push("invalid"),
 
                     // Stack
-                    OpCode::Literal => {
-                        if let Some(offset) = self.read_literal_offset(idx) {
-                            if let Some(value) = self.get_literal(offset as usize) {
-                                inst.push(format!("{idx:<4x} | literal [0x{offset:x}] ({value})"));
-                                idx += size_of::<LiteralOffset>();
-                            } else {
-                                inst.push(format!("{idx:<4x} | literal [0x{offset:x}] (UNKNOWN)"));
-                            }
-                        } else {
-                            inst.push(format!("{idx:<4x} | literal [MALFORMED]"));
-                        }
-                    },
+                    OpCode::Literal => self.push_with_literal("literal"),
+                    OpCode::Pop => self.push("pop"),
 
-                    OpCode::GetLocal => {
-                        if let Some(offset) = self.read_local_offset(idx) {
-                            inst.push(format!("{idx:<4x} | getl [0x{offset:x}]"));
-                            idx += size_of::<LocalOffset>();
-                        } else {
-                            inst.push(format!("{idx:<4x} | getl [MALFORMED]"));
-                        }
-                    },
+                    OpCode::GetLocal => self.push_with_local_offset("getl"),
+                    OpCode::SetLocal => self.push_with_local_offset("setl"),
+                    OpCode::GetGlobal => self.push_with_literal("getg"),
+                    OpCode::SetGlobal => self.push_with_literal("setg"),
 
-                    OpCode::SetLocal => {
-                        if let Some(offset) = self.read_local_offset(idx) {
-                            inst.push(format!("{idx:<4x} | setl [0x{offset:x}]"));
-                            idx += size_of::<LocalOffset>();
-                        } else {
-                            inst.push(format!("{idx:<4x} | setl [MALFORMED]"));
-                        }
-                    },
-
-                    OpCode::GetGlobal => {
-                        if let Some(offset) = self.read_literal_offset(idx) {
-                            if let Some(value) = self.get_literal(offset as usize) {
-                                inst.push(format!("{idx:<4x} | getg [0x{offset:x}] ({value})"));
-                                idx += size_of::<LiteralOffset>();
-                            } else {
-                                inst.push(format!("{idx:<4x} | getg [0x{offset:x}] (UNKNOWN)"));
-                            }
-                        } else {
-                            inst.push(format!("{idx:<4x} | getg [MALFORMED]"));
-                        }
-                    },
-
-                    OpCode::SetGlobal => {
-                        if let Some(offset) = self.read_literal_offset(idx) {
-                            if let Some(value) = self.get_literal(offset as usize) {
-                                inst.push(format!("{idx:<4x} | setg [0x{offset:x}] ({value})"));
-                                idx += size_of::<LiteralOffset>();
-                            } else {
-                                inst.push(format!("{idx:<4x} | setg [0x{offset:x}] (UNKNOWN)"));
-                            }
-                        } else {
-                            inst.push(format!("{idx:<4x} | setg [MALFORMED]"));
-                        }
-                    },
-
-                    OpCode::Pop => inst.push(format!("{idx:<4x} | pop")),
-                    
                     // Object Manipulation
 
-                    OpCode::NewObject => inst.push(format!("{idx:<4x} | newobj")),
-
-                    OpCode::GetField => {
-                        if let Some(offset) = self.read_local_offset(idx) {
-                            inst.push(format!("{idx:<4x} | getf (s:0x{offset:x})"));
-                            idx += size_of::<LocalOffset>();
-                        } else {
-                            inst.push(format!("{idx:<4x} | getf [MALFORMED]"));
-                        }
-                    },
-
-                    OpCode::SetField => {
-                        if let Some(offset) = self.read_local_offset(idx) {
-                            inst.push(format!("{idx:<4x} | setf [s:0x{offset:x}]"));
-                            idx += size_of::<LocalOffset>();
-                        } else {
-                            inst.push(format!("{idx:<4x} | setf [MALFORMED]"));
-                        }
-                    },
+                    OpCode::NewObject => self.push("newobj"),
+                    OpCode::GetField => self.push_with_local_offset("getf"),
+                    OpCode::SetField => self.push_with_local_offset("setf"),
 
                     // Arithmetic
-                    OpCode::Add => inst.push(format!("{idx:<4x} | add")),
-                    OpCode::Sub => inst.push(format!("{idx:<4x} | sub")),
-                    OpCode::Mul => inst.push(format!("{idx:<4x} | mul")),
-                    OpCode::Div => inst.push(format!("{idx:<4x} | div")),
-                    OpCode::Mod => inst.push(format!("{idx:<4x} | mod")),
-                    OpCode::Neg => inst.push(format!("{idx:<4x} | neg")),
-                    OpCode::Not => inst.push(format!("{idx:<4x} | not")),
-                    OpCode::Eq => inst.push(format!("{idx:<4x} | eq")),
-                    OpCode::Neq => inst.push(format!("{idx:<4x} | neq")),
-                    OpCode::Lt => inst.push(format!("{idx:<4x} | lt")),
-                    OpCode::Le => inst.push(format!("{idx:<4x} | le")),
-                    OpCode::Gt => inst.push(format!("{idx:<4x} | gt")),
-                    OpCode::Ge => inst.push(format!("{idx:<4x} | ge")),
+                    OpCode::Add => self.push("add"),
+                    OpCode::Sub => self.push("sub"),
+                    OpCode::Mul => self.push("mul"),
+                    OpCode::Div => self.push("div"),
+                    OpCode::Mod => self.push("mod"),
+                    OpCode::Neg => self.push("neg"),
+                    OpCode::Not => self.push("not"),
+                    OpCode::Eq  => self.push("eq"),
+                    OpCode::Neq => self.push("neq"),
+                    OpCode::Lt  => self.push("lt"),
+                    OpCode::Le  => self.push("le"),
+                    OpCode::Gt  => self.push("gt"),
+                    OpCode::Ge  => self.push("ge"),
 
                     // Branching
-                    OpCode::Jump => {
-                        if let Some(addr) = self.read_instruction_offset(idx) {
-                            inst.push(format!("{idx:<4x} | jmp [0x{addr:x}]"));
-                            idx += size_of::<InstructionOffset>();
-                        } else {
-                            inst.push(format!("{idx:<4x} | jmp [MALFORMED]"));
-                        }
-                    },
-                    OpCode::JumpIf => {
-                        if let Some(addr) = self.read_instruction_offset(idx) {
-                            inst.push(format!("{idx:<4x} | jmpi [0x{addr:x}]"));
-                            idx += size_of::<InstructionOffset>();
-                        } else {
-                            inst.push(format!("{idx:<4x} | jmpi [MALFORMED]"));
-                        }
-                    },
+                    OpCode::Jump => self.push_with_instruction_offset("jmp"),
+                    OpCode::JumpIf => self.push_with_instruction_offset("jmpi"),
 
                     // Terminal
-                    OpCode::Poll => inst.push(format!("{idx:<4x} | poll")),
-                    OpCode::Render => inst.push(format!("{idx:<4x} | render")),
+                    OpCode::Poll => self.push("poll"),
+                    OpCode::Render => self.push("render"),
                 },
-                Err(_) => inst.push(format!("{idx:<4x}| unknown [0x{:x}]", byte)),
+                Err(_) => self.inst.push(format!("{:<4x}| unknown [0x{:x}]", byte, self.idx)),
             }
         }
+
+        let mut string = format!("Chunk '{}'", self.chunk.name);
+
+        let literals = self.chunk.literals
+            .iter()
+            .enumerate()
+            .map(|(i, literal)| format!("0x{i:x} {literal}"))
+            .collect::<Vec<_>>();
 
         if !literals.is_empty() {
             string.push_str("\n== LITERALS ==\n");
             string.push_str(&literals.join("\n"));
         }
 
-        if !inst.is_empty() {
+        if !self.inst.is_empty() {
             string.push_str("\n== INSTRUCTIONS ==\n");
-            string.push_str(&inst.join("\n"));
+            string.push_str(&self.inst.join("\n"));
         }
 
-        f.write_str(&string)
+        string
+    }
+    
+    fn push(&mut self, name: &'static str) {
+        self.push_line(format!("{name}"));
+    }
+    
+    fn push_with_literal(&mut self, name: &'static str) {
+        if let Some(offset) = self.chunk.read_literal_offset(self.idx) {
+            if let Some(value) = self.chunk.get_literal(offset as usize) {
+                self.push_line(format!("{name} [0x{offset:x}] ({value})"));
+                self.idx += size_of::<LiteralOffset>();
+            } else {
+                self.push_line(format!("{name} [0x{offset:x}]"));
+            }
+        } else {
+            self.push_line(format!("{name} [MALFORMED]"));
+        }
+    }
+    
+    fn push_with_local_offset(&mut self, name: &'static str) {
+        if let Some(offset) = self.chunk.read_local_offset(self.idx) {
+            self.push_line(format!("{name} [0x{offset:x}]"));
+            self.idx += size_of::<LocalOffset>();
+        } else {
+            self.push_line(format!("{name} [MALFORMED]"));
+        }
+    }
+
+    fn push_with_instruction_offset(&mut self, name: &'static str) {
+        if let Some(offset) = self.chunk.read_instruction_offset(self.idx) {
+            self.push_line(format!("{name} [0x{offset:x}]"));
+            self.idx += size_of::<InstructionOffset>();
+        } else {
+            self.push_line(format!("{name} [MALFORMED]"));
+        }
+    }
+
+    fn push_line(&mut self, line: impl AsRef<str>) {
+        self.inst.push(format!("0x{:<6x} | {}", self.idx, line.as_ref()));
     }
 }
