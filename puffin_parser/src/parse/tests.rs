@@ -50,7 +50,11 @@ fn test_layout() {
                     text "hello, world!";
                     hbox {
                         button onclick=foo "click me!";
-                        // button onclick={exit(1)(2)(3);} "quit";
+                        button onclick=[foo, bar] "also me!";
+                        button onclick(ev)={foo()} "and me!";
+                        button onclick(ev)={foo(); bar()} "not me!";
+                        button onclick={foo(); bar()} "perhaps me...";
+                        button onclick={exit(1)(2)(3)} "quit";
                     }
                 }
             }

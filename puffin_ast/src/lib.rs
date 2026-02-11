@@ -137,24 +137,32 @@ pub struct Layout {
 }
 
 #[derive(Debug)]
-pub struct LayoutItemProp {
-    pub event_name: Token,
-    pub actions: Vec<Expression>,
+pub struct LambdaFunctionBinding {
+    pub parameters: Vec<Token>,
+    pub expressions: Vec<Expression>,
 }
 
-impl LayoutItemProp {
-    pub fn new(event_name: Token, actions: Vec<Expression>) -> Self {
-        Self {
-            event_name,
-            actions
-        }
-    }
+#[derive(Debug)]
+pub struct DirectBindings {
+    pub names: Vec<Token>,
+}
+
+#[derive(Debug)]
+pub struct Binding {
+    pub name: Token,
+    pub binding: LayoutItemProp,
+}
+
+#[derive(Debug)]
+pub enum LayoutItemProp {
+    DirectBindings(DirectBindings),
+    Lambda(LambdaFunctionBinding),
 }
 
 #[derive(Debug)]
 pub struct LayoutItem {
     pub name: Token,
-    pub props: Vec<LayoutItemProp>,
+    pub bindings: Vec<Binding>,
     pub string_literal: Option<Token>,
     pub declarations: Vec<Declaration>,
 }
