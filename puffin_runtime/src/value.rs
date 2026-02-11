@@ -252,6 +252,89 @@ impl Value {
             _ => Err(RuntimeError::InvalidBinaryOperation { op: "modulo".to_owned(), lhs_type: self.type_name().to_owned(), rhs_type: rhs.type_name().to_owned() }),
         }
     }
+    
+    pub fn is_equal(&self, rhs: &Self) -> bool {
+        match self {
+            Value::Int(lhs) => match rhs {
+                Value::Int(rhs) => *lhs == *rhs,
+                Value::Float(rhs) => *lhs as FloatType == *rhs,
+                _ => false,
+            },
+            Value::Float(lhs) => match rhs {
+                Value::Int(rhs) => *lhs == *rhs as FloatType,
+                Value::Float(rhs) => *lhs == *rhs,
+                _ => false,
+            },
+            
+            Value::Bool(lhs) => match rhs {
+                Value::Bool(rhs) => *lhs == *rhs,
+                
+                _ => false,
+            },
+            
+            Value::String(lhs) => match rhs {
+                Value::String(rhs) => *lhs == *rhs,
+                
+                _ => false,
+            },
+            
+            Value::Object(lhs) => match rhs {
+                Value::Object(rhs) => lhs.as_ptr() == rhs.as_ptr(),
+                
+                _ => false,
+            }
+        }
+    }
+    
+    pub fn not_equal(&self, rhs: &Self) -> bool {
+        !self.is_equal(rhs)
+    }
+    
+    pub fn greater(&self, rhs: &Self) -> bool {
+        match self {
+            Value::Int(lhs) => match rhs {
+                Value::Int(rhs) => *lhs > *rhs,
+                Value::Float(rhs) => *lhs as FloatType > *rhs,
+                
+                _ => false,
+            },
+            Value::Float(lhs) => match rhs {
+                Value::Int(rhs) => *lhs > *rhs as FloatType,
+                Value::Float(rhs) => *lhs > *rhs,
+
+                _ => false,
+            },
+            
+            _ => false,
+        }
+    }
+    
+    pub fn lesser(&self, rhs: &Self) -> bool {
+        match self {
+            Value::Int(lhs) => match rhs {
+                Value::Int(rhs) => *lhs < *rhs,
+                Value::Float(rhs) => (*lhs as FloatType) < *rhs,
+
+                _ => false,
+            },
+            Value::Float(lhs) => match rhs {
+                Value::Int(rhs) => *lhs < *rhs as FloatType,
+                Value::Float(rhs) => *lhs < *rhs,
+
+                _ => false,
+            },
+
+            _ => false,
+        }
+    }
+    
+    pub fn greater_equal(&self, rhs: &Self) -> bool {
+        self.greater(rhs) || self.is_equal(rhs)
+    }
+    
+    pub fn lesser_equal(&self, rhs: &Self) -> bool {
+        self.lesser(rhs) || self.is_equal(rhs)
+    }
 
     pub fn try_negate(&self) -> Result<Value, RuntimeError> {
         match self {
@@ -285,23 +368,23 @@ impl Value {
         }
     }
 
-    pub fn as_string(self) -> Result<StringType, RuntimeError> {
+    pub fn take_string(self) -> Result<StringType, RuntimeError> {
         TryInto::<StringType>::try_into(self)
     }
 
-    pub fn as_int(self) -> Result<IntType, RuntimeError> {
+    pub fn take_int(self) -> Result<IntType, RuntimeError> {
         TryInto::<IntType>::try_into(self)
     }
 
-    pub fn as_float(self) -> Result<FloatType, RuntimeError> {
+    pub fn take_float(self) -> Result<FloatType, RuntimeError> {
         TryInto::<FloatType>::try_into(self)
     }
 
-    pub fn as_bool(self) -> Result<BoolType, RuntimeError> {
+    pub fn take_bool(self) -> Result<BoolType, RuntimeError> {
         TryInto::<BoolType>::try_into(self)
     }
 
-    pub fn as_object(self) -> Result<ObjectType, RuntimeError> {
+    pub fn take_object(self) -> Result<ObjectType, RuntimeError> {
         TryInto::<ObjectType>::try_into(self)
     }
 }
@@ -327,7 +410,7 @@ impl Object {
 
 impl Display for Object {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("[object Object]")
+        f.write_str("Object")
     }
 }
 

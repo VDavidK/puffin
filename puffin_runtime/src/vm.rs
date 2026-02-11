@@ -4,7 +4,7 @@ use num_enum::TryFromPrimitive;
 use ratatui::DefaultTerminal;
 
 use crate::{RuntimeError, Value, chunk::Chunk, op::OpCode, value::new_object};
-
+use crate::chunk::{InstructionOffset, LiteralOffset, LocalOffset};
 
 #[derive(Debug)]
 pub struct Vm<'a> {
@@ -35,7 +35,20 @@ impl<'a> Vm<'a> {
     }
 
     pub fn execute(&mut self) -> Result<(), RuntimeError> {
-        match self.fetch_op()? {
+        let op = self.fetch_op()?;
+        
+        #[cfg(feature = "debug_tracing")]
+        {
+            let mut values = self.stack.iter().map(|v| v.to_string()).collect::<Vec<_>>().join("] [");
+            if !values.is_empty() {
+                values = format!("[{values}]");
+            }
+            
+            log::debug!("| {values}");
+            log::debug!("Executing: {op:?}");
+        }
+        
+        match op {
             OpCode::Invalid => return Err(RuntimeError::InvalidOpCode { pc: self.pc }),
 
             OpCode::Literal => {
@@ -66,7 +79,7 @@ impl<'a> Vm<'a> {
             OpCode::GetGlobal => {
                 let literal = self.fetch_literal()?
                     .to_owned()
-                    .as_string()?;
+                    .take_string()?;
 
                 let global = self.globals.get(&literal).ok_or(RuntimeError::GlobalNotFound { name: literal })?;
                 self.push_value(global.clone());
@@ -75,7 +88,7 @@ impl<'a> Vm<'a> {
             OpCode::SetGlobal => {
                 let literal = self.fetch_literal()?
                     .to_owned()
-                    .as_string()?;
+                    .take_string()?;
 
                 let top = self.pop_expecting()?;
 
@@ -91,32 +104,26 @@ impl<'a> Vm<'a> {
             }
 
             OpCode::GetField => {
-                let literal = self.fetch_literal()?
-                    .to_owned()
-                    .as_string()?;
-
-                let obj = self.pop_expecting()?
-                    .as_object()?;
-
+                let name = self.pop_expecting()?.take_string()?;
+                
+                let obj_offset = self.fetch_local_offset()?;
+                let obj = self.get_local(obj_offset)?.clone().take_object()?;
                 let obj = obj.borrow();
 
-                let field = obj.get_field(&literal)
-                    .ok_or(RuntimeError::NoFieldMatchingName { name: literal })?;
+                let field = obj.get_field(&name)
+                    .ok_or(RuntimeError::NoFieldMatchingName { name: name })?;
 
                 self.push_value(field.to_owned());
             },
 
             OpCode::SetField => {
-                let literal = self.fetch_literal()?
-                    .to_owned()
-                    .as_string()?;
-
                 let value = self.pop_expecting()?;
+                let name = self.pop_expecting()?;
 
-                let obj = self.pop_expecting()?
-                    .as_object()?;
+                let obj_offset = self.fetch_local_offset()?;
+                let obj = self.get_local(obj_offset)?.clone().take_object()?;
 
-                obj.borrow_mut().set_field(literal, value.to_owned());
+                obj.borrow_mut().set_field(name.take_string()?, value.to_owned());
             },
 
             OpCode::Add => {
@@ -159,19 +166,64 @@ impl<'a> Vm<'a> {
 
                 self.push_value(rhs.not());
             },
+            
+            OpCode::Eq => {
+                let rhs = self.pop_expecting()?;
+                let lhs = self.pop_expecting()?;
+                
+                self.push_value(lhs.is_equal(&rhs));
+            },
+            OpCode::Neq => {
+                let rhs = self.pop_expecting()?;
+                let lhs = self.pop_expecting()?;
+
+                self.push_value(lhs.not_equal(&rhs));
+            },
+            
+            OpCode::Lt => {
+                let rhs = self.pop_expecting()?;
+                let lhs = self.pop_expecting()?;
+
+                self.push_value(lhs.lesser(&rhs));
+            },
+            OpCode::Le => {
+                let rhs = self.pop_expecting()?;
+                let lhs = self.pop_expecting()?;
+
+                self.push_value(lhs.lesser_equal(&rhs));
+            },
+            
+            OpCode::Gt => {
+                let rhs = self.pop_expecting()?;
+                let lhs = self.pop_expecting()?;
+
+                self.push_value(lhs.greater(&rhs));
+            },
+            OpCode::Ge => {
+                let rhs = self.pop_expecting()?;
+                let lhs = self.pop_expecting()?;
+
+                self.push_value(lhs.greater_equal(&rhs));
+            },
 
             OpCode::Jump => {
-                let addr = self.fetch_u64()?;
+                let addr = self.fetch_instruction_offset()?;
 
                 self.pc = addr as usize;
             },
 
             OpCode::JumpIf => {
-                let addr = self.fetch_u64()?;
+                let addr = self.fetch_instruction_offset()?;
                 let val = self.pop_expecting()?;
 
                 if val.truthy() {
+                    #[cfg(feature = "debug_tracing")]
+                    log::debug!("Value '{}' truthy, jumping from 0x{:x} -> 0x{:x}", val, self.pc, addr);
                     self.pc = addr as usize;
+                }
+                else {
+                    #[cfg(feature = "debug_tracing")]
+                    log::debug!("Skipping jump at 0x{:x}", self.pc);
                 }
             },
 
@@ -224,12 +276,37 @@ impl<'a> Vm<'a> {
         self.pc += 8;
         Ok(val)
     }
+    
+    pub fn fetch_literal_offset(&mut self) -> Result<LiteralOffset, RuntimeError> {
+        let val =  self.chunk.read_literal_offset(self.pc).ok_or(RuntimeError::AccessOutOfBounds { at: self.pc, pc: self.pc })?;
+        self.pc += size_of::<LiteralOffset>();
+        Ok(val)
+    }
+
+    pub fn fetch_local_offset(&mut self) -> Result<LocalOffset, RuntimeError> {
+        let val =  self.chunk.read_local_offset(self.pc).ok_or(RuntimeError::AccessOutOfBounds { at: self.pc, pc: self.pc })?;
+        self.pc += size_of::<LocalOffset>();
+        Ok(val)
+    }
+    
+    pub fn fetch_instruction_offset(&mut self) -> Result<InstructionOffset, RuntimeError> {
+        let val =  self.chunk.read_instruction_offset(self.pc).ok_or(RuntimeError::AccessOutOfBounds { at: self.pc, pc: self.pc })?;
+        self.pc += size_of::<InstructionOffset>();
+        Ok(val)
+    }
 
     pub fn fetch_literal(&mut self) -> Result<&Value, RuntimeError> {
-        let offset = self.fetch_u32()? as usize;
+        let offset = self.fetch_literal_offset()? as usize;
         let value = self.chunk.get_literal(offset)
             .ok_or(RuntimeError::InvalidLiteralAccess { at: offset, pc: self.pc })?;
 
+        Ok(value)
+    }
+    
+    pub fn get_local(&self, offset: LocalOffset) -> Result<&Value, RuntimeError> {
+        let value = self.stack.get(offset as usize)
+            .ok_or(RuntimeError::StackOutOfBounds { at: offset as usize, pc: self.pc })?;
+        
         Ok(value)
     }
 

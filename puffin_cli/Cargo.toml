@@ -6,6 +6,10 @@ edition = "2024"
 [lints]
 workspace = true
 
+[features]
+default = ["logging"]
+logging = ["dep:simplelog", "dep:log"]
+
 [dependencies]
 puffin_runtime = { path = "../puffin_runtime" }
 puffin_parser = { path = "../puffin_parser" }
@@ -13,3 +17,6 @@ puffin_compiler = { path = "../puffin_compiler" }
 ciborium = "0.2.2"
 clap = { version = "4.5.56", features = ["derive"] }
 color-eyre = "0.6.5"
+
+simplelog = { version = "0.12.2", optional = true }
+log = { version = "0.4.29", optional = true }

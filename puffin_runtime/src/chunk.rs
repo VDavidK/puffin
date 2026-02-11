@@ -12,6 +12,10 @@ pub struct Chunk {
     literals: Vec<Value>,
 }
 
+pub type LiteralOffset = u32;
+pub type LocalOffset = u32;
+pub type InstructionOffset = u32;
+
 impl Chunk {
     pub fn new(name: impl AsRef<str>) -> Self {
         Self {
@@ -29,10 +33,10 @@ impl Chunk {
         self.bytes.push(op.into())
     }
 
-    pub fn push_literal(&mut self, literal: impl Into<Value>) -> usize {
-        let offset = self.new_literal(literal.into());
+    pub fn push_literal(&mut self, literal: impl Into<Value>) -> LiteralOffset {
+        let offset = self.new_literal(literal.into()) as LiteralOffset;
         self.push_op(OpCode::Literal);
-        self.push_u32(offset as u32);
+        self.push_literal_offset(offset);
         offset
     }
 
@@ -51,6 +55,37 @@ impl Chunk {
     pub fn push_u64(&mut self, val: u64) {
         self.bytes.extend_from_slice(&val.to_le_bytes());
     }
+    
+    pub fn push_literal_offset(&mut self, val: LiteralOffset) {
+        self.bytes.extend_from_slice(&val.to_le_bytes());
+    }
+    
+    pub fn push_local_offset(&mut self, val: LocalOffset) {
+        self.bytes.extend_from_slice(&val.to_le_bytes());
+    }
+    
+    pub fn push_instruction_offset(&mut self, val: InstructionOffset) {
+        self.bytes.extend_from_slice(&val.to_le_bytes());
+    }
+    
+    pub fn push_jump(&mut self, op: OpCode) -> InstructionOffset {
+        self.push_op(op);
+        self.push_instruction_offset(0xFFFFFFFF);
+        self.addr() - 4
+    }
+    
+    pub fn push_jump_im(&mut self, op: OpCode, to: InstructionOffset) -> InstructionOffset {
+        self.push_op(op);
+        self.push_instruction_offset(to);
+        self.addr() - 4
+    }
+    
+    pub fn patch_jump(&mut self, jump: InstructionOffset, offset: InstructionOffset) {
+        let bytes = offset.to_le_bytes();
+        for (i, byte) in bytes.iter().enumerate() {
+            self.bytes[i + jump as usize] = *byte;
+        }
+    }
 
     pub fn read_u8(&self, idx: usize) -> Option<u8> {
         self.bytes.get(idx).copied()
@@ -67,15 +102,27 @@ impl Chunk {
     pub fn read_u64(&self, idx: usize) -> Option<u64> {
         Some(u64::from_le_bytes(<[u8;8]>::try_from(&self.bytes[idx..idx+8]).ok()?))
     }
-
-    pub fn addr(&self) -> usize {
-        self.bytes.len() - 1
+    
+    pub fn read_literal_offset(&self, idx: usize) -> Option<LiteralOffset> {
+        Some(LiteralOffset::from_le_bytes(<[u8;size_of::<LiteralOffset>()]>::try_from(&self.bytes[idx..idx+size_of::<LiteralOffset>()]).ok()?))
+    }
+    
+    pub fn read_local_offset(&self, idx: usize) -> Option<LocalOffset> {
+        Some(LocalOffset::from_le_bytes(<[u8;size_of::<LocalOffset>()]>::try_from(&self.bytes[idx..idx+size_of::<LocalOffset>()]).ok()?))
+    }
+    
+    pub fn read_instruction_offset(&self, idx: usize) -> Option<InstructionOffset> {
+        Some(InstructionOffset::from_le_bytes(<[u8;size_of::<InstructionOffset>()]>::try_from(&self.bytes[idx..idx+size_of::<InstructionOffset>()]).ok()?))
     }
 
-    pub fn new_literal(&mut self, literal: impl Into<Value>) -> usize {
+    pub fn addr(&self) -> InstructionOffset {
+        self.bytes.len() as InstructionOffset
+    }
+
+    pub fn new_literal(&mut self, literal: impl Into<Value>) -> LiteralOffset {
         let offset = self.literals.len();
         self.literals.push(literal.into());
-        offset
+        offset as LiteralOffset
     }
 
     pub fn get_literal(&self, offset: usize) -> Option<&Value> {
@@ -105,10 +152,10 @@ impl Display for Chunk {
 
                     // Stack
                     OpCode::Literal => {
-                        if let Some(offset) = self.read_u32(idx) {
+                        if let Some(offset) = self.read_literal_offset(idx) {
                             if let Some(value) = self.get_literal(offset as usize) {
                                 inst.push(format!("{idx:<4x} | literal [0x{offset:x}] ({value})"));
-                                idx += 8;
+                                idx += size_of::<LiteralOffset>();
                             } else {
                                 inst.push(format!("{idx:<4x} | literal [0x{offset:x}] (UNKNOWN)"));
                             }
@@ -118,28 +165,28 @@ impl Display for Chunk {
                     },
 
                     OpCode::GetLocal => {
-                        if let Some(offset) = self.read_u32(idx) {
+                        if let Some(offset) = self.read_local_offset(idx) {
                             inst.push(format!("{idx:<4x} | getl [0x{offset:x}]"));
-                            idx += 8;
+                            idx += size_of::<LocalOffset>();
                         } else {
                             inst.push(format!("{idx:<4x} | getl [MALFORMED]"));
                         }
                     },
 
                     OpCode::SetLocal => {
-                        if let Some(offset) = self.read_u32(idx) {
+                        if let Some(offset) = self.read_local_offset(idx) {
                             inst.push(format!("{idx:<4x} | setl [0x{offset:x}]"));
-                            idx += 8;
+                            idx += size_of::<LocalOffset>();
                         } else {
                             inst.push(format!("{idx:<4x} | setl [MALFORMED]"));
                         }
                     },
 
                     OpCode::GetGlobal => {
-                        if let Some(offset) = self.read_u32(idx) {
+                        if let Some(offset) = self.read_literal_offset(idx) {
                             if let Some(value) = self.get_literal(offset as usize) {
                                 inst.push(format!("{idx:<4x} | getg [0x{offset:x}] ({value})"));
-                                idx += 8;
+                                idx += size_of::<LiteralOffset>();
                             } else {
                                 inst.push(format!("{idx:<4x} | getg [0x{offset:x}] (UNKNOWN)"));
                             }
@@ -149,10 +196,10 @@ impl Display for Chunk {
                     },
 
                     OpCode::SetGlobal => {
-                        if let Some(offset) = self.read_u32(idx) {
+                        if let Some(offset) = self.read_literal_offset(idx) {
                             if let Some(value) = self.get_literal(offset as usize) {
                                 inst.push(format!("{idx:<4x} | setg [0x{offset:x}] ({value})"));
-                                idx += 8;
+                                idx += size_of::<LiteralOffset>();
                             } else {
                                 inst.push(format!("{idx:<4x} | setg [0x{offset:x}] (UNKNOWN)"));
                             }
@@ -168,26 +215,18 @@ impl Display for Chunk {
                     OpCode::NewObject => inst.push(format!("{idx:<4x} | newobj")),
 
                     OpCode::GetField => {
-                        if let Some(offset) = self.read_u32(idx) {
-                            if let Some(value) = self.get_literal(offset as usize) {
-                                inst.push(format!("{idx:<4x} | getf [0x{offset:x}] ({value})"));
-                                idx += 8;
-                            } else {
-                                inst.push(format!("{idx:<4x} | getf [0x{offset:x}] (UNKNOWN)"));
-                            }
+                        if let Some(offset) = self.read_local_offset(idx) {
+                            inst.push(format!("{idx:<4x} | getf (s:0x{offset:x})"));
+                            idx += size_of::<LocalOffset>();
                         } else {
                             inst.push(format!("{idx:<4x} | getf [MALFORMED]"));
                         }
                     },
 
                     OpCode::SetField => {
-                        if let Some(offset) = self.read_u32(idx) {
-                            if let Some(value) = self.get_literal(offset as usize) {
-                                inst.push(format!("{idx:<4x} | setf [0x{offset:x}] ({value})"));
-                                idx += 8;
-                            } else {
-                                inst.push(format!("{idx:<4x} | setf [0x{offset:x}] (UNKNOWN)"));
-                            }
+                        if let Some(offset) = self.read_local_offset(idx) {
+                            inst.push(format!("{idx:<4x} | setf [s:0x{offset:x}]"));
+                            idx += size_of::<LocalOffset>();
                         } else {
                             inst.push(format!("{idx:<4x} | setf [MALFORMED]"));
                         }
@@ -201,20 +240,26 @@ impl Display for Chunk {
                     OpCode::Mod => inst.push(format!("{idx:<4x} | mod")),
                     OpCode::Neg => inst.push(format!("{idx:<4x} | neg")),
                     OpCode::Not => inst.push(format!("{idx:<4x} | not")),
+                    OpCode::Eq => inst.push(format!("{idx:<4x} | eq")),
+                    OpCode::Neq => inst.push(format!("{idx:<4x} | neq")),
+                    OpCode::Lt => inst.push(format!("{idx:<4x} | lt")),
+                    OpCode::Le => inst.push(format!("{idx:<4x} | le")),
+                    OpCode::Gt => inst.push(format!("{idx:<4x} | gt")),
+                    OpCode::Ge => inst.push(format!("{idx:<4x} | ge")),
 
                     // Branching
                     OpCode::Jump => {
-                        if let Some(addr) = self.read_u64(idx) {
+                        if let Some(addr) = self.read_instruction_offset(idx) {
                             inst.push(format!("{idx:<4x} | jmp [0x{addr:x}]"));
-                            idx += 8;
+                            idx += size_of::<InstructionOffset>();
                         } else {
                             inst.push(format!("{idx:<4x} | jmp [MALFORMED]"));
                         }
                     },
                     OpCode::JumpIf => {
-                        if let Some(addr) = self.read_u64(idx) {
+                        if let Some(addr) = self.read_instruction_offset(idx) {
                             inst.push(format!("{idx:<4x} | jmpi [0x{addr:x}]"));
-                            idx += 8;
+                            idx += size_of::<InstructionOffset>();
                         } else {
                             inst.push(format!("{idx:<4x} | jmpi [MALFORMED]"));
                         }

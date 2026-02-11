@@ -55,10 +55,15 @@ pub enum RuntimeError {
 
 pub fn run(program: &Chunk) -> Result<(), RuntimeError> {
     let mut vm = Vm::new(program);
+    
+    #[cfg(feature = "debug_tracing")]
+    log::debug!("Starting execution");
 
     while vm.is_running() {
         vm.execute()?;
     }
+    
+    log::debug!("Execution finished without errors");
 
     Ok(())
 }

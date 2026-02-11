@@ -1,0 +1,286 @@
+18:01:15 [INFO] -- Running chunk --
+Chunk 'Test Program 2'
+== LITERALS ==
+0x0 0
+0x1 10
+0x2 1
+== INSTRUCTIONS ==
+1    | poll
+2    | literal [0x0] (0)
+7    | getl [0x0]
+c    | literal [0x1] (10)
+11   | ge
+12   | jmpi [0x32]
+17   | getl [0x0]
+1c   | render
+1d   | poll
+1e   | getl [0x0]
+23   | literal [0x2] (1)
+28   | add
+29   | setl [0x0]
+2e   | jmp [0x6]
+18:01:15 [DEBUG] (1) puffin_runtime: Starting execution
+18:01:15 [DEBUG] (1) puffin_runtime::vm: | 
+18:01:15 [DEBUG] (1) puffin_runtime::vm: Executing: Poll
+18:01:15 [DEBUG] (1) puffin_runtime::vm: | 
+18:01:15 [DEBUG] (1) puffin_runtime::vm: Executing: Literal
+18:01:15 [DEBUG] (1) puffin_runtime::vm: | [0]
+18:01:15 [DEBUG] (1) puffin_runtime::vm: Executing: GetLocal
+18:01:15 [DEBUG] (1) puffin_runtime::vm: | [0] [0]
+18:01:15 [DEBUG] (1) puffin_runtime::vm: Executing: Literal
+18:01:15 [DEBUG] (1) puffin_runtime::vm: | [0] [0] [10]
+18:01:15 [DEBUG] (1) puffin_runtime::vm: Executing: Ge
+18:01:15 [DEBUG] (1) puffin_runtime::vm: | [0] [false]
+18:01:15 [DEBUG] (1) puffin_runtime::vm: Executing: JumpIf
+18:01:15 [DEBUG] (1) puffin_runtime::vm: Skipping jump at 0x16
+18:01:15 [DEBUG] (1) puffin_runtime::vm: | [0]
+18:01:15 [DEBUG] (1) puffin_runtime::vm: Executing: GetLocal
+18:01:15 [DEBUG] (1) puffin_runtime::vm: | [0] [0]
+18:01:15 [DEBUG] (1) puffin_runtime::vm: Executing: Render
+18:01:15 [DEBUG] (1) puffin_runtime::vm: | [0]
+18:01:15 [DEBUG] (1) puffin_runtime::vm: Executing: Poll
+18:01:18 [DEBUG] (1) puffin_runtime::vm: | [0]
+18:01:18 [DEBUG] (1) puffin_runtime::vm: Executing: GetLocal
+18:01:18 [DEBUG] (1) puffin_runtime::vm: | [0] [0]
+18:01:18 [DEBUG] (1) puffin_runtime::vm: Executing: Literal
+18:01:18 [DEBUG] (1) puffin_runtime::vm: | [0] [0] [1]
+18:01:18 [DEBUG] (1) puffin_runtime::vm: Executing: Add
+18:01:18 [DEBUG] (1) puffin_runtime::vm: | [0] [1]
+18:01:18 [DEBUG] (1) puffin_runtime::vm: Executing: SetLocal
+18:01:18 [DEBUG] (1) puffin_runtime::vm: | [1]
+18:01:18 [DEBUG] (1) puffin_runtime::vm: Executing: Jump
+18:01:18 [DEBUG] (1) puffin_runtime::vm: | [1]
+18:01:18 [DEBUG] (1) puffin_runtime::vm: Executing: GetLocal
+18:01:18 [DEBUG] (1) puffin_runtime::vm: | [1] [1]
+18:01:18 [DEBUG] (1) puffin_runtime::vm: Executing: Literal
+18:01:18 [DEBUG] (1) puffin_runtime::vm: | [1] [1] [10]
+18:01:18 [DEBUG] (1) puffin_runtime::vm: Executing: Ge
+18:01:18 [DEBUG] (1) puffin_runtime::vm: | [1] [false]
+18:01:18 [DEBUG] (1) puffin_runtime::vm: Executing: JumpIf
+18:01:18 [DEBUG] (1) puffin_runtime::vm: Skipping jump at 0x16
+18:01:18 [DEBUG] (1) puffin_runtime::vm: | [1]
+18:01:18 [DEBUG] (1) puffin_runtime::vm: Executing: GetLocal
+18:01:18 [DEBUG] (1) puffin_runtime::vm: | [1] [1]
+18:01:18 [DEBUG] (1) puffin_runtime::vm: Executing: Render
+18:01:18 [DEBUG] (1) puffin_runtime::vm: | [1]
+18:01:18 [DEBUG] (1) puffin_runtime::vm: Executing: Poll
+18:01:19 [DEBUG] (1) puffin_runtime::vm: | [1]
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Executing: GetLocal
+18:01:19 [DEBUG] (1) puffin_runtime::vm: | [1] [1]
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Executing: Literal
+18:01:19 [DEBUG] (1) puffin_runtime::vm: | [1] [1] [1]
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Executing: Add
+18:01:19 [DEBUG] (1) puffin_runtime::vm: | [1] [2]
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Executing: SetLocal
+18:01:19 [DEBUG] (1) puffin_runtime::vm: | [2]
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Executing: Jump
+18:01:19 [DEBUG] (1) puffin_runtime::vm: | [2]
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Executing: GetLocal
+18:01:19 [DEBUG] (1) puffin_runtime::vm: | [2] [2]
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Executing: Literal
+18:01:19 [DEBUG] (1) puffin_runtime::vm: | [2] [2] [10]
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Executing: Ge
+18:01:19 [DEBUG] (1) puffin_runtime::vm: | [2] [false]
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Executing: JumpIf
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Skipping jump at 0x16
+18:01:19 [DEBUG] (1) puffin_runtime::vm: | [2]
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Executing: GetLocal
+18:01:19 [DEBUG] (1) puffin_runtime::vm: | [2] [2]
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Executing: Render
+18:01:19 [DEBUG] (1) puffin_runtime::vm: | [2]
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Executing: Poll
+18:01:19 [DEBUG] (1) puffin_runtime::vm: | [2]
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Executing: GetLocal
+18:01:19 [DEBUG] (1) puffin_runtime::vm: | [2] [2]
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Executing: Literal
+18:01:19 [DEBUG] (1) puffin_runtime::vm: | [2] [2] [1]
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Executing: Add
+18:01:19 [DEBUG] (1) puffin_runtime::vm: | [2] [3]
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Executing: SetLocal
+18:01:19 [DEBUG] (1) puffin_runtime::vm: | [3]
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Executing: Jump
+18:01:19 [DEBUG] (1) puffin_runtime::vm: | [3]
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Executing: GetLocal
+18:01:19 [DEBUG] (1) puffin_runtime::vm: | [3] [3]
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Executing: Literal
+18:01:19 [DEBUG] (1) puffin_runtime::vm: | [3] [3] [10]
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Executing: Ge
+18:01:19 [DEBUG] (1) puffin_runtime::vm: | [3] [false]
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Executing: JumpIf
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Skipping jump at 0x16
+18:01:19 [DEBUG] (1) puffin_runtime::vm: | [3]
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Executing: GetLocal
+18:01:19 [DEBUG] (1) puffin_runtime::vm: | [3] [3]
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Executing: Render
+18:01:19 [DEBUG] (1) puffin_runtime::vm: | [3]
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Executing: Poll
+18:01:19 [DEBUG] (1) puffin_runtime::vm: | [3]
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Executing: GetLocal
+18:01:19 [DEBUG] (1) puffin_runtime::vm: | [3] [3]
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Executing: Literal
+18:01:19 [DEBUG] (1) puffin_runtime::vm: | [3] [3] [1]
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Executing: Add
+18:01:19 [DEBUG] (1) puffin_runtime::vm: | [3] [4]
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Executing: SetLocal
+18:01:19 [DEBUG] (1) puffin_runtime::vm: | [4]
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Executing: Jump
+18:01:19 [DEBUG] (1) puffin_runtime::vm: | [4]
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Executing: GetLocal
+18:01:19 [DEBUG] (1) puffin_runtime::vm: | [4] [4]
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Executing: Literal
+18:01:19 [DEBUG] (1) puffin_runtime::vm: | [4] [4] [10]
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Executing: Ge
+18:01:19 [DEBUG] (1) puffin_runtime::vm: | [4] [false]
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Executing: JumpIf
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Skipping jump at 0x16
+18:01:19 [DEBUG] (1) puffin_runtime::vm: | [4]
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Executing: GetLocal
+18:01:19 [DEBUG] (1) puffin_runtime::vm: | [4] [4]
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Executing: Render
+18:01:19 [DEBUG] (1) puffin_runtime::vm: | [4]
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Executing: Poll
+18:01:19 [DEBUG] (1) puffin_runtime::vm: | [4]
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Executing: GetLocal
+18:01:19 [DEBUG] (1) puffin_runtime::vm: | [4] [4]
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Executing: Literal
+18:01:19 [DEBUG] (1) puffin_runtime::vm: | [4] [4] [1]
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Executing: Add
+18:01:19 [DEBUG] (1) puffin_runtime::vm: | [4] [5]
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Executing: SetLocal
+18:01:19 [DEBUG] (1) puffin_runtime::vm: | [5]
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Executing: Jump
+18:01:19 [DEBUG] (1) puffin_runtime::vm: | [5]
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Executing: GetLocal
+18:01:19 [DEBUG] (1) puffin_runtime::vm: | [5] [5]
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Executing: Literal
+18:01:19 [DEBUG] (1) puffin_runtime::vm: | [5] [5] [10]
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Executing: Ge
+18:01:19 [DEBUG] (1) puffin_runtime::vm: | [5] [false]
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Executing: JumpIf
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Skipping jump at 0x16
+18:01:19 [DEBUG] (1) puffin_runtime::vm: | [5]
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Executing: GetLocal
+18:01:19 [DEBUG] (1) puffin_runtime::vm: | [5] [5]
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Executing: Render
+18:01:19 [DEBUG] (1) puffin_runtime::vm: | [5]
+18:01:19 [DEBUG] (1) puffin_runtime::vm: Executing: Poll
+18:01:20 [DEBUG] (1) puffin_runtime::vm: | [5]
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Executing: GetLocal
+18:01:20 [DEBUG] (1) puffin_runtime::vm: | [5] [5]
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Executing: Literal
+18:01:20 [DEBUG] (1) puffin_runtime::vm: | [5] [5] [1]
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Executing: Add
+18:01:20 [DEBUG] (1) puffin_runtime::vm: | [5] [6]
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Executing: SetLocal
+18:01:20 [DEBUG] (1) puffin_runtime::vm: | [6]
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Executing: Jump
+18:01:20 [DEBUG] (1) puffin_runtime::vm: | [6]
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Executing: GetLocal
+18:01:20 [DEBUG] (1) puffin_runtime::vm: | [6] [6]
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Executing: Literal
+18:01:20 [DEBUG] (1) puffin_runtime::vm: | [6] [6] [10]
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Executing: Ge
+18:01:20 [DEBUG] (1) puffin_runtime::vm: | [6] [false]
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Executing: JumpIf
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Skipping jump at 0x16
+18:01:20 [DEBUG] (1) puffin_runtime::vm: | [6]
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Executing: GetLocal
+18:01:20 [DEBUG] (1) puffin_runtime::vm: | [6] [6]
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Executing: Render
+18:01:20 [DEBUG] (1) puffin_runtime::vm: | [6]
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Executing: Poll
+18:01:20 [DEBUG] (1) puffin_runtime::vm: | [6]
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Executing: GetLocal
+18:01:20 [DEBUG] (1) puffin_runtime::vm: | [6] [6]
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Executing: Literal
+18:01:20 [DEBUG] (1) puffin_runtime::vm: | [6] [6] [1]
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Executing: Add
+18:01:20 [DEBUG] (1) puffin_runtime::vm: | [6] [7]
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Executing: SetLocal
+18:01:20 [DEBUG] (1) puffin_runtime::vm: | [7]
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Executing: Jump
+18:01:20 [DEBUG] (1) puffin_runtime::vm: | [7]
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Executing: GetLocal
+18:01:20 [DEBUG] (1) puffin_runtime::vm: | [7] [7]
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Executing: Literal
+18:01:20 [DEBUG] (1) puffin_runtime::vm: | [7] [7] [10]
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Executing: Ge
+18:01:20 [DEBUG] (1) puffin_runtime::vm: | [7] [false]
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Executing: JumpIf
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Skipping jump at 0x16
+18:01:20 [DEBUG] (1) puffin_runtime::vm: | [7]
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Executing: GetLocal
+18:01:20 [DEBUG] (1) puffin_runtime::vm: | [7] [7]
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Executing: Render
+18:01:20 [DEBUG] (1) puffin_runtime::vm: | [7]
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Executing: Poll
+18:01:20 [DEBUG] (1) puffin_runtime::vm: | [7]
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Executing: GetLocal
+18:01:20 [DEBUG] (1) puffin_runtime::vm: | [7] [7]
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Executing: Literal
+18:01:20 [DEBUG] (1) puffin_runtime::vm: | [7] [7] [1]
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Executing: Add
+18:01:20 [DEBUG] (1) puffin_runtime::vm: | [7] [8]
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Executing: SetLocal
+18:01:20 [DEBUG] (1) puffin_runtime::vm: | [8]
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Executing: Jump
+18:01:20 [DEBUG] (1) puffin_runtime::vm: | [8]
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Executing: GetLocal
+18:01:20 [DEBUG] (1) puffin_runtime::vm: | [8] [8]
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Executing: Literal
+18:01:20 [DEBUG] (1) puffin_runtime::vm: | [8] [8] [10]
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Executing: Ge
+18:01:20 [DEBUG] (1) puffin_runtime::vm: | [8] [false]
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Executing: JumpIf
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Skipping jump at 0x16
+18:01:20 [DEBUG] (1) puffin_runtime::vm: | [8]
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Executing: GetLocal
+18:01:20 [DEBUG] (1) puffin_runtime::vm: | [8] [8]
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Executing: Render
+18:01:20 [DEBUG] (1) puffin_runtime::vm: | [8]
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Executing: Poll
+18:01:20 [DEBUG] (1) puffin_runtime::vm: | [8]
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Executing: GetLocal
+18:01:20 [DEBUG] (1) puffin_runtime::vm: | [8] [8]
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Executing: Literal
+18:01:20 [DEBUG] (1) puffin_runtime::vm: | [8] [8] [1]
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Executing: Add
+18:01:20 [DEBUG] (1) puffin_runtime::vm: | [8] [9]
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Executing: SetLocal
+18:01:20 [DEBUG] (1) puffin_runtime::vm: | [9]
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Executing: Jump
+18:01:20 [DEBUG] (1) puffin_runtime::vm: | [9]
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Executing: GetLocal
+18:01:20 [DEBUG] (1) puffin_runtime::vm: | [9] [9]
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Executing: Literal
+18:01:20 [DEBUG] (1) puffin_runtime::vm: | [9] [9] [10]
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Executing: Ge
+18:01:20 [DEBUG] (1) puffin_runtime::vm: | [9] [false]
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Executing: JumpIf
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Skipping jump at 0x16
+18:01:20 [DEBUG] (1) puffin_runtime::vm: | [9]
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Executing: GetLocal
+18:01:20 [DEBUG] (1) puffin_runtime::vm: | [9] [9]
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Executing: Render
+18:01:20 [DEBUG] (1) puffin_runtime::vm: | [9]
+18:01:20 [DEBUG] (1) puffin_runtime::vm: Executing: Poll
+18:01:21 [DEBUG] (1) puffin_runtime::vm: | [9]
+18:01:21 [DEBUG] (1) puffin_runtime::vm: Executing: GetLocal
+18:01:21 [DEBUG] (1) puffin_runtime::vm: | [9] [9]
+18:01:21 [DEBUG] (1) puffin_runtime::vm: Executing: Literal
+18:01:21 [DEBUG] (1) puffin_runtime::vm: | [9] [9] [1]
+18:01:21 [DEBUG] (1) puffin_runtime::vm: Executing: Add
+18:01:21 [DEBUG] (1) puffin_runtime::vm: | [9] [10]
+18:01:21 [DEBUG] (1) puffin_runtime::vm: Executing: SetLocal
+18:01:21 [DEBUG] (1) puffin_runtime::vm: | [10]
+18:01:21 [DEBUG] (1) puffin_runtime::vm: Executing: Jump
+18:01:21 [DEBUG] (1) puffin_runtime::vm: | [10]
+18:01:21 [DEBUG] (1) puffin_runtime::vm: Executing: GetLocal
+18:01:21 [DEBUG] (1) puffin_runtime::vm: | [10] [10]
+18:01:21 [DEBUG] (1) puffin_runtime::vm: Executing: Literal
+18:01:21 [DEBUG] (1) puffin_runtime::vm: | [10] [10] [10]
+18:01:21 [DEBUG] (1) puffin_runtime::vm: Executing: Ge
+18:01:21 [DEBUG] (1) puffin_runtime::vm: | [10] [true]
+18:01:21 [DEBUG] (1) puffin_runtime::vm: Executing: JumpIf
+18:01:21 [DEBUG] (1) puffin_runtime::vm: Value 'true' truthy, jumping from 0x16 -> 0x32
+18:01:21 [DEBUG] (1) puffin_runtime: Execution finished without errors

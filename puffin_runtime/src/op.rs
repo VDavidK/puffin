@@ -43,12 +43,12 @@ pub enum OpCode {
     // Pushes a new object to the top of the stack
     NewObject,
 
-    // : setf
-    // Sets the field of the object one below the top of the stack with the name matching the literal given to the value at the top of the stack
+    // : setf [offset:4B]
+    // Takes the top value from the stack and a string name below that and sets the field with that name on the object pointed to at the provided offset to that value
     SetField,
 
-    // : getf
-    // Pushes the value of the field of the object on the top of the stack with the name matching the literal given
+    // : getf [offset:4B]
+    // Pushes the value of the field of the object at the provided offset on the stack onto the top of the stack with the name matching the literal given
     GetField,
 
     // ----------------------------
@@ -82,6 +82,30 @@ pub enum OpCode {
     // : not
     // Pops the top value off the stack and pushes the negated truthy value
     Not,
+    
+    // : eq
+    // Pops the top two values off and pushes true if they're equal and false if they're not.
+    Eq,
+    
+    // : neq
+    // Pops the top two values off and pushes true if they're not equal and false if they're not.
+    Neq,
+
+    // : ge
+    // Pops the top two values off and pushes true if second is greater than or equal to the first and false if they're not.
+    Ge,
+    
+    // : le
+    // Pops the top two values off and pushes true if second is less than or equal to the first and false if they're not.
+    Le,
+    
+    // : gt
+    // Pops the top two values off and pushes true if second is greater than to the first and false if they're not.
+    Gt,
+    
+    // : lt
+    // Pops the top two values off and pushes true if second is less than to the first and false if they're not.
+    Lt,
 
 
     // ----------------------------
