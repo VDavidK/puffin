@@ -529,18 +529,28 @@ impl<'a> PuffinParser<'a> {
             },
             _ => Err(ParserError::ExpectedLiteralError(pos))
         }?;
-        while self.peek_is(TokenType::LeftParen)? {
-            self.next_token()?;
-            let mut exprs = vec![];
-            if !self.peek_is(TokenType::RightParen)? {
-                exprs.push(self.expression()?);
-                while self.peek_is(TokenType::Comma)? {
+        loop {
+            match self.peek()?.ok_or(ParserError::UnexpectedEofError())?.ty {
+                TokenType::Dot => {
                     self.next_token()?;
-                    exprs.push(self.expression()?);
+                    let field = self.next_token()?;
+                    expr = Expression::Accessor { expression: Box::new(expr), field };
+                },
+                TokenType::LeftParen => {
+                    self.next_token()?;
+                    let mut exprs = vec![];
+                    if !self.peek_is(TokenType::RightParen)? {
+                        exprs.push(self.expression()?);
+                        while self.peek_is(TokenType::Comma)? {
+                            self.next_token()?;
+                            exprs.push(self.expression()?);
+                        }
+                    }
+                    self.expect(&[TokenType::RightParen])?;
+                    expr = Expression::FunctionCall{ callee: Box::new(expr), arguments: exprs };
                 }
+                _ => break
             }
-            self.expect(&[TokenType::RightParen])?;
-            expr = Expression::FunctionCall{ callee: Box::new(expr), arguments: exprs };
         }
         Ok(expr)
     }
@@ -548,7 +558,7 @@ impl<'a> PuffinParser<'a> {
     /// \<block\> ::= {\<statement\>}
     fn block_stat(&mut self) -> Result<Statement, ParserError> {
         let mut stats = Vec::new();
-        if !self.peek_is(TokenType::RightBrace)? {
+        while !self.peek_is(TokenType::RightBrace)? {
             stats.push(self.statement()?);
         }
         let stat = Statement::Block(BlockStatement{ statements: stats });
@@ -578,7 +588,7 @@ impl<'a> PuffinParser<'a> {
         while self.peek_is(TokenType::Identifier)? {
             bindings.push(self.layout_binding()?);
         }
-        let string_literal = if self.peek_is(TokenType::String)? {
+        let string_literal = if self.peek_is(TokenType::String)? || self.peek_is(TokenType::Identifier)? {
             Some(self.next_token()?)
         } else {
             None

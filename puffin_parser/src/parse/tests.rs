@@ -100,6 +100,7 @@ fn test_return() {
     }
     assert!(foo.is_ok())
 }
+
 #[test]
 fn test_comments() {
     let foo = run_parser_str(r#"
@@ -107,6 +108,20 @@ fn test_comments() {
         fn foo() {
             // TODO: Make this do stuff.
             return;
+        }
+    "#);
+    if let Err(e) = &foo {
+        println!("{}", format!("parse error: {:}", e).red());
+    }
+    assert!(foo.is_ok())
+}
+
+#[test]
+fn test_accessor() {
+    let foo = run_parser_str(r#"
+        fn foo() {
+            foo = bar.baz.qux;
+            thing = func().field.other().field;
         }
     "#);
     if let Err(e) = &foo {

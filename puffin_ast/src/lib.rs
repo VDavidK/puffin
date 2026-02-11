@@ -272,6 +272,7 @@ pub enum Expression {
     Binary { lhs: Box<Expression>, op: Token, rhs: Box<Expression> },
     Unary { op: Token, rhs: Box<Expression> },
     FunctionCall { callee: Box<Expression>, arguments: Vec<Expression> },
+    Accessor { expression: Box<Expression>, field: Token },
 }
 
 #[derive(Debug)]
