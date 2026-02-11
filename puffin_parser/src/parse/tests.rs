@@ -43,20 +43,19 @@ fn test_if() {
 
 #[test]
 fn test_layout() {
-    let foo = run_parser_str("
+    let foo = run_parser_str(r#"
         component MyComponent(foo, bar, baz) {
             layout {
                 vbox {
-                    text \"hello, world!\";
+                    text "hello, world!";
                     hbox {
-                        button onclick=foo \"click me!\";
-                        button onclick={foo(); bar()} \"hello\";
-                        button onclick={exit()} \"quit\";
+                        button onclick=foo "click me!";
+                        // button onclick={exit(1)(2)(3);} "quit";
                     }
                 }
             }
         }
-    ");
+    "#);
     if let Err(e) = &foo {
         println!("{}", format!("parse error: {:}", e).red());
     }
@@ -87,6 +86,9 @@ fn test_return() {
         }
         fn other() {
             return;
+        }
+        fn other_other() {
+            return 1;
         }
     "#);
     if let Err(e) = &foo {

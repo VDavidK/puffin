@@ -137,16 +137,25 @@ pub struct Layout {
 }
 
 #[derive(Debug)]
-pub struct LayoutItemEventBinding {
+pub struct LayoutItemProp {
     pub event_name: Token,
-    pub action: Expression,
+    pub actions: Vec<Expression>,
+}
+
+impl LayoutItemProp {
+    pub fn new(event_name: Token, actions: Vec<Expression>) -> Self {
+        Self {
+            event_name,
+            actions
+        }
+    }
 }
 
 #[derive(Debug)]
 pub struct LayoutItem {
     pub name: Token,
-    pub events: Vec<LayoutItemEventBinding>,
-    pub args: Vec<Expression>,
+    pub props: Vec<LayoutItemProp>,
+    pub string_literal: Option<Token>,
     pub declarations: Vec<Declaration>,
 }
 
@@ -254,7 +263,7 @@ pub enum Expression {
     Literal { token: Token },
     Binary { lhs: Box<Expression>, op: Token, rhs: Box<Expression> },
     Unary { op: Token, rhs: Box<Expression> },
-    FunctionCall { name: Token, arguments: Vec<Expression> },
+    FunctionCall { callee: Box<Expression>, arguments: Vec<Expression> },
 }
 
 #[derive(Debug)]

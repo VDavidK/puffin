@@ -202,4 +202,8 @@ impl<'a> PuffinLexer<'a> {
     fn lexeme(&self) -> &str {
         &self.src[self.start.idx()..self.end.idx()]
     }
+
+    pub(crate) fn attach_snippet(&self, span: Span) -> Span {
+        span.with_snippet(self.src, self.src_name, 1)
+    }
 }
