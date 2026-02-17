@@ -29,6 +29,8 @@ pub enum TokenType {
     KwReturn, // "return"
     KwStyle, // "style"
     KwWith, // "with"
+    KwEnum, // "enum"
+    KwDefault, // "default"
 
     LeftBrace, // "{"
     RightBrace, // "}"

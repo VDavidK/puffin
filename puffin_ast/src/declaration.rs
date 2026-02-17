@@ -13,7 +13,7 @@ pub struct ComponentDeclaration {
 #[derive(Debug)]
 pub struct VarDeclaration {
     pub name: Token,
-    pub value: Expression,
+    pub value: Box<Expression>,
     pub var_type: VarType,
 }
 
@@ -65,13 +65,34 @@ pub struct MethodDeclaration {
     pub decorator: Option<Decorator>,
     pub name: Token,
     pub parameters: Vec<Token>,
-    pub block: Statement,
+    pub block: Box<Statement>,
+}
+
+#[derive(Debug)]
+pub struct RequireDeclaration {
+    module_name: Token,
+}
+
+#[derive(Debug)]
+pub struct UseDeclaration {
+    name: Box<Expression>,
+}
+
+#[derive(Debug)]
+pub struct ExportDeclaration {
+    exported: Box<Declaration>,
 }
 
 #[derive(Debug)]
 pub struct Decorator {
     pub name: Token,
     pub parameters: Vec<Token>,
+}
+
+#[derive(Debug)]
+pub struct EnumDeclaration {
+    pub name: Token,
+    pub members: Vec<Token>,
 }
 
 #[derive(Debug)]
@@ -82,6 +103,10 @@ pub enum Declaration {
     LayoutItem(LayoutItemDeclaration),
     Signal(SignalDeclaration),
     Method(MethodDeclaration),
+    Require(RequireDeclaration),
+    Use(UseDeclaration),
+    Export(ExportDeclaration),
+    Enum(EnumDeclaration),
 }
 
 impl Decorator {
@@ -89,6 +114,22 @@ impl Decorator {
         Self {
             name,
             parameters,
+        }
+    }
+}
+
+impl RequireDeclaration {
+    pub fn new(module_name: Token) -> Self {
+        Self {
+            module_name
+        }
+    }
+}
+
+impl UseDeclaration {
+    pub fn new(name: Expression) -> Self {
+        Self {
+            name: Box::new(name),
         }
     }
 }
@@ -111,7 +152,7 @@ impl VarDeclaration {
     pub fn new(name: Token, value: Expression, var_type: VarType) -> Self {
         Self {
             name,
-            value,
+            value: Box::new(value),
             var_type,
         }
     }
@@ -178,7 +219,7 @@ impl MethodDeclaration {
         Self {
             name,
             parameters,
-            block,
+            block: Box::new(block),
             decorator: None,
         }
     }
@@ -186,5 +227,22 @@ impl MethodDeclaration {
     pub fn with_decorator(&mut self, decorator: Decorator) -> &Self {
         self.decorator = Some(decorator);
         self
+    }
+}
+
+impl ExportDeclaration {
+    pub fn new(exported: Declaration) -> Self {
+        Self {
+            exported: Box::new(exported),
+        }
+    }
+}
+
+impl EnumDeclaration {
+    pub fn new(name: Token, members: Vec<Token>) -> Self {
+        Self {
+            name,
+            members,
+        }
     }
 }
