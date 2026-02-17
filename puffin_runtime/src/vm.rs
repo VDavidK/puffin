@@ -4,7 +4,7 @@ use num_enum::TryFromPrimitive;
 use ratatui::DefaultTerminal;
 
 use crate::{RuntimeError, Value, chunk::Chunk, op::OpCode, value::new_object};
-use crate::chunk::{InstructionOffset, LiteralOffset, LocalOffset};
+use crate::chunk::{InstructionOffset, ConstantOffset, LocalOffset};
 
 #[derive(Debug)]
 pub struct Vm<'a> {
@@ -51,10 +51,10 @@ impl<'a> Vm<'a> {
         match op {
             OpCode::Invalid => return Err(RuntimeError::InvalidOpCode { pc: self.pc }),
 
-            OpCode::Literal => {
-                let literal = self.fetch_literal()?
+            OpCode::Constant => {
+                let constant = self.fetch_constant()?
                     .to_owned();
-                self.push_value(literal);
+                self.push_value(constant);
             },
 
             OpCode::GetLocal => {
@@ -77,22 +77,22 @@ impl<'a> Vm<'a> {
             },
 
             OpCode::GetGlobal => {
-                let literal = self.fetch_literal()?
+                let constant = self.fetch_constant()?
                     .to_owned()
                     .take_string()?;
 
-                let global = self.globals.get(&literal).ok_or(RuntimeError::GlobalNotFound { name: literal })?;
+                let global = self.globals.get(&constant).ok_or(RuntimeError::GlobalNotFound { name: constant })?;
                 self.push_value(global.clone());
             },
 
             OpCode::SetGlobal => {
-                let literal = self.fetch_literal()?
+                let constant = self.fetch_constant()?
                     .to_owned()
                     .take_string()?;
 
                 let top = self.pop_expecting()?;
 
-                self.globals.insert(literal, top);
+                self.globals.insert(constant, top);
             },
 
             OpCode::Pop => {
@@ -279,9 +279,9 @@ impl<'a> Vm<'a> {
         Ok(val)
     }
     
-    pub fn fetch_literal_offset(&mut self) -> Result<LiteralOffset, RuntimeError> {
-        let val =  self.chunk.read_literal_offset(self.pc).ok_or(RuntimeError::AccessOutOfBounds { at: self.pc, pc: self.pc })?;
-        self.pc += size_of::<LiteralOffset>();
+    pub fn fetch_constant_offset(&mut self) -> Result<ConstantOffset, RuntimeError> {
+        let val =  self.chunk.read_constant_offset(self.pc).ok_or(RuntimeError::AccessOutOfBounds { at: self.pc, pc: self.pc })?;
+        self.pc += size_of::<ConstantOffset>();
         Ok(val)
     }
 
@@ -297,10 +297,10 @@ impl<'a> Vm<'a> {
         Ok(val)
     }
 
-    pub fn fetch_literal(&mut self) -> Result<&Value, RuntimeError> {
-        let offset = self.fetch_literal_offset()? as usize;
-        let value = self.chunk.get_literal(offset)
-            .ok_or(RuntimeError::InvalidLiteralAccess { at: offset, pc: self.pc })?;
+    pub fn fetch_constant(&mut self) -> Result<&Value, RuntimeError> {
+        let offset = self.fetch_constant_offset()? as usize;
+        let value = self.chunk.get_constant(offset)
+            .ok_or(RuntimeError::InvalidConstantAccess { at: offset, pc: self.pc })?;
 
         Ok(value)
     }

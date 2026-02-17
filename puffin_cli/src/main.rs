@@ -82,12 +82,12 @@ fn test_chunk_2() -> Chunk {
     chunk.push_op(OpCode::Poll);
     
     // for i in 0:10 {
-    chunk.push_literal(0);
+    chunk.push_constant(0);
     let i_offset = 0;
     let start_loop = chunk.addr();
     chunk.push_op(OpCode::GetLocal);
     chunk.push_local_offset(i_offset);
-    chunk.push_literal(10);
+    chunk.push_constant(10);
     chunk.push_op(OpCode::Ge);
     let end_jump = chunk.push_jump(OpCode::JumpIf);
     
@@ -102,7 +102,7 @@ fn test_chunk_2() -> Chunk {
     // }
     chunk.push_op(OpCode::GetLocal);
     chunk.push_local_offset(i_offset);
-    chunk.push_literal(1);
+    chunk.push_constant(1);
     chunk.push_op(OpCode::Add);
     chunk.push_op(OpCode::SetLocal);
     chunk.push_local_offset(i_offset);
@@ -116,21 +116,21 @@ fn test_chunk() -> Chunk {
     let mut chunk = puffin_runtime::Chunk::new("Test Program");
 
     // var foo = 10;
-    chunk.push_literal(Value::Int(10));
+    chunk.push_constant(Value::Int(10));
     let foo_offset = 0;
 
     // static bar = 4;
-    chunk.push_literal(Value::Int(4));
-    let bar_name = chunk.new_literal(Value::String("bar".into()));
+    chunk.push_constant(Value::Int(4));
+    let bar_name = chunk.new_constant(Value::String("bar".into()));
     chunk.push_op(OpCode::SetGlobal);
-    chunk.push_literal_offset(bar_name);
+    chunk.push_constant_offset(bar_name);
 
     // foo = foo + 8 / bar;
     chunk.push_op(OpCode::GetLocal);
     chunk.push_local_offset(foo_offset);
-    chunk.push_literal(Value::Int(8));
+    chunk.push_constant(Value::Int(8));
     chunk.push_op(OpCode::GetGlobal);
-    chunk.push_literal_offset(bar_name);
+    chunk.push_constant_offset(bar_name);
     chunk.push_op(OpCode::Div);
     chunk.push_op(OpCode::Add);
     chunk.push_op(OpCode::SetLocal);
@@ -156,14 +156,14 @@ fn test_chunk() -> Chunk {
     chunk.push_op(OpCode::Poll);
 
     // render "Hello";
-    chunk.push_literal("Hello");
+    chunk.push_constant("Hello");
     chunk.push_op(OpCode::Render);
 
     // poll;
     chunk.push_op(OpCode::Poll);
 
     // render "World";
-    chunk.push_literal("World");
+    chunk.push_constant("World");
     chunk.push_op(OpCode::Render);
 
     // poll;
@@ -174,15 +174,15 @@ fn test_chunk() -> Chunk {
     let baz_offset = 1;
 
     // baz.bar = "Hello!";
-    chunk.push_op(OpCode::Literal);
-    chunk.push_literal_offset(bar_name);
-    chunk.push_literal("Hello!");
+    chunk.push_op(OpCode::Constant);
+    chunk.push_constant_offset(bar_name);
+    chunk.push_constant("Hello!");
     chunk.push_op(OpCode::SetField);
     chunk.push_local_offset(baz_offset);
 
     // render baz.bar;
-    chunk.push_op(OpCode::Literal);
-    chunk.push_literal_offset(bar_name);
+    chunk.push_op(OpCode::Constant);
+    chunk.push_constant_offset(bar_name);
     chunk.push_op(OpCode::GetField);
     chunk.push_local_offset(baz_offset);
     chunk.push_op(OpCode::Render);

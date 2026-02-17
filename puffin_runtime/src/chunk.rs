@@ -9,10 +9,10 @@ use crate::{Value, op::OpCode};
 pub struct Chunk {
     name: String,
     bytes: Vec<u8>,
-    literals: Vec<Value>,
+    constants: Vec<Value>,
 }
 
-pub type LiteralOffset = u32;
+pub type ConstantOffset = u32;
 pub type LocalOffset = u32;
 pub type InstructionOffset = u32;
 
@@ -21,7 +21,7 @@ impl Chunk {
         Self {
             name: name.as_ref().to_owned(),
             bytes: vec![],
-            literals: vec![],
+            constants: vec![],
         }
     }
 
@@ -33,10 +33,10 @@ impl Chunk {
         self.bytes.push(op.into())
     }
 
-    pub fn push_literal(&mut self, literal: impl Into<Value>) -> LiteralOffset {
-        let offset = self.new_literal(literal.into()) as LiteralOffset;
-        self.push_op(OpCode::Literal);
-        self.push_literal_offset(offset);
+    pub fn push_constant(&mut self, constant: impl Into<Value>) -> ConstantOffset {
+        let offset = self.new_constant(constant.into()) as ConstantOffset;
+        self.push_op(OpCode::Constant);
+        self.push_constant_offset(offset);
         offset
     }
 
@@ -56,7 +56,7 @@ impl Chunk {
         self.bytes.extend_from_slice(&val.to_le_bytes());
     }
     
-    pub fn push_literal_offset(&mut self, val: LiteralOffset) {
+    pub fn push_constant_offset(&mut self, val: ConstantOffset) {
         self.bytes.extend_from_slice(&val.to_le_bytes());
     }
     
@@ -103,8 +103,8 @@ impl Chunk {
         Some(u64::from_le_bytes(<[u8;8]>::try_from(&self.bytes[idx..idx+8]).ok()?))
     }
     
-    pub fn read_literal_offset(&self, idx: usize) -> Option<LiteralOffset> {
-        Some(LiteralOffset::from_le_bytes(<[u8;size_of::<LiteralOffset>()]>::try_from(&self.bytes[idx..idx+size_of::<LiteralOffset>()]).ok()?))
+    pub fn read_constant_offset(&self, idx: usize) -> Option<ConstantOffset> {
+        Some(ConstantOffset::from_le_bytes(<[u8;size_of::<ConstantOffset>()]>::try_from(&self.bytes[idx..idx+size_of::<ConstantOffset>()]).ok()?))
     }
     
     pub fn read_local_offset(&self, idx: usize) -> Option<LocalOffset> {
@@ -119,14 +119,14 @@ impl Chunk {
         self.bytes.len() as InstructionOffset
     }
 
-    pub fn new_literal(&mut self, literal: impl Into<Value>) -> LiteralOffset {
-        let offset = self.literals.len();
-        self.literals.push(literal.into());
-        offset as LiteralOffset
+    pub fn new_constant(&mut self, constant: impl Into<Value>) -> ConstantOffset {
+        let offset = self.constants.len();
+        self.constants.push(constant.into());
+        offset as ConstantOffset
     }
 
-    pub fn get_literal(&self, offset: usize) -> Option<&Value> {
-        self.literals.get(offset)
+    pub fn get_constant(&self, offset: usize) -> Option<&Value> {
+        self.constants.get(offset)
     }
 }
 
@@ -163,13 +163,13 @@ impl<'a> ChunkFormatter<'a> {
                     OpCode::Invalid => self.push("invalid"),
 
                     // Stack
-                    OpCode::Literal => self.push_with_literal("literal"),
+                    OpCode::Constant => self.push_with_constant("const"),
                     OpCode::Pop => self.push("pop"),
 
                     OpCode::GetLocal => self.push_with_local_offset("getl"),
                     OpCode::SetLocal => self.push_with_local_offset("setl"),
-                    OpCode::GetGlobal => self.push_with_literal("getg"),
-                    OpCode::SetGlobal => self.push_with_literal("setg"),
+                    OpCode::GetGlobal => self.push_with_constant("getg"),
+                    OpCode::SetGlobal => self.push_with_constant("setg"),
 
                     // Object Manipulation
 
@@ -207,15 +207,15 @@ impl<'a> ChunkFormatter<'a> {
 
         let mut string = format!("Chunk '{}'", self.chunk.name);
 
-        let literals = self.chunk.literals
+        let constants = self.chunk.constants
             .iter()
             .enumerate()
-            .map(|(i, literal)| format!("0x{i:x} {literal}"))
+            .map(|(i, constant)| format!("0x{i:x} {constant}"))
             .collect::<Vec<_>>();
 
-        if !literals.is_empty() {
-            string.push_str("\n== LITERALS ==\n");
-            string.push_str(&literals.join("\n"));
+        if !constants.is_empty() {
+            string.push_str("\n== CONSTANTS ==\n");
+            string.push_str(&constants.join("\n"));
         }
 
         if !self.inst.is_empty() {
@@ -230,11 +230,11 @@ impl<'a> ChunkFormatter<'a> {
         self.push_line(format!("{name}"));
     }
     
-    fn push_with_literal(&mut self, name: &'static str) {
-        if let Some(offset) = self.chunk.read_literal_offset(self.idx) {
-            if let Some(value) = self.chunk.get_literal(offset as usize) {
+    fn push_with_constant(&mut self, name: &'static str) {
+        if let Some(offset) = self.chunk.read_constant_offset(self.idx) {
+            if let Some(value) = self.chunk.get_constant(offset as usize) {
                 self.push_line(format!("{name} [0x{offset:x}] ({value})"));
-                self.idx += size_of::<LiteralOffset>();
+                self.idx += size_of::<ConstantOffset>();
             } else {
                 self.push_line(format!("{name} [0x{offset:x}]"));
             }

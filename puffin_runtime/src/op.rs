@@ -11,9 +11,9 @@ pub enum OpCode {
     // Stack Instructions
     // ----------------------------
 
-    // : literal [offset:4B]
-    // Pushes a literal to the top of the stack
-    Literal,
+    // : const [offset:4B]
+    // Pushes a constant to the top of the stack
+    Constant,
 
     // : pop
     // Pops the top value off the stack
@@ -28,11 +28,11 @@ pub enum OpCode {
     SetLocal,
 
     // : getg [offset:4B]
-    // Pushes the value of a global variable matching the name of the literal at the given offset to the stack
+    // Pushes the value of a global variable matching the name of the constant at the given offset to the stack
     GetGlobal,
 
     // : setg [offset:4B]
-    // Overwrites the value of a global variable matching the name of the literal at the given offset with the value at the top of the stack
+    // Overwrites the value of a global variable matching the name of the constant at the given offset with the value at the top of the stack
     SetGlobal,
 
     // ----------------------------
@@ -48,7 +48,7 @@ pub enum OpCode {
     SetField,
 
     // : getf [offset:4B]
-    // Pushes the value of the field of the object at the provided offset on the stack onto the top of the stack with the name matching the literal given
+    // Pushes the value of the field of the object at the provided offset on the stack onto the top of the stack with the name matching the constant given
     GetField,
 
     // ----------------------------

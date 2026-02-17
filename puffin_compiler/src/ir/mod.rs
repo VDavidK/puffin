@@ -2,7 +2,7 @@ use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read};
 use puffin_runtime::{Chunk, Value};
-use puffin_runtime::chunk::{InstructionOffset, LiteralOffset};
+use puffin_runtime::chunk::{InstructionOffset, ConstantOffset};
 use puffin_runtime::op::OpCode;
 use puffin_runtime::value::{FloatType, IntType};
 
@@ -11,8 +11,8 @@ pub enum IrError {
     #[error("Invalid op code received")]
     InvalidOpCode,
 
-    #[error("Invalid literal received")]
-    InvalidLiteral,
+    #[error("Invalid constant received")]
+    InvalidConstant,
 
     #[error("Invalid offset received")]
     InvalidOffset,
@@ -22,7 +22,7 @@ pub fn compile(name: impl AsRef<str>, reader: impl Read) -> Result<Chunk, IrErro
     let mut reader = BufReader::new(reader);
     let mut chunk = Chunk::new(name);
     let mut labels = HashMap::<String, InstructionOffset>::new();
-    let mut literals = HashMap::<Value, LiteralOffset>::new();
+    let mut constants = HashMap::<Value, ConstantOffset>::new();
     let mut unpatched_jumps = HashMap::<String, Vec<InstructionOffset>>::new();
 
     let mut buf = String::new();
@@ -58,45 +58,45 @@ pub fn compile(name: impl AsRef<str>, reader: impl Read) -> Result<Chunk, IrErro
         let args = &line[1..];
 
         match get_op_code(cmd) {
-            OpCode::Literal => match literals.entry(parse_literal(args[0])?) {
+            OpCode::Constant => match constants.entry(parse_constant(args[0])?) {
                 Entry::Occupied(entry) => {
-                    chunk.push_literal_offset(*entry.get());
+                    chunk.push_constant_offset(*entry.get());
                 }
                 Entry::Vacant(entry) => {
-                    let offset = chunk.push_literal(entry.key().clone());
+                    let offset = chunk.push_constant(entry.key().clone());
                     entry.insert(offset);
                 }
             }
 
             OpCode::GetLocal => {
                 chunk.push_op(OpCode::GetLocal);
-                chunk.push_literal_offset(parse_offset(args[0])? as LiteralOffset);
+                chunk.push_constant_offset(parse_offset(args[0])? as ConstantOffset);
             }
             OpCode::SetLocal => {
                 chunk.push_op(OpCode::SetLocal);
-                chunk.push_literal_offset(parse_offset(args[0])? as LiteralOffset);
+                chunk.push_constant_offset(parse_offset(args[0])? as ConstantOffset);
             }
             OpCode::GetGlobal => {
-                let literal = parse_literal(args[0])?;
-                let offset = get_literal_offset(&mut chunk, &mut literals, literal);
+                let constant = parse_constant(args[0])?;
+                let offset = get_constant_offset(&mut chunk, &mut constants, constant);
 
                 chunk.push_op(OpCode::GetGlobal);
-                chunk.push_literal_offset(offset);
+                chunk.push_constant_offset(offset);
             }
             OpCode::SetGlobal => {
-                let literal = parse_literal(args[0])?;
-                let offset = get_literal_offset(&mut chunk, &mut literals, literal);
+                let constant = parse_constant(args[0])?;
+                let offset = get_constant_offset(&mut chunk, &mut constants, constant);
 
                 chunk.push_op(OpCode::SetGlobal);
-                chunk.push_literal_offset(offset);
+                chunk.push_constant_offset(offset);
             }
             OpCode::SetField => {
                 chunk.push_op(OpCode::SetField);
-                chunk.push_literal_offset(parse_offset(args[0])? as LiteralOffset);
+                chunk.push_constant_offset(parse_offset(args[0])? as ConstantOffset);
             }
             OpCode::GetField => {
                 chunk.push_op(OpCode::SetField);
-                chunk.push_literal_offset(parse_offset(args[0])? as LiteralOffset);
+                chunk.push_constant_offset(parse_offset(args[0])? as ConstantOffset);
             }
             OpCode::Jump => add_jump(&mut chunk, &mut labels, &mut unpatched_jumps, OpCode::Jump, args[0]),
             OpCode::JumpIf => add_jump(&mut chunk, &mut labels, &mut unpatched_jumps, OpCode::JumpIf, args[0]),
@@ -125,20 +125,20 @@ fn add_jump(chunk: &mut Chunk, labels: &mut HashMap<String, InstructionOffset>, 
     }
 }
 
-fn get_literal_offset(chunk: &mut Chunk, literals: &mut HashMap<Value, LiteralOffset>, literal: Value) -> LiteralOffset {
-    if !literals.contains_key(&literal) {
-        let offset = chunk.push_literal(literal.clone());
-        literals.insert(literal, offset);
+fn get_constant_offset(chunk: &mut Chunk, constants: &mut HashMap<Value, ConstantOffset>, constant: Value) -> ConstantOffset {
+    if !constants.contains_key(&constant) {
+        let offset = chunk.push_constant(constant.clone());
+        constants.insert(constant, offset);
         offset
     } else {
-        *literals.get(&literal).unwrap()
+        *constants.get(&constant).unwrap()
     }
 }
 
 fn get_op_code(name: impl AsRef<str>) -> OpCode {
     match name.as_ref() {
-        // Literal argument instructions
-        "literal" => OpCode::Literal,
+        // Constant argument instructions
+        "const" => OpCode::Constant,
         "getg" => OpCode::GetGlobal,
         "setg" => OpCode::SetGlobal,
 
@@ -184,10 +184,10 @@ fn parse_label(label: impl AsRef<str>) -> String {
     label.as_ref()[1..].to_string()
 }
 
-fn parse_literal(lit: impl AsRef<str>) -> Result<Value, IrError> {
+fn parse_constant(lit: impl AsRef<str>) -> Result<Value, IrError> {
     let lit = lit.as_ref();
 
-    match lit.chars().next().ok_or(IrError::InvalidLiteral)? {
+    match lit.chars().next().ok_or(IrError::InvalidConstant)? {
         '"' => Ok(Value::String(lit[1..lit.len() - 1].to_string())),
 
         't' if lit == "true" => Ok(Value::Bool(true)),
@@ -197,7 +197,7 @@ fn parse_literal(lit: impl AsRef<str>) -> Result<Value, IrError> {
             // Parse float or int
             let value = lit.parse::<FloatType>()
                 .map(|v| Value::Float(v))
-                .map_err(|_| IrError::InvalidLiteral)
+                .map_err(|_| IrError::InvalidConstant)
                 .or_else(|err| lit.parse::<IntType>()
                     .map(|v| Value::Int(v))
                     .map_err(|_| err)
@@ -206,6 +206,6 @@ fn parse_literal(lit: impl AsRef<str>) -> Result<Value, IrError> {
             Ok(value)
         }
 
-        _ => Err(IrError::InvalidLiteral),
+        _ => Err(IrError::InvalidConstant),
     }
 }

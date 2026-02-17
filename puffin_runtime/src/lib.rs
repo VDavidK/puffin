@@ -27,8 +27,8 @@ pub enum RuntimeError {
     #[error("Trying to access out of bounds values on the stack (0x{at:x}) at: 0x{pc:x}")]
     StackOutOfBounds { at: usize, pc: usize },
 
-    #[error("Trying to access out of bounds literal (0x{at:x}) at: 0x{pc:x}")]
-    InvalidLiteralAccess { at: usize, pc: usize },
+    #[error("Trying to access out of bounds constant (0x{at:x}) at: 0x{pc:x}")]
+    InvalidConstantAccess { at: usize, pc: usize },
 
     #[error("Unable to perform binary {op} operation on {lhs_type} and {rhs_type}")]
     InvalidBinaryOperation { op: String, lhs_type: String, rhs_type: String },
