@@ -1,5 +1,5 @@
 use crate::lex::LexerError::{UnterminatedBlockComment, UnterminatedStringLiteral};
-use puffin_ast::{span::Span, Token, TokenType, position::Position};
+use puffin_ast::{span::Span, token::Token, token::TokenType, position::Position};
 
 #[derive(Debug, thiserror::Error)]
 pub enum LexerError {
