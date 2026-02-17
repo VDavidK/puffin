@@ -60,6 +60,7 @@ pub fn compile(name: impl AsRef<str>, reader: impl Read) -> Result<Chunk, IrErro
         match get_op_code(cmd) {
             OpCode::Constant => match constants.entry(parse_constant(args[0])?) {
                 Entry::Occupied(entry) => {
+                    chunk.push_op(OpCode::Constant);
                     chunk.push_constant_offset(*entry.get());
                 }
                 Entry::Vacant(entry) => {
@@ -100,6 +101,7 @@ pub fn compile(name: impl AsRef<str>, reader: impl Read) -> Result<Chunk, IrErro
             }
             OpCode::Jump => add_jump(&mut chunk, &mut labels, &mut unpatched_jumps, OpCode::Jump, args[0]),
             OpCode::JumpIf => add_jump(&mut chunk, &mut labels, &mut unpatched_jumps, OpCode::JumpIf, args[0]),
+            OpCode::Call => add_call(&mut chunk, &mut labels, &mut unpatched_jumps, args[0], args[1]),
 
             OpCode::Invalid => return Err(IrError::InvalidOpCode),
 
@@ -110,13 +112,41 @@ pub fn compile(name: impl AsRef<str>, reader: impl Read) -> Result<Chunk, IrErro
     Ok(chunk)
 }
 
-fn add_jump(chunk: &mut Chunk, labels: &mut HashMap<String, InstructionOffset>, unpatched_jumps: &mut HashMap<String, Vec<InstructionOffset>>, jump: OpCode, label: impl AsRef<str>) {
+fn add_jump(
+    chunk: &mut Chunk,
+    labels: &mut HashMap<String, InstructionOffset>,
+    unpatched_jumps: &mut HashMap<String, Vec<InstructionOffset>>,
+    jump: OpCode,
+    label: impl AsRef<str>,
+) {
     let label = parse_label(label);
 
     if let Some(offset) = labels.get(&label) {
         chunk.push_jump_im(jump, *offset);
     } else {
         let jump = chunk.push_jump(jump);
+        if let Some(v) = unpatched_jumps.get_mut(&label) {
+            v.push(jump);
+        } else {
+            unpatched_jumps.insert(label, vec![jump]);
+        }
+    }
+}
+
+fn add_call(
+    chunk: &mut Chunk,
+    labels: &mut HashMap<String, InstructionOffset>,
+    unpatched_jumps: &mut HashMap<String, Vec<InstructionOffset>>,
+    arg_count: impl AsRef<str>,
+    label: impl AsRef<str>,
+) {
+    let label = parse_label(label);
+    let arg_count = str::parse::<u8>(arg_count.as_ref()).unwrap();
+
+    if let Some(offset) = labels.get(&label) {
+        chunk.push_call_im(arg_count, *offset);
+    } else {
+        let jump = chunk.push_call(arg_count);
         if let Some(v) = unpatched_jumps.get_mut(&label) {
             v.push(jump);
         } else {
@@ -151,6 +181,8 @@ fn get_op_code(name: impl AsRef<str>) -> OpCode {
         // Address argument instructions
         "jmp" => OpCode::Jump,
         "jmpi" => OpCode::JumpIf,
+        "call" => OpCode::Call,
+        "ret" => OpCode::Return,
 
         // No argument instructions
         "pop" => OpCode::Pop,
@@ -192,6 +224,7 @@ fn parse_constant(lit: impl AsRef<str>) -> Result<Value, IrError> {
 
         't' if lit == "true" => Ok(Value::Bool(true)),
         'f' if lit == "false" => Ok(Value::Bool(false)),
+        'n' if lit == "null" => Ok(Value::Null),
 
         c if c.is_ascii_digit() => {
             // Parse float or int

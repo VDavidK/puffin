@@ -16,6 +16,7 @@ pub enum Value {
     Float(FloatType),
     Bool(BoolType),
     String(StringType),
+    Null,
 
     #[serde(skip)]
     Object(ObjectType),
@@ -153,6 +154,7 @@ impl Display for Value {
             Value::Bool(v) => f.write_fmt(format_args!("{v}")),
             Value::String(v) => f.write_fmt(format_args!("{v}")),
             Value::Object(v) => f.write_fmt(format_args!("{}", v.borrow())),
+            Value::Null => f.write_fmt(format_args!("null")),
         }
     }
 }
@@ -283,6 +285,12 @@ impl Value {
                 
                 _ => false,
             }
+
+            Value::Null => match rhs {
+                Value::Null => true,
+
+                _ => false,
+            }
         }
     }
     
@@ -355,6 +363,7 @@ impl Value {
             Value::Bool(val) => *val,
             Value::String(val) => !val.is_empty(),
             Value::Object(_) => true,
+            Value::Null => false,
         }
     }
 
@@ -365,6 +374,7 @@ impl Value {
             Value::Bool(_) => "bool",
             Value::String(_) => "string",
             Value::Object(_) => "object",
+            Value::Null => "null",
         }
     }
 

@@ -7,12 +7,20 @@ use crate::{RuntimeError, Value, chunk::Chunk, op::OpCode, value::new_object};
 use crate::chunk::{InstructionOffset, ConstantOffset, LocalOffset};
 
 #[derive(Debug)]
+struct CallFrame {
+    pub return_addr: InstructionOffset,
+    pub stack_offset: usize,
+    pub local_count: usize,
+}
+
+#[derive(Debug)]
 pub struct Vm<'a> {
     chunk: &'a Chunk,
     stack: Vec<Value>,
     pc: usize,
     running: bool,
     globals: HashMap<String, Value>,
+    call_stack: Vec<CallFrame>,
     term: DefaultTerminal,
 }
 
@@ -26,6 +34,7 @@ impl<'a> Vm<'a> {
             pc: 0,
             running: true,
             globals: HashMap::new(),
+            call_stack: vec![],
             term,
         }
     }
@@ -58,22 +67,16 @@ impl<'a> Vm<'a> {
             },
 
             OpCode::GetLocal => {
-                let offset = self.fetch_u32()? as usize;
-                let value = self.stack.get(offset)
-                    .ok_or(RuntimeError::StackOutOfBounds { at: offset, pc: self.pc })?;
+                let offset = self.fetch_local_offset()?;
+                let value = self.get_local(offset)?;
 
-                self.stack.push(value.clone());
+                self.push_value(value.clone());
             },
 
             OpCode::SetLocal => {
                 let top = self.pop_expecting()?;
-
-                let offset = self.fetch_u32()? as usize;
-                if offset >= self.stack.len() {
-                    return Err(RuntimeError::StackOutOfBounds { at: offset, pc: self.pc });
-                }
-
-                self.stack[offset] = top;
+                let offset = self.fetch_local_offset()?;
+                self.set_local(offset, top)?;
             },
 
             OpCode::GetGlobal => {
@@ -227,6 +230,34 @@ impl<'a> Vm<'a> {
                 }
             },
 
+            OpCode::Call => {
+                let arg_count = self.fetch_u8()?;
+                let addr = self.fetch_instruction_offset()?;
+
+                if let Some(frame) = self.call_stack.last_mut() {
+                    frame.local_count -= arg_count as usize;
+                }
+
+                self.call_stack.push(self.new_call_frame(arg_count as usize));
+                self.pc = addr as usize;
+            },
+
+            OpCode::Return => {
+                if let Some(frame) = self.call_stack.pop() {
+                    self.pc = frame.return_addr as usize;
+                    let ret_value = self.pop_expecting()?;
+
+                    // Pop all values pushed in the current call frame
+                    for _ in 0..frame.local_count - 1 {
+                        self.pop_expecting()?;
+                    }
+
+                    self.push_value(ret_value);
+                } else {
+                    self.running = false;
+                }
+            },
+
             OpCode::Exit => {
                 self.running = false;
             }
@@ -306,18 +337,39 @@ impl<'a> Vm<'a> {
     }
     
     pub fn get_local(&self, offset: LocalOffset) -> Result<&Value, RuntimeError> {
-        let value = self.stack.get(offset as usize)
+        let value = self.stack.get(offset as usize + self.stack_offset())
             .ok_or(RuntimeError::StackOutOfBounds { at: offset as usize, pc: self.pc })?;
         
         Ok(value)
     }
 
+    pub fn set_local(&mut self, offset: LocalOffset, value: Value) -> Result<(), RuntimeError> {
+        let offset = offset as usize + self.stack_offset();
+
+        if offset >= self.stack.len() {
+            return Err(RuntimeError::StackOutOfBounds { at: offset, pc: self.pc });
+        }
+
+        self.stack[offset] = value;
+        Ok(())
+    }
+
     pub fn push_value<T: Into<Value>>(&mut self, value: T) {
         self.stack.push(value.into());
+
+        if let Some(frame) = self.call_stack.last_mut() {
+            frame.local_count += 1;
+        }
     }
 
     pub fn pop_value(&mut self) -> Option<Value> {
-        self.stack.pop()
+        let val = self.stack.pop();
+
+        if let Some(frame) = self.call_stack.last_mut() && val.is_some() {
+            frame.local_count -= 1;
+        }
+
+        val
     }
 
     pub fn peek_value(&mut self) -> Option<&Value> {
@@ -325,7 +377,27 @@ impl<'a> Vm<'a> {
     }
 
     pub fn pop_expecting(&mut self) -> Result<Value, RuntimeError> {
-        self.stack.pop().ok_or(RuntimeError::StackEmpty)
+        let val = self.stack.pop().ok_or(RuntimeError::StackEmpty)?;
+
+        if let Some(frame) = self.call_stack.last_mut() {
+            frame.local_count -= 1;
+        }
+
+        Ok(val)
+    }
+
+    fn stack_offset(&self) -> usize {
+        self.call_stack.last()
+            .map(|frame| frame.stack_offset)
+            .unwrap_or(0)
+    }
+
+    fn new_call_frame(&self, arg_count: usize) -> CallFrame {
+        CallFrame {
+            return_addr: self.pc as InstructionOffset,
+            stack_offset: self.stack.len() - arg_count,
+            local_count: arg_count,
+        }
     }
 }
 

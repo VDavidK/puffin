@@ -73,13 +73,27 @@ impl Chunk {
         self.push_instruction_offset(0xFFFFFFFF);
         self.addr() - 4
     }
-    
+
+    pub fn push_call(&mut self, arg_count: u8) -> InstructionOffset {
+        self.push_op(OpCode::Call);
+        self.push_u8(arg_count);
+        self.push_instruction_offset(0xFFFFFFFF);
+        self.addr() - 4
+    }
+
     pub fn push_jump_im(&mut self, op: OpCode, to: InstructionOffset) -> InstructionOffset {
         self.push_op(op);
         self.push_instruction_offset(to);
         self.addr() - 4
     }
-    
+
+    pub fn push_call_im(&mut self, arg_count: u8, to: InstructionOffset) -> InstructionOffset {
+        self.push_op(OpCode::Call);
+        self.push_u8(arg_count);
+        self.push_instruction_offset(to);
+        self.addr() - 4
+    }
+
     pub fn patch_jump(&mut self, jump: InstructionOffset, offset: InstructionOffset) {
         let bytes = offset.to_le_bytes();
         for (i, byte) in bytes.iter().enumerate() {
@@ -195,6 +209,8 @@ impl<'a> ChunkFormatter<'a> {
                     // Branching
                     OpCode::Jump => self.push_with_instruction_offset("jmp"),
                     OpCode::JumpIf => self.push_with_instruction_offset("jmpi"),
+                    OpCode::Call => self.push_call(),
+                    OpCode::Return  => self.push("return"),
 
                     // Terminal
                     OpCode::Exit => self.push("exit"),
@@ -236,7 +252,7 @@ impl<'a> ChunkFormatter<'a> {
                 self.push_line(format!("{name} [0x{offset:x}] ({value})"));
                 self.idx += size_of::<ConstantOffset>();
             } else {
-                self.push_line(format!("{name} [0x{offset:x}]"));
+                self.push_line(format!("{name} [0x{offset:x}] (CONSTANT NOT FOUND)"));
             }
         } else {
             self.push_line(format!("{name} [MALFORMED]"));
@@ -259,6 +275,18 @@ impl<'a> ChunkFormatter<'a> {
         } else {
             self.push_line(format!("{name} [MALFORMED]"));
         }
+    }
+
+    fn push_call(&mut self) {
+        if let Some(arg_count) = self.chunk.read_u8(self.idx) {
+            if let Some(offset) = self.chunk.read_instruction_offset(self.idx) {
+                self.push_line(format!("call ({arg_count}) [0x{offset:x}]"));
+                self.idx += size_of::<u8>();
+                self.idx += size_of::<InstructionOffset>();
+                return;
+            }
+        }
+        self.push_line("call [MALFORMED]".to_owned());
     }
 
     fn push_line(&mut self, line: impl AsRef<str>) {

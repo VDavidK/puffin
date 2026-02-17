@@ -23,8 +23,8 @@ pub enum OpCode {
     // Pushes the value of a local variable stored at the offset to the stack
     GetLocal,
 
-    /// : setl [offset:4B]
-    /// Overwrites the value of a local stored at the offset with the value at the top of the stack
+    // : setl [offset:4B]
+    // Overwrites the value of a local stored at the offset with the value at the top of the stack
     SetLocal,
 
     // : getg [offset:4B]
@@ -120,6 +120,16 @@ pub enum OpCode {
     // Pops the top of the stack and if the value is truthy, then sets the program counter to the specified address
     JumpIf,
 
+    // : call [args_count:1B] [addr:8B]
+    // Pushes the current program counter to the call stack along with a stack offset based on the argument count, then sets it to the specified address
+    // Takes ownership of the arguments passed in.
+    Call,
+
+    // : ret
+    // Pops the top value from the call stack and sets the program counter to that value. If the call stack is empty, then it exits the program
+    // Pops all other local variables defined in the current scope
+    Return,
+
     
     // ----------------------------
     // Terminal Instructions
@@ -130,7 +140,7 @@ pub enum OpCode {
     Exit,
 
     // : poll
-    // Waits for user input and runs the corrisponding event handlers
+    // Waits for user input and runs the corresponding event handlers
     Poll,
 
     // : render
