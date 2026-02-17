@@ -227,10 +227,12 @@ impl<'a> Vm<'a> {
                 }
             },
 
+            OpCode::Exit => {
+                self.running = false;
+            }
+
             OpCode::Poll => {
-                if ratatui::crossterm::event::read()?.is_key_press() {
-                    // self.running = false;
-                }
+                ratatui::crossterm::event::read()?;
             },
             
             OpCode::Render => {

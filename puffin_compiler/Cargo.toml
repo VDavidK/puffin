@@ -9,3 +9,4 @@ workspace = true
 [dependencies]
 puffin_ast = { path = "../puffin_ast" }
 puffin_runtime = { path = "../puffin_runtime" }
+thiserror = "2.0.18"

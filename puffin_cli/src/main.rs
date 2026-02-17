@@ -9,9 +9,14 @@ use simplelog::{Config, LevelFilter, WriteLogger};
 #[derive(Subcommand, Debug)]
 enum Operation {
     Run {
+        #[arg(long, action, default_value_t = false)]
+        ir: bool,
         input: PathBuf,
     },
     Compile {
+        #[arg(long, action, default_value_t = false)]
+        ir: bool,
+        input: PathBuf,
         output: Option<PathBuf>,
     },
     Test,
@@ -33,14 +38,24 @@ fn main() -> color_eyre::Result<()> {
     let args = Args::parse();
 
     match args.op {
-        Operation::Compile { output } => {
-            let chunk = test_chunk();
+        Operation::Compile { input, output, ir } => {
+            let chunk = if ir {
+                let file = File::open(&input)?;
+                puffin_compiler::ir::compile(input.file_name().unwrap().to_str().unwrap(), file)?
+            } else {
+                test_chunk()
+            };
             let file = File::create(output.unwrap_or("out.pfb".into()))?;
             ciborium::into_writer(&chunk, file)?;
         },
-        Operation::Run { input } => {
-            let file = File::open(input)?;
-            let chunk = ciborium::from_reader::<puffin_runtime::Chunk, File>(file)?;
+        Operation::Run { input, ir } => {
+            let file = File::open(&input)?;
+
+            let chunk = if ir {
+                puffin_compiler::ir::compile(input.file_name().unwrap().to_str().unwrap(), file)?
+            } else {
+                ciborium::from_reader::<puffin_runtime::Chunk, File>(file)?
+            };
 
             #[cfg(feature = "logging")]
             log::debug!("-- Running chunk --\n{chunk}");

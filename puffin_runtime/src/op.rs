@@ -15,6 +15,10 @@ pub enum OpCode {
     // Pushes a literal to the top of the stack
     Literal,
 
+    // : pop
+    // Pops the top value off the stack
+    Pop,
+
     // : getl [offset:4B]
     // Pushes the value of a local variable stored at the offset to the stack
     GetLocal,
@@ -30,10 +34,6 @@ pub enum OpCode {
     // : setg [offset:4B]
     // Overwrites the value of a global variable matching the name of the literal at the given offset with the value at the top of the stack
     SetGlobal,
-
-    // : pop
-    // Pops the top value off the stack
-    Pop,
 
     // ----------------------------
     // Object Manipulation Instructions
@@ -124,6 +124,10 @@ pub enum OpCode {
     // ----------------------------
     // Terminal Instructions
     // ----------------------------
+
+    // : exit
+    // Exits the application
+    Exit,
 
     // : poll
     // Waits for user input and runs the corrisponding event handlers

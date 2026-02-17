@@ -197,6 +197,7 @@ impl<'a> ChunkFormatter<'a> {
                     OpCode::JumpIf => self.push_with_instruction_offset("jmpi"),
 
                     // Terminal
+                    OpCode::Exit => self.push("exit"),
                     OpCode::Poll => self.push("poll"),
                     OpCode::Render => self.push("render"),
                 },
