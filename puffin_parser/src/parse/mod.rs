@@ -2,8 +2,9 @@ use puffin_ast::{Ast, VarType};
 use puffin_ast::span::Span;
 use puffin_ast::token::{Token, TokenType};
 use puffin_ast::statement::{Statement, ExpressionStatement, BreakStatement, ContinueStatement, ForStatement, IfStatement, BlockStatement, ReturnStatement, MatchStatement, VariableDeclarationStatement};
-use puffin_ast::declaration::{Declaration, VarDeclaration, Decorator, ComponentDeclaration, MethodDeclaration, SignalDeclaration, LayoutDeclaration, LayoutItemDeclaration, LayoutItemProp, LambdaFunctionBinding, BindingDeclaration, DirectBindings, RequireDeclaration, UseDeclaration, ExportDeclaration, EnumDeclaration};
+use puffin_ast::declaration::{Declaration, VarDeclaration, Decorator, ComponentDeclaration, MethodDeclaration, SignalDeclaration, LayoutDeclaration, RequireDeclaration, UseDeclaration, ExportDeclaration, EnumDeclaration};
 use puffin_ast::expression::{AccessorExpression, BinaryExpression, Expression, FunctionCallExpression, LiteralExpression, UnaryExpression, ArrayExpression, DictionaryExpression, MatchExpression};
+use puffin_ast::markup::{ Markup, LambdaFunctionBinding, MarkupBinding, DirectBindings, ComponentRender, IterativeRender, IfConditionalRender, MatchConditionalRender };
 use crate::lex::{PuffinLexer, LexerError};
 
 fn get_op_precedence(ty: TokenType) -> usize {
@@ -139,14 +140,14 @@ impl<'a> PuffinParser<'a> {
             Err(ParserError::UnexpectedTokenError{
                 span: self.lexer.attach_snippet(res.span.to_owned()),
                 expected: types.iter().cloned().collect::<Vec<_>>(),
-                received: res.ty
+                received: res.ty,
             })
         }
     }
 
     /// Runs the parser on the source file provided when it was initialized.
     pub(crate) fn run(mut self) -> Result<Ast, ParserError> {
-        let mut decls = vec!();
+        let mut decls = vec![];
         while !self.eof() {
             decls.push(self.declaration()?);
         }
@@ -186,7 +187,7 @@ impl<'a> PuffinParser<'a> {
     fn enum_decl(&mut self) -> Result<Declaration, ParserError> {
         self.expect(&[TokenType::KwEnum])?;
         let name = self.expect(&[TokenType::Identifier])?;
-        let mut members = vec!();
+        let mut members = vec![];
         self.expect(&[TokenType::LeftBrace])?;
         while !self.peek_is(TokenType::RightBrace)? {
             members.push(self.expect(&[TokenType::Identifier])?);
@@ -227,7 +228,7 @@ impl<'a> PuffinParser<'a> {
         let name = self.expect(&[TokenType::Identifier])?;
         let params = self.parameters()?;
         self.expect(&[TokenType::LeftBrace])?;
-        let mut decls = vec!();
+        let mut decls = vec![];
         while !self.peek_is(TokenType::RightBrace)? {
             decls.push(self.declaration()?);
         }
@@ -269,7 +270,7 @@ impl<'a> PuffinParser<'a> {
             self.expect(&[TokenType::RightParen])?;
             params
         } else {
-            vec!()
+            vec![]
         };
         Ok(params)
     }
@@ -290,7 +291,7 @@ impl<'a> PuffinParser<'a> {
     fn signal_decl(&mut self) -> Result<Declaration, ParserError> {
         self.expect(&[TokenType::KwSignal])?;
         let pos = self.pos();
-        let name = self.next_token_or_none()?.ok_or(ParserError::ExpectedIdentifierError(pos))?;
+        let name = self.expect(&[TokenType::Identifier])?;
         let params = self.parameters()?;
         let decl = Declaration::Signal(SignalDeclaration::new(name, params));
         self.expect(&[TokenType::Semicolon])?;
@@ -299,7 +300,7 @@ impl<'a> PuffinParser<'a> {
 
     /// <name_list> ::= \<identifier\>, {",", \<identifier\>}
     fn name_list(&mut self) -> Result<Vec<Token>, ParserError> {
-        let mut names: Vec<Token> = vec!();
+        let mut names: Vec<Token> = vec![];
         while self.peek_is(TokenType::Identifier)? {
             // Safe unwrap, as peek_is has verified the token's existence.
             names.push(self.next_token_or_none()?.unwrap().clone());
@@ -349,7 +350,7 @@ impl<'a> PuffinParser<'a> {
     fn match_stat(&mut self) -> Result<Statement, ParserError> {
         self.expect(&[TokenType::KwMatch])?;
         let comparator = self.expression()?;
-        let mut cases = vec!();
+        let mut cases = vec![];
         let mut default_case = None;
         self.expect(&[TokenType::LeftBrace])?;
         while !self.peek_is(TokenType::RightBrace)? {
@@ -465,7 +466,7 @@ impl<'a> PuffinParser<'a> {
     fn match_expr(&mut self) -> Result<Expression, ParserError> {
         self.expect(&[TokenType::KwMatch])?;
         let comparator = self.expression()?;
-        let mut cases = vec!();
+        let mut cases = vec![];
         self.expect(&[TokenType::LeftBrace])?;
         let mut default_case = None;
         while !self.peek_is(TokenType::RightBrace)? {
@@ -502,7 +503,7 @@ impl<'a> PuffinParser<'a> {
                 let tok = self.expect(&[TokenType::LeftParen, TokenType::Assign])?;
                 match tok.ty {
                     TokenType::LeftParen => {
-                        let mut arguments= vec!();
+                        let mut arguments= vec![];
                         while let Some(tok) = self.safe_peek()? && tok.ty != TokenType::RightParen {
                             arguments.push(self.expression()?);
                         }
@@ -581,7 +582,7 @@ impl<'a> PuffinParser<'a> {
                 let array = if !self.peek_is(TokenType::RightBracket)? {
                 self.expr_list(TokenType::RightBracket, TokenType::Comma)?
                 } else {
-                    vec!()
+                    vec![]
                 };
                 self.expect(&[TokenType::RightBracket])?;
                 let expr = Expression::Array(ArrayExpression::new(array));
@@ -602,7 +603,7 @@ impl<'a> PuffinParser<'a> {
                 },
                 TokenType::LeftParen => {
                     self.next_token()?;
-                    let mut exprs = vec!();
+                    let mut exprs = vec![];
                     if !self.peek_is(TokenType::RightParen)? {
                         exprs.push(self.expression()?);
                         while self.peek_is(TokenType::Comma)? {
@@ -619,9 +620,20 @@ impl<'a> PuffinParser<'a> {
         Ok(expr)
     }
 
+    /// <expr_list> ::= \<expression\>, {",", \<expression\>}
+    fn expr_list(&mut self, delimiter: TokenType, separator: TokenType) -> Result<Vec<Expression>, ParserError> {
+        let mut exprs = vec![];
+        exprs.push(self.expression()?);
+        while self.peek_is(separator)? && !self.peek_is(delimiter)? {
+            self.next_token()?;
+            exprs.push(self.expression()?);
+        }
+        Ok(exprs)
+    }
+
     /// \<block\> ::= {\<statement\>}
     fn block_stat(&mut self) -> Result<Statement, ParserError> {
-        let mut stats = vec!();
+        let mut stats = vec![];
         while !self.peek_is(TokenType::RightBrace)? {
             stats.push(self.statement()?);
         }
@@ -631,102 +643,164 @@ impl<'a> PuffinParser<'a> {
 
     fn layout_decl(&mut self) -> Result<Declaration, ParserError> {
         self.expect(&[TokenType::KwLayout])?;
-        self.expect(&[TokenType::LeftBrace])?;
-        let mut components = vec!();
-        while !self.peek_is(TokenType::RightBrace)? {
-            components.push(self.layout_item()?);
-        }
-        self.expect(&[TokenType::RightBrace])?;
-        let decl = Declaration::Layout(LayoutDeclaration::new(components));
-        Ok(decl)
-    }
-
-    /// <layout_item> ::= \<identifier\>, {\<prop\>, "=", \<primary_expression\>}, "{", {\<layout_item\>}, "}"<br>
-    /// <layout_item> ::= \<identifier\>, {\<prop\>, "=", \<primary_expression\>}, \[\<string\>\], ";"
-    fn layout_item(&mut self) -> Result<Declaration, ParserError> {
-        let name = self.expect(&[TokenType::Identifier])?;
-        let mut bindings = vec!();
-        let mut declarations = vec!();
-        while self.peek_is(TokenType::Identifier)? {
-            bindings.push(self.layout_binding()?);
-        }
-        let string_literal = if self.peek_is(TokenType::String)? || self.peek_is(TokenType::Identifier)? {
+        let name = if self.peek_is(TokenType::Identifier)? {
             Some(self.next_token()?)
         } else {
             None
         };
-        if self.peek_is(TokenType::LeftBrace)? {
-            self.next_token()?;
-            while !self.peek_is(TokenType::RightBrace)? {
-                declarations.push(self.layout_item()?);
-            }
-            self.expect(&[TokenType::RightBrace])?;
-        } else {
-            self.expect(&[TokenType::Semicolon])?;
-        }
-        let item = Declaration::LayoutItem(LayoutItemDeclaration::new(name, bindings, string_literal, declarations));
-        Ok(item)
+        self.expect(&[TokenType::LeftBrace])?;
+        let markup = self.markup()?;
+        self.expect(&[TokenType::RightBrace])?;
+        Ok(LayoutDeclaration::new(markup).with_name(name).into())
     }
 
-    /// <expr_list> ::= \<expression\>, {",", \<expression\>}
-    fn expr_list(&mut self, delimiter: TokenType, separator: TokenType) -> Result<Vec<Expression>, ParserError> {
-        let mut exprs = vec!();
-        exprs.push(self.expression()?);
-        while self.peek_is(separator)? && !self.peek_is(delimiter)? {
-            self.next_token()?;
-            exprs.push(self.expression()?);
-        }
-        Ok(exprs)
-    }
-
-    fn layout_binding(&mut self) -> Result<BindingDeclaration, ParserError> {
-        let name = self.expect(&[TokenType::Identifier])?;
-        if self.peek_is(TokenType::LeftParen)? {
-            self.next_token()?;
-            let parameters = self.name_list()?;
-            self.expect(&[TokenType::RightParen])?;
-            self.expect(&[TokenType::Assign])?;
-            self.expect(&[TokenType::LeftBrace])?;
-            let exprs = if !self.peek_is(TokenType::RightBrace)? {
-                self.expr_list(TokenType::RightBrace, TokenType::Semicolon)?
-            } else {
-                vec!()
-            };
-            self.expect(&[TokenType::RightBrace])?;
-            Ok(BindingDeclaration::new(name, LayoutItemProp::Lambda(LambdaFunctionBinding::new(parameters, exprs))))
-        } else {
-            self.expect(&[TokenType::Assign])?;
-            match self.safe_peek()?.ok_or(ParserError::UnexpectedEofError())?.ty {
+    fn markup(&mut self) -> Result<Vec<Markup>, ParserError> {
+        let mut markup = vec![];
+        loop {
+            let markup_item = match self.peek()?.ty {
+                TokenType::KwMatch => self.match_markup()?,
+                TokenType::KwIf => self.if_markup()?,
+                TokenType::KwFor => self.for_markup()?,
                 TokenType::Identifier => {
-                    let decl = BindingDeclaration::new(name, LayoutItemProp::DirectBindings(
-                        DirectBindings::new(vec![self.expect(&[TokenType::Identifier])?]))
-                    );
-                    Ok(decl)
+                    self.markup_item()?
                 },
-                TokenType::LeftBracket => {
+                _ => break
+            };
+            markup.push(markup_item);
+        }
+        Ok(markup)
+    }
+
+    fn match_markup(&mut self) -> Result<Markup, ParserError> {
+        self.expect(&[TokenType::KwMatch])?;
+        let comparator = self.expression()?;
+        self.expect(&[TokenType::LeftBrace])?;
+        let mut cases = vec![];
+        let mut default_case = None;
+        while !self.peek_is(TokenType::RightBrace)? {
+            if self.peek_is(TokenType::KwDefault)? {
+                self.expect(&[TokenType::KwDefault])?;
+                let token = if self.peek_is(TokenType::Identifier)? {
+                    Some(self.next_token()?)
+                } else {
+                    None
+                };
+                self.expect(&[TokenType::Arrow])?;
+                let markup = self.markup()?;
+                if self.peek_is(TokenType::Comma)? {
                     self.next_token()?;
-                    let names = self.name_list()?;
-                    self.expect(&[TokenType::RightBracket])?;
-                    let decl = BindingDeclaration::new(name, LayoutItemProp::DirectBindings(DirectBindings::new(names)));
-                    Ok(decl)
-                },
-                TokenType::LeftBrace => {
-                    self.next_token()?;
-                    let exprs = if !self.peek_is(TokenType::RightBrace)? {
-                        self.expr_list(TokenType::RightBrace, TokenType::Semicolon)?
-                    } else {
-                        vec!()
-                    };
-                    self.expect(&[TokenType::RightBrace])?;
-                    let decl = BindingDeclaration::new(name, LayoutItemProp::Lambda(LambdaFunctionBinding::new(vec!(), exprs )));
-                    Ok(decl)
-                },
-                t => Err(ParserError::UnexpectedTokenError{
-                    span: self.pos().to_owned(),
-                    expected: vec![TokenType::Assign, TokenType::LeftBracket],
-                    received: t
-                })
+                }
+                default_case = Some((token, markup));
+                break;
+            } else {
+                let lhs = self.expression()?;
+                self.expect(&[TokenType::Arrow])?;
+                let rhs = if self.peek_is(TokenType::LeftBrace)? {
+                    self.markup()?
+                } else {
+                    vec![self.markup_item()?]
+                };
+                if !self.peek_is(TokenType::RightBrace)? {
+                    self.expect(&[TokenType::Comma])?;
+                }
+                cases.push((lhs, rhs));
             }
         }
+        self.expect(&[TokenType::RightBrace])?;
+        Ok(MatchConditionalRender::new(comparator, cases, default_case).into())
+    }
+
+    fn if_markup(&mut self) -> Result<Markup, ParserError> {
+        self.expect(&[TokenType::KwIf])?;
+        todo!();
+    }
+
+    fn for_markup(&mut self) -> Result<Markup, ParserError> {
+        self.expect(&[TokenType::KwFor])?;
+        todo!();
+    }
+
+    fn markup_item(&mut self) -> Result<Markup, ParserError> {
+        let name = self.next_token()?;
+        let bindings = if self.peek_is(TokenType::Identifier)? {
+            let mut bindings = vec![];
+            while self.peek_is(TokenType::Identifier)? {
+                let name = self.next_token()?;
+                let mut is_lambda = false;
+                let parameters = if self.peek_is(TokenType::LeftParen)? {
+                    is_lambda = true;
+                    self.expect(&[TokenType::LeftParen])?;
+                    let mut parameters = vec![];
+                    while !self.peek_is(TokenType::RightParen)? {
+                        parameters.push(self.expect(&[TokenType::Identifier])?);
+                        if self.peek_is(TokenType::Comma)? {
+                            self.expect(&[TokenType::Comma])?;
+                        } else {
+                            self.expect(&[TokenType::RightParen])?;
+                            break;
+                        }
+                    }
+                    parameters
+                } else {
+                    vec![]
+                };
+                self.expect(&[TokenType::Assign])?;
+                let binding = if is_lambda {
+                    self.expect(&[TokenType::LeftBrace])?;
+                    let exprs = self.expr_list(TokenType::Semicolon, TokenType::RightBrace)?;
+                    self.expect(&[TokenType::RightBrace])?;
+                    LambdaFunctionBinding::new(parameters, exprs).into()
+                } else {
+                    let tokens = if self.peek_is(TokenType::LeftBracket)? {
+                        let mut tokens = vec![];
+                        self.next_token()?;
+                        while !self.peek_is(TokenType::RightBracket)? {
+                            tokens.push(self.expect(&[TokenType::Identifier])?);
+                            if self.peek_is(TokenType::Comma)? {
+                                self.next_token()?;
+                            } else {
+                                break;
+                            }
+                        }
+                        self.expect(&[TokenType::RightBracket])?;
+                        tokens
+                    } else {
+                        vec![self.expect(&[TokenType::Identifier])?]
+                    };
+                    DirectBindings::new(tokens).into()
+                };
+                bindings.push(MarkupBinding::new(name, binding))
+            }
+            bindings
+        } else {
+            vec![]
+        };
+        let string_literal = if self.peek_is(TokenType::String)? {
+            Some(self.next_token()?)
+        } else {
+            None
+        };
+        let children = if string_literal.is_some() {
+            self.expect(&[TokenType::Semicolon])?;
+            vec![]
+        } else if self.peek_is(TokenType::LeftBrace)? {
+            self.markup_block()?
+        } else {
+            vec![]
+        };
+        Ok(ComponentRender::new(name, bindings, string_literal, children).into())
+    }
+
+    fn markup_block(&mut self) -> Result<Vec<Markup>, ParserError> {
+        self.expect(&[TokenType::LeftBrace])?;
+        let mut markup = vec![];
+        while !self.peek_is(TokenType::RightBrace)? {
+            markup.push(self.markup_item()?);
+            if self.peek_is(TokenType::Semicolon)? {
+                self.next_token()?;
+            }
+        }
+        self.expect(&[TokenType::RightBrace])?;
+        Ok(markup)
     }
 }

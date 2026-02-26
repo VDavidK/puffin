@@ -1,3 +1,4 @@
+#![allow(unused, dead_code)] // TODO: Remove this before going to prod (please)
 use crate::parse::{PuffinParser, ParserError};
 use puffin_ast::Ast;
 
