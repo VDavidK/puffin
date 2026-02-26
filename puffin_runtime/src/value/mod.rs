@@ -1,7 +1,12 @@
-use std::{cell::RefCell, collections::HashMap, fmt::Display, hash::Hash, rc::Rc};
+mod function;
+mod object;
+
+use std::{cell::RefCell, fmt::Display, hash::Hash, rc::Rc};
+
+pub use object::{Object, new_object};
+pub use function::Function;
 
 use serde_derive::{Deserialize, Serialize};
-
 use crate::RuntimeError;
 
 pub type IntType = i64;
@@ -9,6 +14,7 @@ pub type FloatType = f64;
 pub type BoolType = bool;
 pub type StringType = String;
 pub type ObjectType = Rc<RefCell<Object>>;
+pub type FunctionType = Rc<Function>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Value {
@@ -16,6 +22,7 @@ pub enum Value {
     Float(FloatType),
     Bool(BoolType),
     String(StringType),
+    Function(FunctionType),
     Null,
 
     #[serde(skip)]
@@ -135,17 +142,6 @@ impl From<i32> for Value {
     }
 }
 
-impl TryFrom<Value> for ObjectType {
-    type Error = RuntimeError;
-
-    fn try_from(value: Value) -> Result<Self, Self::Error> {
-        match value {
-            Value::Object(s) => Ok(s),
-            _ => Err(RuntimeError::IncorrectType { ty: value.type_name().to_owned(), expected: "object".to_owned() }),
-        }
-    }
-}
-
 impl Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -154,6 +150,7 @@ impl Display for Value {
             Value::Bool(v) => f.write_fmt(format_args!("{v}")),
             Value::String(v) => f.write_fmt(format_args!("{v}")),
             Value::Object(v) => f.write_fmt(format_args!("{}", v.borrow())),
+            Value::Function(v) => f.write_fmt(format_args!("{}", v)),
             Value::Null => f.write_fmt(format_args!("null")),
         }
     }
@@ -254,7 +251,7 @@ impl Value {
             _ => Err(RuntimeError::InvalidBinaryOperation { op: "modulo".to_owned(), lhs_type: self.type_name().to_owned(), rhs_type: rhs.type_name().to_owned() }),
         }
     }
-    
+
     pub fn is_equal(&self, rhs: &Self) -> bool {
         match self {
             Value::Int(lhs) => match rhs {
@@ -267,22 +264,28 @@ impl Value {
                 Value::Float(rhs) => *lhs == *rhs,
                 _ => false,
             },
-            
+
             Value::Bool(lhs) => match rhs {
                 Value::Bool(rhs) => *lhs == *rhs,
-                
+
                 _ => false,
             },
-            
+
             Value::String(lhs) => match rhs {
                 Value::String(rhs) => *lhs == *rhs,
-                
+
                 _ => false,
             },
-            
+
             Value::Object(lhs) => match rhs {
                 Value::Object(rhs) => lhs.as_ptr() == rhs.as_ptr(),
-                
+
+                _ => false,
+            }
+
+            Value::Function(lhs) => match rhs {
+                Value::Function(rhs) => Rc::as_ptr(lhs) == Rc::as_ptr(rhs),
+
                 _ => false,
             }
 
@@ -293,17 +296,17 @@ impl Value {
             }
         }
     }
-    
+
     pub fn not_equal(&self, rhs: &Self) -> bool {
         !self.is_equal(rhs)
     }
-    
+
     pub fn greater(&self, rhs: &Self) -> bool {
         match self {
             Value::Int(lhs) => match rhs {
                 Value::Int(rhs) => *lhs > *rhs,
                 Value::Float(rhs) => *lhs as FloatType > *rhs,
-                
+
                 _ => false,
             },
             Value::Float(lhs) => match rhs {
@@ -312,11 +315,11 @@ impl Value {
 
                 _ => false,
             },
-            
+
             _ => false,
         }
     }
-    
+
     pub fn lesser(&self, rhs: &Self) -> bool {
         match self {
             Value::Int(lhs) => match rhs {
@@ -335,11 +338,11 @@ impl Value {
             _ => false,
         }
     }
-    
+
     pub fn greater_equal(&self, rhs: &Self) -> bool {
         self.greater(rhs) || self.is_equal(rhs)
     }
-    
+
     pub fn lesser_equal(&self, rhs: &Self) -> bool {
         self.lesser(rhs) || self.is_equal(rhs)
     }
@@ -363,6 +366,7 @@ impl Value {
             Value::Bool(val) => *val,
             Value::String(val) => !val.is_empty(),
             Value::Object(_) => true,
+            Value::Function(_) => true,
             Value::Null => false,
         }
     }
@@ -374,6 +378,7 @@ impl Value {
             Value::Bool(_) => "bool",
             Value::String(_) => "string",
             Value::Object(_) => "object",
+            Value::Function(_) => "function",
             Value::Null => "null",
         }
     }
@@ -397,33 +402,8 @@ impl Value {
     pub fn take_object(self) -> Result<ObjectType, RuntimeError> {
         TryInto::<ObjectType>::try_into(self)
     }
-}
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct Object {
-    fields: HashMap<String, Value>,
-}
-
-impl Object {
-    pub fn new() -> Self {
-        Self::default()
+    pub fn take_function(self) -> Result<FunctionType, RuntimeError> {
+        TryInto::<FunctionType>::try_into(self)
     }
-
-    pub fn set_field(&mut self, name: String, value: Value) {
-        self.fields.insert(name, value);
-    }
-
-    pub fn get_field(&self, name: impl AsRef<str>) -> Option<&Value> {
-        self.fields.get(name.as_ref())
-    }
-}
-
-impl Display for Object {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("Object")
-    }
-}
-
-pub fn new_object() -> ObjectType {
-    Rc::new(RefCell::new(Object::new()))
 }

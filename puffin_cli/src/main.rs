@@ -1,6 +1,8 @@
 use std::{fs::File, path::PathBuf};
-
+use std::io::Read;
+use std::rc::Rc;
 use clap::{Parser, Subcommand};
+use color_eyre::eyre::OptionExt;
 use puffin_runtime::{Chunk, Value, op::OpCode, run};
 
 #[cfg(feature = "logging")]
@@ -9,13 +11,9 @@ use simplelog::{Config, LevelFilter, WriteLogger};
 #[derive(Subcommand, Debug)]
 enum Operation {
     Run {
-        #[arg(long, action, default_value_t = false)]
-        ir: bool,
         input: PathBuf,
     },
     Compile {
-        #[arg(long, action, default_value_t = false)]
-        ir: bool,
         input: PathBuf,
         output: Option<PathBuf>,
     },
@@ -38,29 +36,30 @@ fn main() -> color_eyre::Result<()> {
     let args = Args::parse();
 
     match args.op {
-        Operation::Compile { input, output, ir } => {
-            let chunk = if ir {
-                let file = File::open(&input)?;
-                puffin_compiler::ir::compile(input.file_name().unwrap().to_str().unwrap(), file)?
-            } else {
-                test_chunk()
-            };
+        Operation::Compile { input, output } => {
+            let input_file = File::open(&input)?;
+            let chunk = puffin_compiler::ir::compile(input.file_name().unwrap().to_str().unwrap(), input_file)?;
             let file = File::create(output.unwrap_or("out.pfb".into()))?;
             ciborium::into_writer(&chunk, file)?;
         },
-        Operation::Run { input, ir } => {
-            let file = File::open(&input)?;
+        Operation::Run { input } => {
+            let mut file = File::open(&input)?;
+            let input_path_str = input.to_str()
+                .ok_or_eyre("File name must be valid UTF-8 name")?;
 
-            let chunk = if ir {
-                puffin_compiler::ir::compile(input.file_name().unwrap().to_str().unwrap(), file)?
+            let chunk = if let Some(ext) = input.extension() && ext == "pfb" {
+                ciborium::from_reader::<Chunk, File>(file)?
             } else {
-                ciborium::from_reader::<puffin_runtime::Chunk, File>(file)?
+                let mut file_contents = String::new();
+                file.read_to_string(&mut file_contents)?;
+                let ast = puffin_parser::run_parser(file_contents, input_path_str)?;
+                puffin_compiler::compile_ast(input_path_str, ast)
             };
 
             #[cfg(feature = "logging")]
             log::debug!("-- Running chunk --\n{chunk}");
 
-            run(&chunk)?;
+            run(Rc::new(chunk))?;
         },
         Operation::Test => {
             let chunk = test_chunk_2();
@@ -68,7 +67,7 @@ fn main() -> color_eyre::Result<()> {
             #[cfg(feature = "logging")]
             log::info!("-- Running chunk --\n{chunk}");
             
-            run(&chunk)?;
+            run(Rc::new(chunk))?;
         },
     }
 

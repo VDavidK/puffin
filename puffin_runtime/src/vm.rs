@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-
+use std::rc::Rc;
 use num_enum::TryFromPrimitive;
 use ratatui::DefaultTerminal;
 
@@ -8,39 +8,44 @@ use crate::chunk::{InstructionOffset, ConstantOffset, LocalOffset};
 
 #[derive(Debug)]
 struct CallFrame {
+    pub chunk: Rc<Chunk>,
     pub return_addr: InstructionOffset,
     pub stack_offset: usize,
     pub local_count: usize,
+    pub pc: usize,
 }
 
 #[derive(Debug)]
-pub struct Vm<'a> {
-    chunk: &'a Chunk,
+pub struct Vm {
     stack: Vec<Value>,
-    pc: usize,
     running: bool,
     globals: HashMap<String, Value>,
     call_stack: Vec<CallFrame>,
     term: DefaultTerminal,
 }
 
-impl<'a> Vm<'a> {
-    pub fn new(chunk: &'a Chunk) -> Self {
+impl Vm {
+    pub fn new(chunk: Rc<Chunk>) -> Self {
         let term = ratatui::init();
+        let main_frame = CallFrame {
+            chunk,
+            return_addr: 0,
+            stack_offset: 0,
+            local_count: 0,
+            pc: 0,
+        };
 
         Self {
-            chunk,
             stack: vec![],
-            pc: 0,
             running: true,
             globals: HashMap::new(),
-            call_stack: vec![],
+            call_stack: vec![main_frame],
             term,
         }
     }
 
     pub fn is_running(&self) -> bool {
-        self.running && self.pc < self.chunk.byte_len()
+        self.running && !self.call_stack.is_empty() && self.pc().unwrap() < self.chunk().unwrap().byte_len()
     }
 
     pub fn execute(&mut self) -> Result<(), RuntimeError> {
@@ -58,7 +63,7 @@ impl<'a> Vm<'a> {
         }
         
         match op {
-            OpCode::Invalid => return Err(RuntimeError::InvalidOpCode { pc: self.pc }),
+            OpCode::Invalid => return Err(RuntimeError::InvalidOpCode { pc: self.pc()? }),
 
             OpCode::Constant => {
                 let constant = self.fetch_constant()?
@@ -212,7 +217,7 @@ impl<'a> Vm<'a> {
             OpCode::Jump => {
                 let addr = self.fetch_instruction_offset()?;
 
-                self.pc = addr as usize;
+                self.set_pc(addr as usize);
             },
 
             OpCode::JumpIf => {
@@ -221,30 +226,38 @@ impl<'a> Vm<'a> {
 
                 if val.truthy() {
                     #[cfg(feature = "debug_tracing")]
-                    log::debug!("Value '{}' truthy, jumping from 0x{:x} -> 0x{:x}", val, self.pc, addr);
-                    self.pc = addr as usize;
+                    log::debug!("Value '{}' truthy, jumping from 0x{:x} -> 0x{:x}", val, self.pc()?, addr);
+                    self.set_pc(addr as usize);
                 }
                 else {
                     #[cfg(feature = "debug_tracing")]
-                    log::debug!("Skipping jump at 0x{:x}", self.pc);
+                    log::debug!("Skipping jump at 0x{:x}", self.pc()?);
                 }
             },
 
             OpCode::Call => {
-                let arg_count = self.fetch_u8()?;
+                let func = self.pop_expecting()?.take_function()?;
                 let addr = self.fetch_instruction_offset()?;
 
                 if let Some(frame) = self.call_stack.last_mut() {
-                    frame.local_count -= arg_count as usize;
+                    frame.local_count -= func.parity as usize;
                 }
 
-                self.call_stack.push(self.new_call_frame(arg_count as usize));
-                self.pc = addr as usize;
+                let frame = CallFrame {
+                    chunk: func.chunk.clone(),
+                    return_addr: 0,
+                    stack_offset: 0,
+                    local_count: 0,
+                    pc: 0,
+                };
+
+                self.call_stack.push(frame);
+                self.set_pc(addr as usize);
             },
 
             OpCode::Return => {
                 if let Some(frame) = self.call_stack.pop() {
-                    self.pc = frame.return_addr as usize;
+                    self.set_pc(frame.return_addr as usize);
                     let ret_value = self.pop_expecting()?;
 
                     // Pop all values pushed in the current call frame
@@ -276,69 +289,71 @@ impl<'a> Vm<'a> {
     }
 
     pub fn fetch_op(&mut self) -> Result<OpCode, RuntimeError> {
-        let byte = self.chunk
-            .read_u8(self.pc)
-            .ok_or(RuntimeError::AccessOutOfBounds { at: self.pc, pc: self.pc })?;
+        let byte = self.chunk()?
+            .read_u8(self.pc()?)
+            .ok_or(RuntimeError::AccessOutOfBounds { at: self.pc()?, pc: self.pc()? })?;
 
-        self.pc += 1;
+        self.move_pc(1);
 
         OpCode::try_from_primitive(byte)
-            .map_err(|_| RuntimeError::UnrecognizedOpCode { op: byte, pc: self.pc })
+            .map_err(|_| RuntimeError::UnrecognizedOpCode { op: byte, pc: self.pc().unwrap() })
     }
 
     pub fn fetch_u8(&mut self) -> Result<u8, RuntimeError> {
-        let byte =  self.chunk.read_u8(self.pc).ok_or(RuntimeError::AccessOutOfBounds { at: self.pc, pc: self.pc })?;
-        self.pc += 1;
+        let byte =  self.chunk()?
+            .read_u8(self.pc()?)
+            .ok_or(RuntimeError::AccessOutOfBounds { at: self.pc()?, pc: self.pc()? })?;
+        self.move_pc(1);
         Ok(byte)
     }
 
     pub fn fetch_u16(&mut self) -> Result<u16, RuntimeError> {
-        let val =  self.chunk.read_u16(self.pc).ok_or(RuntimeError::AccessOutOfBounds { at: self.pc, pc: self.pc })?;
-        self.pc += 2;
+        let val =  self.chunk()?.read_u16(self.pc()?).ok_or(RuntimeError::AccessOutOfBounds { at: self.pc()?, pc: self.pc()? })?;
+        self.move_pc(2);
         Ok(val)
     }
 
     pub fn fetch_u32(&mut self) -> Result<u32, RuntimeError> {
-        let val =  self.chunk.read_u32(self.pc).ok_or(RuntimeError::AccessOutOfBounds { at: self.pc, pc: self.pc })?;
-        self.pc += 4;
+        let val =  self.chunk()?.read_u32(self.pc()?).ok_or(RuntimeError::AccessOutOfBounds { at: self.pc()?, pc: self.pc()? })?;
+        self.move_pc(4);
         Ok(val)
     }
 
     pub fn fetch_u64(&mut self) -> Result<u64, RuntimeError> {
-        let val =  self.chunk.read_u64(self.pc).ok_or(RuntimeError::AccessOutOfBounds { at: self.pc, pc: self.pc })?;
-        self.pc += 8;
+        let val =  self.chunk()?.read_u64(self.pc()?).ok_or(RuntimeError::AccessOutOfBounds { at: self.pc()?, pc: self.pc()? })?;
+        self.move_pc(8);
         Ok(val)
     }
     
     pub fn fetch_constant_offset(&mut self) -> Result<ConstantOffset, RuntimeError> {
-        let val =  self.chunk.read_constant_offset(self.pc).ok_or(RuntimeError::AccessOutOfBounds { at: self.pc, pc: self.pc })?;
-        self.pc += size_of::<ConstantOffset>();
+        let val =  self.chunk()?.read_constant_offset(self.pc()?).ok_or(RuntimeError::AccessOutOfBounds { at: self.pc()?, pc: self.pc()? })?;
+        self.move_pc(size_of::<ConstantOffset>());
         Ok(val)
     }
 
     pub fn fetch_local_offset(&mut self) -> Result<LocalOffset, RuntimeError> {
-        let val =  self.chunk.read_local_offset(self.pc).ok_or(RuntimeError::AccessOutOfBounds { at: self.pc, pc: self.pc })?;
-        self.pc += size_of::<LocalOffset>();
+        let val =  self.chunk()?.read_local_offset(self.pc()?).ok_or(RuntimeError::AccessOutOfBounds { at: self.pc()?, pc: self.pc()? })?;
+        self.move_pc(size_of::<LocalOffset>());
         Ok(val)
     }
     
     pub fn fetch_instruction_offset(&mut self) -> Result<InstructionOffset, RuntimeError> {
-        let val =  self.chunk.read_instruction_offset(self.pc).ok_or(RuntimeError::AccessOutOfBounds { at: self.pc, pc: self.pc })?;
-        self.pc += size_of::<InstructionOffset>();
+        let val =  self.chunk()?.read_instruction_offset(self.pc()?).ok_or(RuntimeError::AccessOutOfBounds { at: self.pc()?, pc: self.pc()? })?;
+        self.move_pc(size_of::<InstructionOffset>());
         Ok(val)
     }
 
     pub fn fetch_constant(&mut self) -> Result<&Value, RuntimeError> {
         let offset = self.fetch_constant_offset()? as usize;
-        let value = self.chunk.get_constant(offset)
-            .ok_or(RuntimeError::InvalidConstantAccess { at: offset, pc: self.pc })?;
+        let value = self.chunk()?.get_constant(offset)
+            .ok_or(RuntimeError::InvalidConstantAccess { at: offset, pc: self.pc()? })?;
 
         Ok(value)
     }
     
     pub fn get_local(&self, offset: LocalOffset) -> Result<&Value, RuntimeError> {
         let value = self.stack.get(offset as usize + self.stack_offset())
-            .ok_or(RuntimeError::StackOutOfBounds { at: offset as usize, pc: self.pc })?;
+            .ok_or(RuntimeError::StackOutOfBounds { at: offset as usize, pc: self.pc()? })?;
         
         Ok(value)
     }
@@ -347,7 +362,7 @@ impl<'a> Vm<'a> {
         let offset = offset as usize + self.stack_offset();
 
         if offset >= self.stack.len() {
-            return Err(RuntimeError::StackOutOfBounds { at: offset, pc: self.pc });
+            return Err(RuntimeError::StackOutOfBounds { at: offset, pc: self.pc()? });
         }
 
         self.stack[offset] = value;
@@ -392,16 +407,32 @@ impl<'a> Vm<'a> {
             .unwrap_or(0)
     }
 
-    fn new_call_frame(&self, arg_count: usize) -> CallFrame {
-        CallFrame {
-            return_addr: self.pc as InstructionOffset,
-            stack_offset: self.stack.len() - arg_count,
-            local_count: arg_count,
+    fn chunk(&self) -> Result<&Chunk, RuntimeError> {
+        self.call_stack.last()
+            .map(|frame| frame.chunk.as_ref())
+            .ok_or(RuntimeError::StackEmpty)
+    }
+
+    fn pc(&self) -> Result<usize, RuntimeError> {
+        self.call_stack.last()
+            .map(|frame| frame.pc)
+            .ok_or(RuntimeError::StackEmpty)
+    }
+
+    fn move_pc(&mut self, amount: usize) {
+        if let Some(frame) = self.call_stack.last_mut() {
+            frame.pc += amount
+        }
+    }
+
+    fn set_pc(&mut self, pc: usize) {
+        if let Some(frame) = self.call_stack.last_mut() {
+            frame.pc = pc
         }
     }
 }
 
-impl<'a> Drop for Vm<'a> {
+impl Drop for Vm {
     fn drop(&mut self) {
         ratatui::restore();
     }

@@ -63,13 +63,13 @@ pub enum ParserError {
 mod tests;
 
 #[derive(Debug)]
-pub(crate) struct PuffinParser<'a> {
+pub struct PuffinParser<'a> {
     lexer: PuffinLexer<'a>,
     current_token: Option<Token>,
 }
 
 impl<'a> PuffinParser<'a> {
-    pub(crate) fn new(src: &'a str, src_name: &'a str) -> Self {
+    pub fn new(src: &'a str, src_name: &'a str) -> Self {
         PuffinParser {
             lexer: PuffinLexer::new(src, src_name),
             current_token: None,
@@ -146,7 +146,7 @@ impl<'a> PuffinParser<'a> {
     }
 
     /// Runs the parser on the source file provided when it was initialized.
-    pub(crate) fn run(mut self) -> Result<Ast, ParserError> {
+    pub fn run(mut self) -> Result<Ast, ParserError> {
         let mut decls = vec![];
         while !self.eof() {
             decls.push(self.declaration()?);

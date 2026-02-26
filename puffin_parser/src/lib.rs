@@ -17,8 +17,8 @@ pub fn run_parser_file(file_path: &str) -> Result<Ast, ParserError> {
 }
 
 /// The actual function responsible for running the lexer and parser.
-fn run_parser(src: impl AsRef<str>, file_path: impl AsRef<str>) -> Result<Ast, ParserError> {
-    let parser = PuffinParser::new(src.as_ref(), file_path.as_ref());
+pub fn run_parser(src: impl AsRef<str>, source_name: impl AsRef<str>) -> Result<Ast, ParserError> {
+    let parser = PuffinParser::new(src.as_ref(), source_name.as_ref());
 
     parser.run()
 }

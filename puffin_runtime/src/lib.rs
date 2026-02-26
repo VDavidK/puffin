@@ -5,6 +5,7 @@ pub mod op;
 pub mod chunk;
 pub mod value;
 
+use std::rc::Rc;
 pub use chunk::Chunk;
 pub use value::Value;
 
@@ -50,10 +51,13 @@ pub enum RuntimeError {
 
     #[error("Expected '{expected}' got {ty}")]
     IncorrectType { ty: String, expected: String },
+
+    #[error("Attempting to execute instructions with an empty call stack")]
+    CallStackEmpty,
 }
 
 
-pub fn run(program: &Chunk) -> Result<(), RuntimeError> {
+pub fn run(program: Rc<Chunk>) -> Result<(), RuntimeError> {
     let mut vm = Vm::new(program);
     
     #[cfg(feature = "debug_tracing")]
