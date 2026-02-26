@@ -138,5 +138,5 @@ fn test_example_code() {
     if let Err(e) = &result {
         println!("{}", format!("parse error: {:}", e).red());
     }
-    // assert!(result.is_ok())
+    assert!(result.is_ok())
 }

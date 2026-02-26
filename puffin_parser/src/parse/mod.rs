@@ -4,7 +4,7 @@ use puffin_ast::token::{Token, TokenType};
 use puffin_ast::statement::{Statement, AssignStatement, ExpressionStatement, BreakStatement, ContinueStatement, ForStatement, IfStatement, BlockStatement, ReturnStatement, MatchStatement, VariableDeclarationStatement, IncrementStatement, DecrementStatement, OpAssignStatement};
 use puffin_ast::declaration::{Declaration, VarDeclaration, Decorator, ComponentDeclaration, MethodDeclaration, SignalDeclaration, LayoutDeclaration, RequireDeclaration, UseDeclaration, ExportDeclaration, EnumDeclaration};
 use puffin_ast::expression::{AccessorExpression, BinaryExpression, Expression, FunctionCallExpression, LiteralExpression, UnaryExpression, ArrayExpression, DictionaryExpression, MatchExpression, IndexExpression};
-use puffin_ast::markup::{ Markup, LambdaFunctionBinding, MarkupBinding, DirectBindings, ComponentRender, IterativeRender, IfConditionalRender, MatchConditionalRender, LayoutRender };
+use puffin_ast::markup::{Markup, LambdaFunctionBinding, MarkupBinding, DirectBindings, ComponentRender, IterativeRender, IfConditionalRender, MatchConditionalRender, LayoutRender, StyleRender};
 use crate::lex::{PuffinLexer, LexerError};
 
 fn get_op_precedence(ty: TokenType) -> usize {
@@ -152,7 +152,6 @@ impl<'a> PuffinParser<'a> {
             decls.push(self.declaration()?);
         }
         let ast = Ast::new(decls);
-        dbg!(&ast);
         Ok(ast)
     }
 
@@ -234,8 +233,7 @@ impl<'a> PuffinParser<'a> {
         }
         self.expect(&[TokenType::RightBrace])?;
 
-        let decl = Declaration::Component(ComponentDeclaration::new(params, decls).with_name(name));
-        Ok(decl)
+        Ok(ComponentDeclaration::new(params, decls).with_name(name).into())
     }
 
     /// \<decorated_method_decl\> ::= "@", \<identifier\>, \<parameters\>, \<method_decl\>
@@ -690,11 +688,33 @@ impl<'a> PuffinParser<'a> {
                 TokenType::Identifier => {
                     self.markup_item()?
                 },
+                TokenType::KwStyle => {
+                    self.next_token()?;
+                    let mut style_rules = vec![];
+                    if self.peek_is(TokenType::LeftBrace)? {
+                        self.next_token()?;
+                        while !self.peek_is(TokenType::RightBrace)? {
+                            style_rules.push(self.style_markup()?);
+                        }
+                        self.expect(&[TokenType::RightBrace])?;
+                    } else if self.peek_is(TokenType::Identifier)? {
+                        style_rules.push(self.style_markup()?);
+                    }
+                    StyleRender::new(style_rules).into()
+                },
                 _ => break
             };
             markup.push(markup_item);
         }
         Ok(markup)
+    }
+
+    fn style_markup(&mut self) -> Result<(Token, Expression), ParserError> {
+        let style_name = self.expect(&[TokenType::Identifier])?;
+        self.expect(&[TokenType::Assign]);
+        let value = self.expression()?;
+        self.expect(&[TokenType::Semicolon]);
+        Ok((style_name, value))
     }
 
     fn match_markup(&mut self) -> Result<Markup, ParserError> {
@@ -738,7 +758,19 @@ impl<'a> PuffinParser<'a> {
 
     fn if_markup(&mut self) -> Result<Markup, ParserError> {
         self.expect(&[TokenType::KwIf])?;
-        todo!();
+        let condition = self.expression()?;
+        let if_markup = self.markup_block()?;
+        let mut elseif_markup = None;
+        let mut else_markup = vec![];
+        if self.peek_is(TokenType::KwElse)? {
+        self.next_token()?;
+            if self.peek_is(TokenType::KwIf)? {
+                elseif_markup = Some(self.if_markup()?);
+            } else {
+                else_markup = self.markup_block()?
+            }
+        }
+        Ok(IfConditionalRender::new(condition, if_markup, elseif_markup, else_markup).into())
     }
 
     fn for_markup(&mut self) -> Result<Markup, ParserError> {
