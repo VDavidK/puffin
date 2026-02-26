@@ -1,10 +1,10 @@
 use puffin_ast::{Ast, VarType};
 use puffin_ast::span::Span;
 use puffin_ast::token::{Token, TokenType};
-use puffin_ast::statement::{Statement, AssignStatement, ExpressionStatement, BreakStatement, ContinueStatement, ForStatement, IfStatement, BlockStatement, ReturnStatement, MatchStatement, VariableDeclarationStatement};
+use puffin_ast::statement::{Statement, AssignStatement, ExpressionStatement, BreakStatement, ContinueStatement, ForStatement, IfStatement, BlockStatement, ReturnStatement, MatchStatement, VariableDeclarationStatement, IncrementStatement, DecrementStatement, OpAssignStatement};
 use puffin_ast::declaration::{Declaration, VarDeclaration, Decorator, ComponentDeclaration, MethodDeclaration, SignalDeclaration, LayoutDeclaration, RequireDeclaration, UseDeclaration, ExportDeclaration, EnumDeclaration};
-use puffin_ast::expression::{AccessorExpression, BinaryExpression, Expression, FunctionCallExpression, LiteralExpression, UnaryExpression, ArrayExpression, DictionaryExpression, MatchExpression};
-use puffin_ast::markup::{ Markup, LambdaFunctionBinding, MarkupBinding, DirectBindings, ComponentRender, IterativeRender, IfConditionalRender, MatchConditionalRender };
+use puffin_ast::expression::{AccessorExpression, BinaryExpression, Expression, FunctionCallExpression, LiteralExpression, UnaryExpression, ArrayExpression, DictionaryExpression, MatchExpression, IndexExpression};
+use puffin_ast::markup::{ Markup, LambdaFunctionBinding, MarkupBinding, DirectBindings, ComponentRender, IterativeRender, IfConditionalRender, MatchConditionalRender, LayoutRender };
 use crate::lex::{PuffinLexer, LexerError};
 
 fn get_op_precedence(ty: TokenType) -> usize {
@@ -336,6 +336,7 @@ impl<'a> PuffinParser<'a> {
         let name = self.expect(&[TokenType::Identifier])?;
         self.expect(&[TokenType::Assign])?;
         let expr = self.expression()?;
+        self.expect(&[TokenType::Semicolon])?;
         Ok(VariableDeclarationStatement::new(name, expr, var_type).into())
     }
 
@@ -492,7 +493,6 @@ impl<'a> PuffinParser<'a> {
             }
         }
         self.expect(&[TokenType::RightBrace])?;
-        self.expect(&[TokenType::Semicolon])?;
         Ok(MatchExpression::new(comparator, cases, default_case).into())
     }
 
@@ -508,6 +508,25 @@ impl<'a> PuffinParser<'a> {
             TokenType::Semicolon => {
                 self.next_token()?;
                 Ok(ExpressionStatement::new(expr).into())
+            },
+            TokenType::Increment => {
+                self.next_token()?;
+                self.expect(&[TokenType::Semicolon])?;
+                Ok(IncrementStatement::new(expr).into())
+            },
+            TokenType::Decrement => {
+                self.next_token()?;
+                self.expect(&[TokenType::Semicolon])?;
+                Ok(DecrementStatement::new(expr).into())
+            },
+            TokenType::IncrementAssign
+            | TokenType::DecrementAssign
+            | TokenType::MulAssign
+            | TokenType::DivAssign =>  {
+                let op = self.next_token()?;
+                let rhs = self.expression()?;
+                self.expect(&[TokenType::Semicolon])?;
+                Ok(OpAssignStatement::new(expr, op, rhs).into())
             },
             _ => Err(ParserError::ExpectedStatementError(self.pos()))
         }
@@ -598,8 +617,14 @@ impl<'a> PuffinParser<'a> {
                         }
                     }
                     self.expect(&[TokenType::RightParen])?;
-                    expr = Expression::FunctionCall(FunctionCallExpression::new(expr, exprs));
-                }
+                    expr = FunctionCallExpression::new(expr, exprs).into();
+                },
+                TokenType::LeftBracket => {
+                    self.next_token()?;
+                    let indexer = self.expression()?;
+                    self.expect(&[TokenType::RightBracket])?;
+                    expr = IndexExpression::new(indexer, expr).into();
+                },
                 _ => break
             }
         }
@@ -629,15 +654,30 @@ impl<'a> PuffinParser<'a> {
 
     fn layout_decl(&mut self) -> Result<Declaration, ParserError> {
         self.expect(&[TokenType::KwLayout])?;
+        let mut parameters = vec![];
         let name = if self.peek_is(TokenType::Identifier)? {
-            Some(self.next_token()?)
+            let name = self.next_token()?;
+            if self.peek_is(TokenType::LeftParen)? {
+                self.next_token()?;
+                loop {
+                    parameters.push(self.expect(&[TokenType::Identifier])?);
+                    if self.peek_is(TokenType::Comma)? {
+                        self.next_token()?;
+                    }
+                    if self.peek_is(TokenType::RightParen)? {
+                        self.next_token()?;
+                        break;
+                    }
+                }
+            }
+            Some(name)
         } else {
             None
         };
         self.expect(&[TokenType::LeftBrace])?;
         let markup = self.markup()?;
         self.expect(&[TokenType::RightBrace])?;
-        Ok(LayoutDeclaration::new(markup).with_name(name).into())
+        Ok(LayoutDeclaration::new(markup, parameters).with_name(name).into())
     }
 
     fn markup(&mut self) -> Result<Vec<Markup>, ParserError> {
@@ -703,11 +743,36 @@ impl<'a> PuffinParser<'a> {
 
     fn for_markup(&mut self) -> Result<Markup, ParserError> {
         self.expect(&[TokenType::KwFor])?;
-        todo!();
+        let name = self.expect(&[TokenType::Identifier])?;
+        self.expect(&[TokenType::KwIn])?;
+        let iterable = self.expression()?;
+        let end_range = if self.peek_is(TokenType::Colon)? {
+            self.next_token()?;
+            Some(self.expression()?)
+        } else {
+            None
+        };
+        let block = self.markup_block()?;
+        Ok(IterativeRender::new(name, iterable, end_range, block).into())
     }
 
     fn markup_item(&mut self) -> Result<Markup, ParserError> {
         let name = self.next_token()?;
+        if self.peek_is(TokenType::LeftParen)? {
+            self.next_token()?;
+            let mut exprs = vec![];
+            while !self.peek_is(TokenType::RightParen)? {
+                exprs.push(self.expression()?);
+                if self.peek_is(TokenType::Comma)? {
+                    self.next_token()?;
+                } else {
+                    break;
+                }
+            }
+            self.expect(&[TokenType::RightParen])?;
+            self.expect(&[TokenType::Semicolon])?;
+            return Ok(LayoutRender::new(name, exprs).into())
+        }
         let bindings = if self.peek_is(TokenType::Identifier)? {
             let mut bindings = vec![];
             while self.peek_is(TokenType::Identifier)? {
@@ -731,9 +796,12 @@ impl<'a> PuffinParser<'a> {
                     vec![]
                 };
                 self.expect(&[TokenType::Assign])?;
+                if self.peek_is(TokenType::LeftBrace)? {
+                    is_lambda = true;
+                }
                 let binding = if is_lambda {
                     self.expect(&[TokenType::LeftBrace])?;
-                    let exprs = self.expr_list(TokenType::Semicolon, TokenType::RightBrace)?;
+                    let exprs = self.expr_list(TokenType::RightBrace, TokenType::Semicolon)?;
                     self.expect(&[TokenType::RightBrace])?;
                     LambdaFunctionBinding::new(parameters, exprs).into()
                 } else {
@@ -779,13 +847,7 @@ impl<'a> PuffinParser<'a> {
 
     fn markup_block(&mut self) -> Result<Vec<Markup>, ParserError> {
         self.expect(&[TokenType::LeftBrace])?;
-        let mut markup = vec![];
-        while !self.peek_is(TokenType::RightBrace)? {
-            markup.push(self.markup_item()?);
-            if self.peek_is(TokenType::Semicolon)? {
-                self.next_token()?;
-            }
-        }
+        let mut markup = self.markup()?;
         self.expect(&[TokenType::RightBrace])?;
         Ok(markup)
     }

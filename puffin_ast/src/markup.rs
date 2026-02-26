@@ -4,7 +4,8 @@ use crate::token::Token;
 #[derive(Debug)]
 pub enum Markup {
     /// Direct rendering of a component
-    Render(ComponentRender),
+    Component(ComponentRender),
+    Layout(LayoutRender),
     /// Rendering of a component via match-case
     Match(MatchConditionalRender),
     /// Rendering of a component via if/else
@@ -45,6 +46,12 @@ pub struct ComponentRender {
 }
 
 #[derive(Debug)]
+pub struct LayoutRender {
+    pub name: Token,
+    pub args: Vec<Expression>,
+}
+
+#[derive(Debug)]
 pub struct MatchConditionalRender {
     pub comparator: Box<Expression>,
     pub cases: Vec<(Expression, Vec<Markup>)>,
@@ -64,6 +71,15 @@ pub struct IterativeRender {
     pub iterable: Box<Expression>,
     pub end_range: Option<Box<Expression>>,
     pub block: Vec<Markup>
+}
+
+impl LayoutRender {
+    pub fn new(name: Token, args: Vec<Expression>) -> Self {
+        Self {
+            name,
+            args,
+        }
+    }
 }
 
 impl LambdaFunctionBinding {
@@ -122,9 +138,24 @@ impl MatchConditionalRender {
     }
 }
 
+impl IterativeRender {
+    pub fn new(var_name: Token,
+       iterable: Expression,
+       end_range: Option<Expression>,
+       block: Vec<Markup>
+    ) -> Self {
+        Self {
+            var_name,
+            iterable: Box::new(iterable),
+            end_range: end_range.map(Box::new),
+            block,
+        }
+    }
+}
+
 impl From<ComponentRender> for Markup {
     fn from(m: ComponentRender) -> Self {
-        Markup::Render(m)
+        Markup::Component(m)
     }
 }
 impl From<MatchConditionalRender> for Markup {
@@ -150,5 +181,11 @@ impl From<DirectBindings> for MarkupProp {
 impl From<LambdaFunctionBinding> for MarkupProp {
     fn from(m: LambdaFunctionBinding) -> Self {
         MarkupProp::Lambda(m)
+    }
+}
+
+impl From<LayoutRender> for Markup {
+    fn from(m: LayoutRender) -> Self {
+        Markup::Layout(m)
     }
 }

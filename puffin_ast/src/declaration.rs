@@ -23,6 +23,7 @@ pub struct LayoutDeclaration {
     /* TODO: Figure out what layout members are exactly */
     pub markup: Vec<Markup>,
     pub name: Option<Token>,
+    pub parameters: Vec<Token>,
 }
 
 #[derive(Debug)]
@@ -128,10 +129,11 @@ impl VarDeclaration {
     }
 }
 impl LayoutDeclaration {
-    pub fn new(markup: Vec<Markup>) -> Self {
+    pub fn new(markup: Vec<Markup>, parameters: Vec<Token>) -> Self {
         Self {
             name: None,
             markup,
+            parameters,
         }
     }
 
