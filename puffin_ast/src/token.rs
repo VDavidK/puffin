@@ -7,6 +7,7 @@ pub enum TokenType {
     KwNot, // "not"
     KwTrue, // "true"
     KwFalse, // "false"
+    KwNull, // "null"
     KwIf, // "if"
     KwElse, // "else"
     KwMatch, // "match"

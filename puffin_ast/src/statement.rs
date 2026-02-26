@@ -9,8 +9,8 @@ pub struct BlockStatement {
 
 #[derive(Debug)]
 pub struct AssignStatement {
-    pub name: Token,
-    pub expression: Box<Expression>
+    pub lhs: Box<Expression>,
+    pub rhs: Box<Expression>
 }
 
 #[derive(Debug)]
@@ -153,10 +153,10 @@ impl BlockStatement {
     }
 }
 impl AssignStatement {
-    pub fn new(name: Token, expression: Expression) -> Self {
+    pub fn new(lhs: Expression, rhs: Expression) -> Self {
         Self {
-            name,
-            expression: Box::new(expression)
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs)
         }
     }
 }
