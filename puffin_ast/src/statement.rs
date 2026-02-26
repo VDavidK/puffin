@@ -14,13 +14,6 @@ pub struct AssignStatement {
 }
 
 #[derive(Debug)]
-pub struct VarStatement {
-    pub name: Token,
-    pub expression: Box<Expression>,
-    pub var_type: VarType
-}
-
-#[derive(Debug)]
 pub struct BreakStatement;
 
 #[derive(Debug)]
@@ -92,7 +85,6 @@ pub struct OpAssignStatement {
 pub enum Statement {
     Block(BlockStatement),
     Assign(AssignStatement),
-    Var(VarStatement),
     Break(BreakStatement),
     Continue(ContinueStatement),
     /* FunctionDeclaration { name: Box<Token>, parameters: Vec<Token> }, */
@@ -115,11 +107,6 @@ impl From<BlockStatement> for Statement {
 impl From<AssignStatement> for Statement {
     fn from(m: AssignStatement) -> Self {
         Statement::Assign(m)
-    }
-}
-impl From<VarStatement> for Statement {
-    fn from(m: VarStatement) -> Self {
-        Statement::Var(m)
     }
 }
 impl From<BreakStatement> for Statement {
@@ -195,15 +182,6 @@ impl AssignStatement {
         Self {
             lhs: Box::new(lhs),
             rhs: Box::new(rhs)
-        }
-    }
-}
-impl VarStatement {
-    pub fn new(name: Token, expression: Expression, var_type: VarType) -> Self {
-        Self {
-            name,
-            expression: Box::new(expression),
-            var_type,
         }
     }
 }

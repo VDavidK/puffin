@@ -12,6 +12,8 @@ pub enum Markup {
     If(IfConditionalRender),
     /// Rendering of an iterator of components
     Iterative(IterativeRender),
+    /// Modifying the appearance of a component
+    Style(StyleRender),
 }
 
 #[derive(Debug)]
@@ -62,6 +64,7 @@ pub struct MatchConditionalRender {
 pub struct IfConditionalRender {
     pub condition: Box<Expression>,
     pub if_markup: Vec<Markup>,
+    pub elseif_markup: Option<Box<Markup>>,
     pub else_markup: Vec<Markup>,
 }
 
@@ -71,6 +74,22 @@ pub struct IterativeRender {
     pub iterable: Box<Expression>,
     pub end_range: Option<Box<Expression>>,
     pub block: Vec<Markup>
+}
+
+#[derive(Debug)]
+pub struct StyleRender {
+    pub values: Vec<(Token, Box<Expression>)>,
+}
+
+impl StyleRender {
+    pub fn new(values: Vec<(Token, Expression)>) -> Self {
+        Self {
+            values: values
+                .into_iter()
+                .map(|(name, value)| (name.to_owned(), Box::new(value)))
+                .collect(),
+        }
+    }
 }
 
 impl LayoutRender {
@@ -150,6 +169,23 @@ impl IterativeRender {
             end_range: end_range.map(Box::new),
             block,
         }
+    }
+}
+
+impl IfConditionalRender {
+    pub fn new(condition: Expression, if_markup: Vec<Markup>, elseif_markup: Option<Markup>, else_markup: Vec<Markup>) -> Self {
+        Self {
+            condition: Box::new(condition),
+            if_markup,
+            elseif_markup: elseif_markup.map(Box::new),
+            else_markup,
+        }
+    }
+}
+
+impl From<StyleRender> for Markup {
+    fn from(m: StyleRender) -> Self {
+        Markup::Style(m)
     }
 }
 
