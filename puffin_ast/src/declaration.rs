@@ -2,6 +2,7 @@ use crate::token::{Token};
 use crate::expression::{Expression};
 use crate::statement::{Statement};
 use crate::{VarType};
+use crate::markup::Markup;
 
 #[derive(Debug)]
 pub struct ComponentDeclaration {
@@ -20,38 +21,8 @@ pub struct VarDeclaration {
 #[derive(Debug)]
 pub struct LayoutDeclaration {
     /* TODO: Figure out what layout members are exactly */
-    pub declarations: Vec<Declaration>,
-}
-
-#[derive(Debug)]
-pub struct LambdaFunctionBinding {
-    pub parameters: Vec<Token>,
-    pub expressions: Vec<Expression>,
-}
-
-#[derive(Debug)]
-pub struct DirectBindings {
-    pub names: Vec<Token>,
-}
-
-#[derive(Debug)]
-pub struct BindingDeclaration {
-    pub name: Token,
-    pub binding: LayoutItemProp,
-}
-
-#[derive(Debug)]
-pub enum LayoutItemProp {
-    DirectBindings(DirectBindings),
-    Lambda(LambdaFunctionBinding),
-}
-
-#[derive(Debug)]
-pub struct LayoutItemDeclaration {
-    pub name: Token,
-    pub bindings: Vec<BindingDeclaration>,
-    pub string_literal: Option<Token>,
-    pub declarations: Vec<Declaration>,
+    pub markup: Vec<Markup>,
+    pub name: Option<Token>,
 }
 
 #[derive(Debug)]
@@ -100,7 +71,6 @@ pub enum Declaration {
     Component(ComponentDeclaration),
     Var(VarDeclaration),
     Layout(LayoutDeclaration),
-    LayoutItem(LayoutItemDeclaration),
     Signal(SignalDeclaration),
     Method(MethodDeclaration),
     Require(RequireDeclaration),
@@ -158,54 +128,19 @@ impl VarDeclaration {
     }
 }
 impl LayoutDeclaration {
-    pub fn new(declarations: Vec<Declaration>) -> Self {
+    pub fn new(markup: Vec<Markup>) -> Self {
         Self {
-            declarations,
-        }
-    }
-}
-
-impl LambdaFunctionBinding {
-    pub fn new(parameters: Vec<Token>, expressions: Vec<Expression>) -> Self {
-        Self {
-            parameters,
-            expressions,
-        }
-    }
-}
-
-impl DirectBindings {
-    pub fn new(names: Vec<Token>) -> Self {
-        Self {
-            names,
-        }
-    }
-}
-
-impl BindingDeclaration {
-    pub fn new(name: Token, binding: LayoutItemProp) -> Self {
-        Self {
-            name,
-            binding,
-        }
-    }
-}
-
-impl LayoutItemDeclaration {
-    pub fn new(name: Token, bindings: Vec<BindingDeclaration>, string_literal: Option<Token>, declarations: Vec<Declaration>,) -> Self {
-        Self {
-            name,
-            bindings,
-            string_literal,
-            declarations,
+            name: None,
+            markup,
         }
     }
 
-    pub fn with_string_literal(&mut self, string_literal: Token) -> &Self {
-        self.string_literal = Some(string_literal);
+    pub fn with_name(mut self, name: Option<Token>) -> Self {
+        self.name = name;
         self
     }
 }
+
 impl SignalDeclaration {
     pub fn new(name: Token, parameters: Vec<Token>) -> Self {
         Self {
@@ -244,5 +179,51 @@ impl EnumDeclaration {
             name,
             members,
         }
+    }
+}
+
+impl From<ComponentDeclaration> for Declaration {
+    fn from(value: ComponentDeclaration) -> Self {
+        Declaration::Component(value)
+    }
+}
+impl From<VarDeclaration> for Declaration {
+    fn from(value: VarDeclaration) -> Self {
+        Declaration::Var(value)
+    }
+}
+impl From<LayoutDeclaration> for Declaration {
+    fn from(value: LayoutDeclaration) -> Self {
+        Declaration::Layout(value)
+    }
+}
+impl From<SignalDeclaration> for Declaration {
+    fn from(value: SignalDeclaration) -> Self {
+        Declaration::Signal(value)
+    }
+}
+impl From<MethodDeclaration> for Declaration {
+    fn from(value: MethodDeclaration) -> Self {
+        Declaration::Method(value)
+    }
+}
+impl From<RequireDeclaration> for Declaration {
+    fn from(value: RequireDeclaration) -> Self {
+        Declaration::Require(value)
+    }
+}
+impl From<UseDeclaration> for Declaration {
+    fn from(value: UseDeclaration) -> Self {
+        Declaration::Use(value)
+    }
+}
+impl From<ExportDeclaration> for Declaration {
+    fn from(value: ExportDeclaration) -> Self {
+        Declaration::Export(value)
+    }
+}
+impl From<EnumDeclaration> for Declaration {
+    fn from(value: EnumDeclaration) -> Self {
+        Declaration::Enum(value)
     }
 }
