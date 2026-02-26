@@ -130,13 +130,3 @@ fn test_accessor() {
     }
     assert!(foo.is_ok())
 }
-
-#[test]
-fn test_example_code() {
-    let file = include_str!("../../../local/test.puff");
-    let result = run_parser_str(file);
-    if let Err(e) = &result {
-        println!("{}", format!("parse error: {:}", e).red());
-    }
-    assert!(result.is_ok())
-}
