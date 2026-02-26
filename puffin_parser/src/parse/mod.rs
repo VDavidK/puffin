@@ -1,7 +1,7 @@
 use puffin_ast::{Ast, VarType};
 use puffin_ast::span::Span;
 use puffin_ast::token::{Token, TokenType};
-use puffin_ast::statement::{Statement, ExpressionStatement, BreakStatement, ContinueStatement, ForStatement, IfStatement, BlockStatement, ReturnStatement, MatchStatement, VariableDeclarationStatement};
+use puffin_ast::statement::{Statement, AssignStatement, ExpressionStatement, BreakStatement, ContinueStatement, ForStatement, IfStatement, BlockStatement, ReturnStatement, MatchStatement, VariableDeclarationStatement};
 use puffin_ast::declaration::{Declaration, VarDeclaration, Decorator, ComponentDeclaration, MethodDeclaration, SignalDeclaration, LayoutDeclaration, RequireDeclaration, UseDeclaration, ExportDeclaration, EnumDeclaration};
 use puffin_ast::expression::{AccessorExpression, BinaryExpression, Expression, FunctionCallExpression, LiteralExpression, UnaryExpression, ArrayExpression, DictionaryExpression, MatchExpression};
 use puffin_ast::markup::{ Markup, LambdaFunctionBinding, MarkupBinding, DirectBindings, ComponentRender, IterativeRender, IfConditionalRender, MatchConditionalRender };
@@ -326,7 +326,7 @@ impl<'a> PuffinParser<'a> {
             TokenType::KwContinue => self.continue_stat(),
             TokenType::KwMatch => self.match_stat(),
             TokenType::KwLet | TokenType::KwConst => self.var_stat(),
-            _ => self.expr_call_or_assign_stat()
+            _ => self.expr_or_assign_stat()
         }?;
         Ok(stat)
     }
@@ -496,35 +496,21 @@ impl<'a> PuffinParser<'a> {
         Ok(MatchExpression::new(comparator, cases, default_case).into())
     }
 
-    fn expr_call_or_assign_stat(&mut self) -> Result<Statement, ParserError> {
-        let expr = match self.peek()?.ty {
-            TokenType::Identifier => {
-                let name = Expression::Literal(LiteralExpression::new(self.expect(&[TokenType::Identifier])?));
-                let tok = self.expect(&[TokenType::LeftParen, TokenType::Assign])?;
-                match tok.ty {
-                    TokenType::LeftParen => {
-                        let mut arguments= vec![];
-                        while let Some(tok) = self.safe_peek()? && tok.ty != TokenType::RightParen {
-                            arguments.push(self.expression()?);
-                        }
-                        let expr = Expression::FunctionCall(FunctionCallExpression::new(name, arguments).into());
-                        self.expect(&[TokenType::RightParen])?;
-                        expr
-                    },
-                    TokenType::Assign => Expression::Binary(BinaryExpression::new(
-                        name,
-                        tok.clone(),
-                        self.expression()?)),
-                    _ => return Err(ParserError::ExpectedStatementError(self.pos()))
-                }
+    fn expr_or_assign_stat(&mut self) -> Result<Statement, ParserError> {
+        let expr = self.expression()?;
+        match self.peek()?.ty {
+            TokenType::Assign => {
+                self.next_token()?;
+                let rhs = self.expression()?;
+                self.expect(&[TokenType::Semicolon])?;
+                Ok(AssignStatement::new(expr, rhs).into())
             },
-            _ => return Err(ParserError::ExpectedStatementError(self.pos()))
-        };
-        self.expect(&[TokenType::Semicolon])?;
-        let stat = Statement::Expression(ExpressionStatement{
-            expression: Box::new(expr),
-        });
-        Ok(stat)
+            TokenType::Semicolon => {
+                self.next_token()?;
+                Ok(ExpressionStatement::new(expr).into())
+            },
+            _ => Err(ParserError::ExpectedStatementError(self.pos()))
+        }
     }
 
     fn binary_expr(&mut self, precedence: usize) -> Result<Expression, ParserError> {
@@ -563,9 +549,9 @@ impl<'a> PuffinParser<'a> {
         let pos = self.lexer.attach_snippet(self.pos().clone());
         let tok = self.safe_peek()?.ok_or(ParserError::UnexpectedEofError())?;
         let mut expr = match tok.ty {
-            TokenType::String | TokenType::Integer |
-            TokenType::Float | TokenType::KwTrue |
-            TokenType::KwFalse | TokenType::Identifier => {
+            TokenType::String | TokenType::Integer | TokenType::Float
+            | TokenType::KwTrue | TokenType::KwFalse | TokenType::Identifier
+            | TokenType::KwNull => {
                 let expr = Expression::Literal(LiteralExpression::new(self.next_token()?));
                 Ok(expr)
             },

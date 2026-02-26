@@ -112,6 +112,7 @@ impl<'a> Iterator for PuffinLexer<'a> {
                     "with" => self.token(TokenType::KwWith),
                     "enum" => self.token(TokenType::KwEnum),
                     "default" => self.token(TokenType::KwDefault),
+                    "null" => self.token(TokenType::KwNull),
                     _ => self.token(TokenType::Identifier),
                 }
             },
