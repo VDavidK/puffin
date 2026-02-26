@@ -72,6 +72,23 @@ pub struct VariableDeclarationStatement {
 }
 
 #[derive(Debug)]
+pub struct IncrementStatement {
+    pub target: Box<Expression>,
+}
+
+#[derive(Debug)]
+pub struct DecrementStatement {
+    pub target: Box<Expression>,
+}
+
+#[derive(Debug)]
+pub struct OpAssignStatement {
+    pub lhs: Box<Expression>,
+    pub op: Token,
+    pub rhs: Box<Expression>,
+}
+
+#[derive(Debug)]
 pub enum Statement {
     Block(BlockStatement),
     Assign(AssignStatement),
@@ -85,6 +102,9 @@ pub enum Statement {
     Return(ReturnStatement),
     Match(MatchStatement),
     VariableDeclaration(VariableDeclarationStatement),
+    Increment(IncrementStatement),
+    Decrement(DecrementStatement),
+    OpAssign(OpAssignStatement),
 }
 
 impl From<BlockStatement> for Statement {
@@ -142,6 +162,24 @@ impl From<MatchStatement> for Statement {
 impl From<VariableDeclarationStatement> for Statement {
     fn from(m: VariableDeclarationStatement) -> Self {
         Statement::VariableDeclaration(m)
+    }
+}
+
+impl From<IncrementStatement> for Statement {
+    fn from(m: IncrementStatement) -> Self {
+        Statement::Increment(m)
+    }
+}
+
+impl From<DecrementStatement> for Statement {
+    fn from(m: DecrementStatement) -> Self {
+        Statement::Decrement(m)
+    }
+}
+
+impl From<OpAssignStatement> for Statement {
+    fn from(m: OpAssignStatement) -> Self {
+        Statement::OpAssign(m)
     }
 }
 
@@ -219,6 +257,33 @@ impl VariableDeclarationStatement {
             name,
             value: Box::new(value),
             var_type,
+        }
+    }
+}
+
+impl IncrementStatement {
+    pub fn new(target: Expression) -> Self {
+        Self {
+            target: Box::new(target),
+        }
+    }
+}
+
+impl DecrementStatement {
+    pub fn new(target: Expression) -> Self {
+        Self {
+            target: Box::new(target),
+        }
+    }
+}
+
+
+impl OpAssignStatement {
+    pub fn new(lhs: Expression, op: Token, rhs: Expression) -> Self {
+        Self {
+            lhs: Box::new(lhs),
+            op,
+            rhs: Box::new(rhs),
         }
     }
 }

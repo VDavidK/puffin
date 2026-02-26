@@ -48,6 +48,12 @@ pub struct MatchExpression {
 }
 
 #[derive(Debug)]
+pub struct IndexExpression {
+    pub expression: Box<Expression>,
+    pub index: Box<Expression>,
+}
+
+#[derive(Debug)]
 pub enum Expression {
     Literal(LiteralExpression),
     Binary(BinaryExpression),
@@ -57,6 +63,7 @@ pub enum Expression {
     Array(ArrayExpression),
     Dictionary(DictionaryExpression),
     Match(MatchExpression),
+    Index(IndexExpression),
 }
 
 impl From<LiteralExpression> for Expression {
@@ -104,6 +111,21 @@ impl From<DictionaryExpression> for Expression {
 impl From<MatchExpression> for Expression {
     fn from(m: MatchExpression) -> Self {
         Expression::Match(m)
+    }
+}
+
+impl From<IndexExpression> for Expression {
+    fn from(m: IndexExpression) -> Self {
+        Expression::Index(m)
+    }
+}
+
+impl IndexExpression {
+    pub fn new(expression: Expression, index: Expression) -> Self {
+        Self {
+            expression: Box::new(expression),
+            index: Box::new(index),
+        }
     }
 }
 

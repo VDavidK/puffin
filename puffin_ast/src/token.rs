@@ -73,7 +73,7 @@ pub enum TokenType {
 
 #[derive(Debug, Clone)]
 pub struct Token {
-    lexeme: String,
+    pub lexeme: String,
     pub span: Span,
     pub ty: TokenType,
 }
