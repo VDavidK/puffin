@@ -44,11 +44,11 @@ pub enum OpCode {
     NewObject,
 
     // : setf [offset:4B]
-    // Takes the top value from the stack and a string name below that and sets the field with that name on the object pointed to at the provided offset to that value
+    // Pops the top two values off the stack. Assigns the field with the given name at the offset of the latter value to the first value
     SetField,
 
     // : getf [offset:4B]
-    // Pushes the value of the field of the object at the provided offset on the stack onto the top of the stack with the name matching the constant given
+    // Pops the top of the stack and pushes the value of the field with the given name at the offset to the stack
     GetField,
 
     // ----------------------------
@@ -120,8 +120,8 @@ pub enum OpCode {
     // Pops the top of the stack and if the value is truthy, then sets the program counter to the specified address
     JumpIf,
 
-    // : call [args_count:1B] [addr:8B]
-    // Pushes the current program counter to the call stack along with a stack offset based on the argument count, then sets it to the specified address
+    // : call
+    // Pops the top function off the stack and calls it
     // Takes ownership of the arguments passed in.
     Call,
 

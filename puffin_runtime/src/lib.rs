@@ -4,12 +4,11 @@ pub mod vm;
 pub mod op;
 pub mod chunk;
 pub mod value;
+pub mod runtime;
+pub mod library;
 
-use std::rc::Rc;
 pub use chunk::Chunk;
 pub use value::Value;
-
-use vm::Vm;
 
 #[derive(Debug, thiserror::Error)]
 pub enum RuntimeError {
@@ -57,17 +56,3 @@ pub enum RuntimeError {
 }
 
 
-pub fn run(program: Rc<Chunk>) -> Result<(), RuntimeError> {
-    let mut vm = Vm::new(program);
-    
-    #[cfg(feature = "debug_tracing")]
-    log::debug!("Starting execution");
-
-    while vm.is_running() {
-        vm.execute()?;
-    }
-    
-    log::debug!("Execution finished without errors");
-
-    Ok(())
-}

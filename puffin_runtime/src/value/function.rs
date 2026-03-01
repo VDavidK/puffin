@@ -8,12 +8,12 @@ use crate::value::FunctionType;
 pub struct Function {
     pub chunk: Rc<Chunk>,
     pub identifier: String,
-    pub parity: usize,
+    pub arity: usize,
 }
 
 impl Display for Function {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_fmt(format_args!("<function {}({})>", self.identifier, self.parity))
+        f.write_fmt(format_args!("<function {}({})>", self.identifier, self.arity))
     }
 }
 
@@ -23,7 +23,7 @@ impl TryFrom<Value> for FunctionType {
     fn try_from(value: Value) -> Result<Self, Self::Error> {
         match value {
             Value::Function(s) => Ok(s),
-            _ => Err(RuntimeError::IncorrectType { ty: value.type_name().to_owned(), expected: "object".to_owned() }),
+            _ => Err(RuntimeError::IncorrectType { ty: value.type_name().to_owned(), expected: "function".to_owned() }),
         }
     }
 }

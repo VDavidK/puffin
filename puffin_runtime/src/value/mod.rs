@@ -1,10 +1,12 @@
 mod function;
 mod object;
+mod native_function;
 
 use std::{cell::RefCell, fmt::Display, hash::Hash, rc::Rc};
 
 pub use object::{Object, new_object};
 pub use function::Function;
+pub use native_function::NativeFunction;
 
 use serde_derive::{Deserialize, Serialize};
 use crate::RuntimeError;
@@ -15,6 +17,7 @@ pub type BoolType = bool;
 pub type StringType = String;
 pub type ObjectType = Rc<RefCell<Object>>;
 pub type FunctionType = Rc<Function>;
+pub type NativeFunctionType = Rc<NativeFunction>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Value {
@@ -27,6 +30,9 @@ pub enum Value {
 
     #[serde(skip)]
     Object(ObjectType),
+
+    #[serde(skip)]
+    NativeFunction(NativeFunctionType),
 }
 
 impl PartialEq for Value {
@@ -37,6 +43,8 @@ impl PartialEq for Value {
             (Self::Bool(l0), Self::Bool(r0)) => l0 == r0,
             (Self::String(l0), Self::String(r0)) => l0 == r0,
             (Self::Object(l0), Self::Object(r0)) => l0.as_ptr() == r0.as_ptr(),
+            (Self::Function(l0), Self::Function(r0)) => Rc::as_ptr(l0) == Rc::as_ptr(r0),
+            (Self::NativeFunction(l0), Self::NativeFunction(r0)) => Rc::as_ptr(l0) == Rc::as_ptr(r0),
             _ => false,
         }
     }
@@ -142,6 +150,12 @@ impl From<i32> for Value {
     }
 }
 
+impl From<NativeFunction> for Value {
+    fn from(value: NativeFunction) -> Self {
+        Value::NativeFunction(Rc::new(value))
+    }
+}
+
 impl Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -151,6 +165,7 @@ impl Display for Value {
             Value::String(v) => f.write_fmt(format_args!("{v}")),
             Value::Object(v) => f.write_fmt(format_args!("{}", v.borrow())),
             Value::Function(v) => f.write_fmt(format_args!("{}", v)),
+            Value::NativeFunction(v) => f.write_fmt(format_args!("{}", v)),
             Value::Null => f.write_fmt(format_args!("null")),
         }
     }
@@ -289,6 +304,12 @@ impl Value {
                 _ => false,
             }
 
+            Value::NativeFunction(lhs) => match rhs {
+                Value::NativeFunction(rhs) => Rc::as_ptr(lhs) == Rc::as_ptr(rhs),
+
+                _ => false,
+            }
+
             Value::Null => match rhs {
                 Value::Null => true,
 
@@ -367,6 +388,7 @@ impl Value {
             Value::String(val) => !val.is_empty(),
             Value::Object(_) => true,
             Value::Function(_) => true,
+            Value::NativeFunction(_) => true,
             Value::Null => false,
         }
     }
@@ -379,6 +401,7 @@ impl Value {
             Value::String(_) => "string",
             Value::Object(_) => "object",
             Value::Function(_) => "function",
+            Value::NativeFunction(_) => "native_function",
             Value::Null => "null",
         }
     }
@@ -405,5 +428,9 @@ impl Value {
 
     pub fn take_function(self) -> Result<FunctionType, RuntimeError> {
         TryInto::<FunctionType>::try_into(self)
+    }
+
+    pub fn take_native_function(self) -> Result<NativeFunctionType, RuntimeError> {
+        TryInto::<NativeFunctionType>::try_into(self)
     }
 }

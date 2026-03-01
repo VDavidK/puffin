@@ -16,8 +16,8 @@ impl Object {
         Self::default()
     }
 
-    pub fn set_field(&mut self, name: String, value: Value) {
-        self.fields.insert(name, value);
+    pub fn set_field(&mut self, name: impl AsRef<str>, value: impl Into<Value>) {
+        self.fields.insert(name.as_ref().to_owned(), value.into());
     }
 
     pub fn get_field(&self, name: impl AsRef<str>) -> Option<&Value> {

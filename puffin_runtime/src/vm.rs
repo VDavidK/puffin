@@ -1,51 +1,62 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 use num_enum::TryFromPrimitive;
-use ratatui::DefaultTerminal;
 
 use crate::{RuntimeError, Value, chunk::Chunk, op::OpCode, value::new_object};
 use crate::chunk::{InstructionOffset, ConstantOffset, LocalOffset};
-
-#[derive(Debug)]
-struct CallFrame {
-    pub chunk: Rc<Chunk>,
-    pub return_addr: InstructionOffset,
-    pub stack_offset: usize,
-    pub local_count: usize,
-    pub pc: usize,
-}
+use crate::library::Library;
+use crate::runtime::{CallFrame, Runtime};
 
 #[derive(Debug)]
 pub struct Vm {
-    stack: Vec<Value>,
     running: bool,
     globals: HashMap<String, Value>,
-    call_stack: Vec<CallFrame>,
-    term: DefaultTerminal,
+    runtime: Runtime,
 }
 
 impl Vm {
     pub fn new(chunk: Rc<Chunk>) -> Self {
-        let term = ratatui::init();
         let main_frame = CallFrame {
             chunk,
-            return_addr: 0,
             stack_offset: 0,
             local_count: 0,
             pc: 0,
         };
 
         Self {
-            stack: vec![],
+            runtime: Runtime::new(main_frame),
             running: true,
             globals: HashMap::new(),
-            call_stack: vec![main_frame],
-            term,
         }
     }
 
+    pub fn open_lib<T: Library>(&mut self) {
+        let lib = new_object();
+        T::create(lib.borrow_mut());
+        self.add_global(T::name(), lib);
+    }
+
+    pub fn run(&mut self) -> Result<(), RuntimeError> {
+        #[cfg(feature = "debug_tracing")]
+        log::debug!("Starting execution");
+
+        while self.is_running() {
+            match self.execute() {
+                Err(err) => {
+                    log::error!("Runtime error occurred: {}", err);
+                    return Err(err);
+                }
+                _ => (),
+            }
+        }
+
+        log::debug!("Execution finished without errors");
+
+        Ok(())
+    }
+
     pub fn is_running(&self) -> bool {
-        self.running && !self.call_stack.is_empty() && self.pc().unwrap() < self.chunk().unwrap().byte_len()
+        self.running && !self.runtime.call_stack_empty() && self.runtime.pc().unwrap() < self.runtime.chunk().unwrap().byte_len()
     }
 
     pub fn execute(&mut self) -> Result<(), RuntimeError> {
@@ -53,35 +64,30 @@ impl Vm {
         
         #[cfg(feature = "debug_tracing")]
         {
-            let mut values = self.stack.iter().map(|v| v.to_string()).collect::<Vec<_>>().join("] [");
-            if !values.is_empty() {
-                values = format!("[{values}]");
-            }
-            
-            log::debug!("| {values}");
+            self.runtime.log_stack();
             log::debug!("Executing: {op:?}");
         }
         
         match op {
-            OpCode::Invalid => return Err(RuntimeError::InvalidOpCode { pc: self.pc()? }),
+            OpCode::Invalid => return Err(RuntimeError::InvalidOpCode { pc: self.runtime.pc()? }),
 
             OpCode::Constant => {
                 let constant = self.fetch_constant()?
                     .to_owned();
-                self.push_value(constant);
+                self.runtime.push_value(constant);
             },
 
             OpCode::GetLocal => {
                 let offset = self.fetch_local_offset()?;
-                let value = self.get_local(offset)?;
+                let value = self.runtime.get_local(offset)?;
 
-                self.push_value(value.clone());
+                self.runtime.push_value(value.clone());
             },
 
             OpCode::SetLocal => {
-                let top = self.pop_expecting()?;
+                let top = self.runtime.pop_expecting()?;
                 let offset = self.fetch_local_offset()?;
-                self.set_local(offset, top)?;
+                self.runtime.set_local(offset, top)?;
             },
 
             OpCode::GetGlobal => {
@@ -90,7 +96,7 @@ impl Vm {
                     .take_string()?;
 
                 let global = self.globals.get(&constant).ok_or(RuntimeError::GlobalNotFound { name: constant })?;
-                self.push_value(global.clone());
+                self.runtime.push_value(global.clone());
             },
 
             OpCode::SetGlobal => {
@@ -98,177 +104,158 @@ impl Vm {
                     .to_owned()
                     .take_string()?;
 
-                let top = self.pop_expecting()?;
+                let top = self.runtime.pop_expecting()?;
 
                 self.globals.insert(constant, top);
             },
 
             OpCode::Pop => {
-                self.pop_expecting()?;
+                self.runtime.pop_expecting()?;
             },
 
             OpCode::NewObject => {
-                self.push_value(new_object());
+                self.runtime.push_value(new_object());
             }
 
             OpCode::GetField => {
-                let name = self.pop_expecting()?.take_string()?;
-                
-                let obj_offset = self.fetch_local_offset()?;
-                let obj = self.get_local(obj_offset)?.clone().take_object()?;
+                let name = self.fetch_constant()?.to_string();
+
+                let obj = self.runtime.pop_expecting()?.take_object()?;
                 let obj = obj.borrow();
 
                 let field = obj.get_field(&name)
-                    .ok_or(RuntimeError::NoFieldMatchingName { name: name })?;
+                    .ok_or(RuntimeError::NoFieldMatchingName { name })?;
 
-                self.push_value(field.to_owned());
+                self.runtime.push_value(field.to_owned());
             },
 
             OpCode::SetField => {
-                let value = self.pop_expecting()?;
-                let name = self.pop_expecting()?;
+                let value = self.runtime.pop_expecting()?;
+                let obj = self.runtime.pop_expecting()?.take_object()?;
+                let name = self.fetch_constant()?.to_string();
 
-                let obj_offset = self.fetch_local_offset()?;
-                let obj = self.get_local(obj_offset)?.clone().take_object()?;
-
-                obj.borrow_mut().set_field(name.take_string()?, value.to_owned());
+                obj.borrow_mut().set_field(name, value.to_owned());
             },
 
             OpCode::Add => {
-                let rhs = self.pop_expecting()?;
-                let lhs = self.pop_expecting()?;
+                let rhs = self.runtime.pop_expecting()?;
+                let lhs = self.runtime.pop_expecting()?;
 
-                self.push_value(lhs.try_add(&rhs)?);
+                self.runtime.push_value(lhs.try_add(&rhs)?);
             },
             OpCode::Sub => {
-                let rhs = self.pop_expecting()?;
-                let lhs = self.pop_expecting()?;
+                let rhs = self.runtime.pop_expecting()?;
+                let lhs = self.runtime.pop_expecting()?;
 
-                self.push_value(lhs.try_sub(&rhs)?);
+                self.runtime.push_value(lhs.try_sub(&rhs)?);
             },
             OpCode::Mul => {
-                let rhs = self.pop_expecting()?;
-                let lhs = self.pop_expecting()?;
+                let rhs = self.runtime.pop_expecting()?;
+                let lhs = self.runtime.pop_expecting()?;
 
-                self.push_value(lhs.try_mul(&rhs)?);
+                self.runtime.push_value(lhs.try_mul(&rhs)?);
             },
             OpCode::Div => {
-                let rhs = self.pop_expecting()?;
-                let lhs = self.pop_expecting()?;
+                let rhs = self.runtime.pop_expecting()?;
+                let lhs = self.runtime.pop_expecting()?;
 
-                self.push_value(lhs.try_div(&rhs)?);
+                self.runtime.push_value(lhs.try_div(&rhs)?);
             },
             OpCode::Mod => {
-                let rhs = self.pop_expecting()?;
-                let lhs = self.pop_expecting()?;
+                let rhs = self.runtime.pop_expecting()?;
+                let lhs = self.runtime.pop_expecting()?;
 
-                self.push_value(lhs.try_mod(&rhs)?);
+                self.runtime.push_value(lhs.try_mod(&rhs)?);
             },
             OpCode::Neg => {
-                let rhs = self.pop_expecting()?;
+                let rhs = self.runtime.pop_expecting()?;
 
-                self.push_value(rhs.try_negate()?);
+                self.runtime.push_value(rhs.try_negate()?);
             },
             OpCode::Not => {
-                let rhs = self.pop_expecting()?;
+                let rhs = self.runtime.pop_expecting()?;
 
-                self.push_value(rhs.not());
+                self.runtime.push_value(rhs.not());
             },
             
             OpCode::Eq => {
-                let rhs = self.pop_expecting()?;
-                let lhs = self.pop_expecting()?;
+                let rhs = self.runtime.pop_expecting()?;
+                let lhs = self.runtime.pop_expecting()?;
                 
-                self.push_value(lhs.is_equal(&rhs));
+                self.runtime.push_value(lhs.is_equal(&rhs));
             },
             OpCode::Neq => {
-                let rhs = self.pop_expecting()?;
-                let lhs = self.pop_expecting()?;
+                let rhs = self.runtime.pop_expecting()?;
+                let lhs = self.runtime.pop_expecting()?;
 
-                self.push_value(lhs.not_equal(&rhs));
+                self.runtime.push_value(lhs.not_equal(&rhs));
             },
             
             OpCode::Lt => {
-                let rhs = self.pop_expecting()?;
-                let lhs = self.pop_expecting()?;
+                let rhs = self.runtime.pop_expecting()?;
+                let lhs = self.runtime.pop_expecting()?;
 
-                self.push_value(lhs.lesser(&rhs));
+                self.runtime.push_value(lhs.lesser(&rhs));
             },
             OpCode::Le => {
-                let rhs = self.pop_expecting()?;
-                let lhs = self.pop_expecting()?;
+                let rhs = self.runtime.pop_expecting()?;
+                let lhs = self.runtime.pop_expecting()?;
 
-                self.push_value(lhs.lesser_equal(&rhs));
+                self.runtime.push_value(lhs.lesser_equal(&rhs));
             },
             
             OpCode::Gt => {
-                let rhs = self.pop_expecting()?;
-                let lhs = self.pop_expecting()?;
+                let rhs = self.runtime.pop_expecting()?;
+                let lhs = self.runtime.pop_expecting()?;
 
-                self.push_value(lhs.greater(&rhs));
+                self.runtime.push_value(lhs.greater(&rhs));
             },
             OpCode::Ge => {
-                let rhs = self.pop_expecting()?;
-                let lhs = self.pop_expecting()?;
+                let rhs = self.runtime.pop_expecting()?;
+                let lhs = self.runtime.pop_expecting()?;
 
-                self.push_value(lhs.greater_equal(&rhs));
+                self.runtime.push_value(lhs.greater_equal(&rhs));
             },
 
             OpCode::Jump => {
                 let addr = self.fetch_instruction_offset()?;
 
-                self.set_pc(addr as usize);
+                self.runtime.set_pc(addr as usize);
             },
 
             OpCode::JumpIf => {
                 let addr = self.fetch_instruction_offset()?;
-                let val = self.pop_expecting()?;
+                let val = self.runtime.pop_expecting()?;
 
                 if val.truthy() {
                     #[cfg(feature = "debug_tracing")]
-                    log::debug!("Value '{}' truthy, jumping from 0x{:x} -> 0x{:x}", val, self.pc()?, addr);
-                    self.set_pc(addr as usize);
+                    log::debug!("Value '{}' truthy, jumping from 0x{:x} -> 0x{:x}", val, self.runtime.pc()?, addr);
+                    self.runtime.set_pc(addr as usize);
                 }
                 else {
                     #[cfg(feature = "debug_tracing")]
-                    log::debug!("Skipping jump at 0x{:x}", self.pc()?);
+                    log::debug!("Skipping jump at 0x{:x}", self.runtime.pc()?);
                 }
             },
 
             OpCode::Call => {
-                let func = self.pop_expecting()?.take_function()?;
-                let addr = self.fetch_instruction_offset()?;
+                let func = self.runtime.pop_expecting()?;
 
-                if let Some(frame) = self.call_stack.last_mut() {
-                    frame.local_count -= func.parity as usize;
+                match func {
+                    Value::NativeFunction(func) => {
+                        let callable = &func.fun;
+                        let value = callable(&mut self.runtime)?;
+                        self.runtime.push_value(value);
+                    },
+                    Value::Function(func) => {
+                        self.runtime.call(func.chunk.clone(), func.arity);
+                    },
+                    v => return Err(RuntimeError::IncorrectType { ty: v.type_name().to_string(), expected: "function".to_string() }),
                 }
-
-                let frame = CallFrame {
-                    chunk: func.chunk.clone(),
-                    return_addr: 0,
-                    stack_offset: 0,
-                    local_count: 0,
-                    pc: 0,
-                };
-
-                self.call_stack.push(frame);
-                self.set_pc(addr as usize);
             },
 
             OpCode::Return => {
-                if let Some(frame) = self.call_stack.pop() {
-                    self.set_pc(frame.return_addr as usize);
-                    let ret_value = self.pop_expecting()?;
-
-                    // Pop all values pushed in the current call frame
-                    for _ in 0..frame.local_count - 1 {
-                        self.pop_expecting()?;
-                    }
-
-                    self.push_value(ret_value);
-                } else {
-                    self.running = false;
-                }
+                self.runtime.ret()?;
             },
 
             OpCode::Exit => {
@@ -276,159 +263,87 @@ impl Vm {
             }
 
             OpCode::Poll => {
-                ratatui::crossterm::event::read()?;
+                self.runtime.poll()?;
             },
             
             OpCode::Render => {
-                let value = self.pop_expecting()?;
-                self.term.draw(|frame| frame.render_widget(value.to_string(), frame.area()))?;
+                let value = self.runtime.pop_expecting()?;
+                self.runtime.render(value)?;
             }
         }
 
         Ok(())
     }
 
-    pub fn fetch_op(&mut self) -> Result<OpCode, RuntimeError> {
-        let byte = self.chunk()?
-            .read_u8(self.pc()?)
-            .ok_or(RuntimeError::AccessOutOfBounds { at: self.pc()?, pc: self.pc()? })?;
+    pub fn add_global(&mut self, name: impl AsRef<str>, value: impl Into<Value>) {
+        self.globals.insert(name.as_ref().to_owned(), value.into());
+    }
 
-        self.move_pc(1);
+    pub fn remove_global(&mut self, name: impl AsRef<str>) {
+        self.globals.remove(name.as_ref());
+    }
+
+    pub fn fetch_op(&mut self) -> Result<OpCode, RuntimeError> {
+        let byte = self.runtime.chunk()?
+            .read_u8(self.runtime.pc()?)
+            .ok_or(RuntimeError::AccessOutOfBounds { at: self.runtime.pc()?, pc: self.runtime.pc()? })?;
+
+        self.runtime.move_pc(1);
 
         OpCode::try_from_primitive(byte)
-            .map_err(|_| RuntimeError::UnrecognizedOpCode { op: byte, pc: self.pc().unwrap() })
+            .map_err(|_| RuntimeError::UnrecognizedOpCode { op: byte, pc: self.runtime.pc().unwrap() })
     }
 
     pub fn fetch_u8(&mut self) -> Result<u8, RuntimeError> {
-        let byte =  self.chunk()?
-            .read_u8(self.pc()?)
-            .ok_or(RuntimeError::AccessOutOfBounds { at: self.pc()?, pc: self.pc()? })?;
-        self.move_pc(1);
+        let byte =  self.runtime.chunk()?
+            .read_u8(self.runtime.pc()?)
+            .ok_or(RuntimeError::AccessOutOfBounds { at: self.runtime.pc()?, pc: self.runtime.pc()? })?;
+        self.runtime.move_pc(1);
         Ok(byte)
     }
 
     pub fn fetch_u16(&mut self) -> Result<u16, RuntimeError> {
-        let val =  self.chunk()?.read_u16(self.pc()?).ok_or(RuntimeError::AccessOutOfBounds { at: self.pc()?, pc: self.pc()? })?;
-        self.move_pc(2);
+        let val =  self.runtime.chunk()?.read_u16(self.runtime.pc()?).ok_or(RuntimeError::AccessOutOfBounds { at: self.runtime.pc()?, pc: self.runtime.pc()? })?;
+        self.runtime.move_pc(2);
         Ok(val)
     }
 
     pub fn fetch_u32(&mut self) -> Result<u32, RuntimeError> {
-        let val =  self.chunk()?.read_u32(self.pc()?).ok_or(RuntimeError::AccessOutOfBounds { at: self.pc()?, pc: self.pc()? })?;
-        self.move_pc(4);
+        let val =  self.runtime.chunk()?.read_u32(self.runtime.pc()?).ok_or(RuntimeError::AccessOutOfBounds { at: self.runtime.pc()?, pc: self.runtime.pc()? })?;
+        self.runtime.move_pc(4);
         Ok(val)
     }
 
     pub fn fetch_u64(&mut self) -> Result<u64, RuntimeError> {
-        let val =  self.chunk()?.read_u64(self.pc()?).ok_or(RuntimeError::AccessOutOfBounds { at: self.pc()?, pc: self.pc()? })?;
-        self.move_pc(8);
+        let val =  self.runtime.chunk()?.read_u64(self.runtime.pc()?).ok_or(RuntimeError::AccessOutOfBounds { at: self.runtime.pc()?, pc: self.runtime.pc()? })?;
+        self.runtime.move_pc(8);
         Ok(val)
     }
     
     pub fn fetch_constant_offset(&mut self) -> Result<ConstantOffset, RuntimeError> {
-        let val =  self.chunk()?.read_constant_offset(self.pc()?).ok_or(RuntimeError::AccessOutOfBounds { at: self.pc()?, pc: self.pc()? })?;
-        self.move_pc(size_of::<ConstantOffset>());
+        let val =  self.runtime.chunk()?.read_constant_offset(self.runtime.pc()?).ok_or(RuntimeError::AccessOutOfBounds { at: self.runtime.pc()?, pc: self.runtime.pc()? })?;
+        self.runtime.move_pc(size_of::<ConstantOffset>());
         Ok(val)
     }
 
     pub fn fetch_local_offset(&mut self) -> Result<LocalOffset, RuntimeError> {
-        let val =  self.chunk()?.read_local_offset(self.pc()?).ok_or(RuntimeError::AccessOutOfBounds { at: self.pc()?, pc: self.pc()? })?;
-        self.move_pc(size_of::<LocalOffset>());
+        let val =  self.runtime.chunk()?.read_local_offset(self.runtime.pc()?).ok_or(RuntimeError::AccessOutOfBounds { at: self.runtime.pc()?, pc: self.runtime.pc()? })?;
+        self.runtime.move_pc(size_of::<LocalOffset>());
         Ok(val)
     }
     
     pub fn fetch_instruction_offset(&mut self) -> Result<InstructionOffset, RuntimeError> {
-        let val =  self.chunk()?.read_instruction_offset(self.pc()?).ok_or(RuntimeError::AccessOutOfBounds { at: self.pc()?, pc: self.pc()? })?;
-        self.move_pc(size_of::<InstructionOffset>());
+        let val =  self.runtime.chunk()?.read_instruction_offset(self.runtime.pc()?).ok_or(RuntimeError::AccessOutOfBounds { at: self.runtime.pc()?, pc: self.runtime.pc()? })?;
+        self.runtime.move_pc(size_of::<InstructionOffset>());
         Ok(val)
     }
 
     pub fn fetch_constant(&mut self) -> Result<&Value, RuntimeError> {
         let offset = self.fetch_constant_offset()? as usize;
-        let value = self.chunk()?.get_constant(offset)
-            .ok_or(RuntimeError::InvalidConstantAccess { at: offset, pc: self.pc()? })?;
+        let value = self.runtime.chunk()?.get_constant(offset)
+            .ok_or(RuntimeError::InvalidConstantAccess { at: offset, pc: self.runtime.pc()? })?;
 
         Ok(value)
-    }
-    
-    pub fn get_local(&self, offset: LocalOffset) -> Result<&Value, RuntimeError> {
-        let value = self.stack.get(offset as usize + self.stack_offset())
-            .ok_or(RuntimeError::StackOutOfBounds { at: offset as usize, pc: self.pc()? })?;
-        
-        Ok(value)
-    }
-
-    pub fn set_local(&mut self, offset: LocalOffset, value: Value) -> Result<(), RuntimeError> {
-        let offset = offset as usize + self.stack_offset();
-
-        if offset >= self.stack.len() {
-            return Err(RuntimeError::StackOutOfBounds { at: offset, pc: self.pc()? });
-        }
-
-        self.stack[offset] = value;
-        Ok(())
-    }
-
-    pub fn push_value<T: Into<Value>>(&mut self, value: T) {
-        self.stack.push(value.into());
-
-        if let Some(frame) = self.call_stack.last_mut() {
-            frame.local_count += 1;
-        }
-    }
-
-    pub fn pop_value(&mut self) -> Option<Value> {
-        let val = self.stack.pop();
-
-        if let Some(frame) = self.call_stack.last_mut() && val.is_some() {
-            frame.local_count -= 1;
-        }
-
-        val
-    }
-
-    pub fn peek_value(&mut self) -> Option<&Value> {
-        self.stack.last()
-    }
-
-    pub fn pop_expecting(&mut self) -> Result<Value, RuntimeError> {
-        let val = self.stack.pop().ok_or(RuntimeError::StackEmpty)?;
-
-        if let Some(frame) = self.call_stack.last_mut() {
-            frame.local_count -= 1;
-        }
-
-        Ok(val)
-    }
-
-    fn stack_offset(&self) -> usize {
-        self.call_stack.last()
-            .map(|frame| frame.stack_offset)
-            .unwrap_or(0)
-    }
-
-    fn chunk(&self) -> Result<&Chunk, RuntimeError> {
-        self.call_stack.last()
-            .map(|frame| frame.chunk.as_ref())
-            .ok_or(RuntimeError::StackEmpty)
-    }
-
-    fn pc(&self) -> Result<usize, RuntimeError> {
-        self.call_stack.last()
-            .map(|frame| frame.pc)
-            .ok_or(RuntimeError::StackEmpty)
-    }
-
-    fn move_pc(&mut self, amount: usize) {
-        if let Some(frame) = self.call_stack.last_mut() {
-            frame.pc += amount
-        }
-    }
-
-    fn set_pc(&mut self, pc: usize) {
-        if let Some(frame) = self.call_stack.last_mut() {
-            frame.pc = pc
-        }
     }
 }
 
