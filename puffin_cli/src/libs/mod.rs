@@ -24,3 +24,20 @@ impl Library for CoreLib {
         }, 1));
     }
 }
+
+pub struct OsLib;
+
+impl Library for OsLib {
+    fn name() -> &'static str { "os" }
+
+    fn create(mut lib: RefMut<Object>) {
+        lib.set_field("read_file", NativeFunction::new(|runtime| {
+            let path = runtime.get_local(-1)?.clone().take_string()?;
+            let content = std::fs::read_to_string(path);
+            match content {
+                Ok(content) => Ok(Value::String(content)),
+                Err(_) => Ok(Value::Null),
+            }
+        }, 1))
+    }
+}

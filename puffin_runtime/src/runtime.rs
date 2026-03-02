@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::rc::Rc;
 use ratatui::DefaultTerminal;
 use crate::chunk::LocalOffset;
@@ -16,6 +17,7 @@ pub struct Runtime {
     stack: Vec<Value>,
     call_stack: Vec<CallFrame>,
     term: DefaultTerminal,
+    globals: HashMap<String, Value>,
 }
 
 impl Runtime {
@@ -25,6 +27,7 @@ impl Runtime {
         Runtime {
             stack: vec![],
             call_stack: vec![starting_frame],
+            globals: HashMap::new(),
             term,
         }
     }
@@ -130,6 +133,23 @@ impl Runtime {
         }
     }
 
+    pub(crate) fn local_count(&self) -> Result<usize, RuntimeError> {
+        self.call_stack
+            .last()
+            .map(|frame| frame.local_count)
+            .ok_or(RuntimeError::CallStackEmpty)
+    }
+
+    pub(crate) fn pop_until(&mut self, target_local_count: usize) -> Result<(), RuntimeError> {
+        let local_count = self.local_count()?;
+
+        for _ in 0..(local_count - target_local_count) {
+            self.pop_expecting()?;
+        }
+
+        Ok(())
+    }
+
     pub fn stack_offset(&self) -> usize {
         self.call_stack.last()
             .map(|frame| frame.stack_offset)
@@ -168,5 +188,17 @@ impl Runtime {
     pub fn poll(&self) -> Result<(), RuntimeError> {
         ratatui::crossterm::event::read()?;
         Ok(())
+    }
+
+    pub fn add_global(&mut self, name: impl AsRef<str>, value: impl Into<Value>) {
+        self.globals.insert(name.as_ref().to_owned(), value.into());
+    }
+
+    pub fn remove_global(&mut self, name: impl AsRef<str>) {
+        self.globals.remove(name.as_ref());
+    }
+
+    pub fn get_global(&self, name: impl AsRef<str>) -> Option<&Value> {
+        self.globals.get(name.as_ref())
     }
 }

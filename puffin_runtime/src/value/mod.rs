@@ -138,6 +138,12 @@ impl From<ObjectType> for Value {
     }
 }
 
+impl From<Object> for Value {
+    fn from(value: Object) -> Self {
+        Value::Object(Rc::new(RefCell::new(value)))
+    }
+}
+
 impl From<usize> for Value {
     fn from(value: usize) -> Self {
         Value::Int(value as IntType)

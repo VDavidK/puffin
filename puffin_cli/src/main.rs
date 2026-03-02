@@ -9,7 +9,6 @@ use puffin_runtime::Chunk;
 
 #[cfg(feature = "logging")]
 use simplelog::{Config, LevelFilter, WriteLogger};
-use puffin_runtime::library::Library;
 use puffin_runtime::vm::Vm;
 
 #[derive(Subcommand, Debug)]
@@ -77,6 +76,7 @@ fn main() -> color_eyre::Result<()> {
             let mut vm = Vm::new(Rc::new(chunk));
 
             vm.open_lib::<libs::CoreLib>();
+            vm.open_lib::<libs::OsLib>();
 
             vm.run()?;
         },

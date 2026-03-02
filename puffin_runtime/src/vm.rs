@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::rc::Rc;
 use num_enum::TryFromPrimitive;
 
@@ -10,7 +9,6 @@ use crate::runtime::{CallFrame, Runtime};
 #[derive(Debug)]
 pub struct Vm {
     running: bool,
-    globals: HashMap<String, Value>,
     runtime: Runtime,
 }
 
@@ -26,7 +24,6 @@ impl Vm {
         Self {
             runtime: Runtime::new(main_frame),
             running: true,
-            globals: HashMap::new(),
         }
     }
 
@@ -79,9 +76,9 @@ impl Vm {
 
             OpCode::GetLocal => {
                 let offset = self.fetch_local_offset()?;
-                let value = self.runtime.get_local(offset)?;
+                let value = self.runtime.get_local(offset)?.clone();
 
-                self.runtime.push_value(value.clone());
+                self.runtime.push_value(value);
             },
 
             OpCode::SetLocal => {
@@ -95,8 +92,8 @@ impl Vm {
                     .to_owned()
                     .take_string()?;
 
-                let global = self.globals.get(&constant).ok_or(RuntimeError::GlobalNotFound { name: constant })?;
-                self.runtime.push_value(global.clone());
+                let global = self.get_global(&constant).ok_or(RuntimeError::GlobalNotFound { name: constant })?.clone();
+                self.runtime.push_value(global);
             },
 
             OpCode::SetGlobal => {
@@ -105,8 +102,7 @@ impl Vm {
                     .take_string()?;
 
                 let top = self.runtime.pop_expecting()?;
-
-                self.globals.insert(constant, top);
+                self.add_global(constant, top);
             },
 
             OpCode::Pop => {
@@ -244,7 +240,9 @@ impl Vm {
                 match func {
                     Value::NativeFunction(func) => {
                         let callable = &func.fun;
+                        let local_count = self.runtime.local_count()? - func.arity;
                         let value = callable(&mut self.runtime)?;
+                        self.runtime.pop_until(local_count)?;
                         self.runtime.push_value(value);
                     },
                     Value::Function(func) => {
@@ -276,11 +274,15 @@ impl Vm {
     }
 
     pub fn add_global(&mut self, name: impl AsRef<str>, value: impl Into<Value>) {
-        self.globals.insert(name.as_ref().to_owned(), value.into());
+        self.runtime.add_global(name, value);
+    }
+
+    pub fn get_global(&mut self, name: impl AsRef<str>) -> Option<&Value> {
+        self.runtime.get_global(name)
     }
 
     pub fn remove_global(&mut self, name: impl AsRef<str>) {
-        self.globals.remove(name.as_ref());
+        self.runtime.remove_global(name);
     }
 
     pub fn fetch_op(&mut self) -> Result<OpCode, RuntimeError> {
