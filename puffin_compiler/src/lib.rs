@@ -3,6 +3,7 @@ use puffin_runtime::Chunk;
 use crate::compiler::{CompileError, Compiler};
 
 pub mod compiler;
+mod scope;
 
 pub fn compile_ast(name: impl AsRef<str>, ast: &Ast) -> Result<Chunk, CompileError> {
     let mut chunk = Chunk::new(name);

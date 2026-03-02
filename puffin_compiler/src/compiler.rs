@@ -8,6 +8,7 @@ use puffin_runtime::{Chunk, Value};
 use puffin_runtime::chunk::{ConstantOffset, LocalOffset};
 use puffin_runtime::op::OpCode;
 use puffin_runtime::value::{FloatType, IntType};
+use crate::scope::Scope;
 
 #[derive(thiserror::Error, Debug)]
 pub enum CompileError {
@@ -24,14 +25,16 @@ pub enum CompileError {
     InvalidTarget,
 
     #[error("Incorrect number of arguments")]
-    IncorrectFunctionCallArity
+    IncorrectFunctionCallArity,
+
+    #[error("Cannot pop top scope")]
+    TopScopePopped,
 }
 
 pub struct Compiler<'a> {
     chunk: &'a mut Chunk,
     constant_table: HashMap<Value, ConstantOffset>,
-    local_table: HashMap<&'a str, LocalOffset>,
-    local_count: usize,
+    scope: Scope<'a>,
 }
 
 impl<'a> Compiler<'a> {
@@ -39,8 +42,7 @@ impl<'a> Compiler<'a> {
         Self {
             chunk,
             constant_table: HashMap::new(),
-            local_table: HashMap::new(),
-            local_count: 0,
+            scope: Scope::new(),
         }
     }
 
@@ -80,9 +82,11 @@ impl<'a> Compiler<'a> {
         //
         match statement {
             Statement::Block(block) => {
+                self.push_scope();
                 for stmt in &block.statements {
                     self.compile_statement(stmt)?;
                 }
+                self.pop_scope()?;
             }
             Statement::Assign(assign) => {
                 self.compile_expression(&assign.rhs)?;
@@ -103,7 +107,64 @@ impl<'a> Compiler<'a> {
             }
             // Statement::Break(_) => {}
             // Statement::Continue(_) => {}
-            // Statement::For(_) => {}
+            Statement::For(stmt) => {
+                if let Some(end) = &stmt.end_range {
+
+                    //   <start> #start_local
+                    //   <end>   #end_local
+                    //   getl #start_local
+                    //   getl #end_local
+                    //   lt
+                    //   jumpi :end
+                    // loop:
+                    //   <body>
+                    //   getl #start_local
+                    //   const 1
+                    //   add
+                    //   setl #start_local
+                    //   getl #start_local
+                    //   getl #end_local
+                    //   lt
+                    //   jumpi :loop
+                    // end:
+
+                    self.compile_expression(&stmt.iterable)?;
+                    let start_local = self.scope.total_local_count() as LocalOffset;
+                    self.scope.define_local(&stmt.var_name.lexeme);
+                    self.compile_expression(&end)?;
+                    let end_local = self.scope.total_local_count() as LocalOffset;
+
+                    self.chunk.push_op(OpCode::GetLocal);
+                    self.chunk.push_local_offset(end_local);
+                    self.chunk.push_op(OpCode::GetLocal);
+                    self.chunk.push_local_offset(start_local);
+                    self.chunk.push_op(OpCode::Lt);
+                    let end_jump = self.chunk.push_jump(OpCode::JumpIf);
+
+                    let one = self.add_to_constants(1)?;
+
+                    let loop_addr = self.chunk.addr();
+                    self.compile_statement(&stmt.block)?;
+                    self.chunk.push_op(OpCode::GetLocal);
+                    self.chunk.push_local_offset(start_local);
+                    self.chunk.push_op(OpCode::Constant);
+                    self.chunk.push_constant_offset(one);
+                    self.chunk.push_op(OpCode::Add);
+                    self.chunk.push_op(OpCode::SetLocal);
+                    self.chunk.push_local_offset(start_local);
+                    self.chunk.push_op(OpCode::GetLocal);
+                    self.chunk.push_local_offset(start_local);
+                    self.chunk.push_op(OpCode::GetLocal);
+                    self.chunk.push_local_offset(end_local);
+                    self.chunk.push_op(OpCode::Lt);
+                    self.chunk.push_jump_im(OpCode::JumpIf, loop_addr);
+
+                    self.chunk.patch_jump(end_jump, self.chunk.addr());
+                } else {
+                    todo!("Generic for loops not supported yet");
+                }
+            }
+
             Statement::If(stmt) => {
                 self.compile_expression(&stmt.condition)?;
                 self.chunk.push_op(OpCode::Not);
@@ -130,9 +191,7 @@ impl<'a> Compiler<'a> {
             // Statement::Match(_) => {}
             Statement::VariableDeclaration(var) => {
                 self.compile_expression(&var.value)?;
-                self.local_table.insert(&var.name.lexeme, self.local_count as LocalOffset);
-
-                self.local_count += 1;
+                self.scope.define_local(&var.name.lexeme);
             }
             _ => (),
         }
@@ -144,7 +203,7 @@ impl<'a> Compiler<'a> {
         match expression {
             Expression::Literal(literal) => {
                 if literal.token.ty == TokenType::Identifier {
-                    match self.local_table.get(literal.token.lexeme.as_str()) {
+                    match self.scope.lookup_local(literal.token.lexeme.as_str()) {
                         None => {
                             let global = self.token_to_constant(&literal.token)?;
                             self.chunk.push_op(OpCode::GetGlobal);
@@ -152,12 +211,13 @@ impl<'a> Compiler<'a> {
                         },
                         Some(addr) => {
                             self.chunk.push_op(OpCode::GetLocal);
-                            self.chunk.push_local_offset(*addr);
+                            self.chunk.push_local_offset(addr);
                         }
                     }
                 } else {
-                    let constant = self.token_to_value(&literal.token)?;
-                    self.chunk.push_constant(constant);
+                    let constant = self.token_to_constant(&literal.token)?;
+                    self.chunk.push_op(OpCode::Constant);
+                    self.chunk.push_constant_offset(constant);
                 }
             }
             Expression::Binary(binary) => {
@@ -215,13 +275,13 @@ impl<'a> Compiler<'a> {
                 Ok(VariableTarget::Object(name))
             },
 
-            Expression::Literal(literal) => match self.local_table.get(literal.token.lexeme.as_str()) {
+            Expression::Literal(literal) => match self.scope.lookup_local(literal.token.lexeme.as_str()) {
                 None => {
                     let global = self.token_to_constant(&literal.token)?;
                     Ok(VariableTarget::Global(global))
                 },
                 Some(addr) => {
-                    Ok(VariableTarget::Local(*addr))
+                    Ok(VariableTarget::Local(addr))
                 }
             },
 
@@ -294,7 +354,28 @@ impl<'a> Compiler<'a> {
         if let Some(addr) = self.constant_table.get(&constant) {
             Ok(*addr)
         } else {
-            Ok(self.chunk.new_constant(constant))
+            let offset = self.chunk.new_constant(constant.clone());
+            self.constant_table.insert(constant, offset);
+            Ok(offset)
+        }
+    }
+
+    fn push_scope(&mut self) {
+        let old_scope = std::mem::replace(&mut self.scope, Scope::new());
+        self.scope.set_parent(Box::new(old_scope));
+    }
+
+    fn pop_scope(&mut self) -> Result<(), CompileError> {
+        match self.scope.remove_parent() {
+            Some(parent) => {
+                for _ in 0..self.scope.local_count() {
+                    self.chunk.push_op(OpCode::Pop);
+                }
+
+                self.scope = *parent;
+                Ok(())
+            },
+            None => Err(CompileError::TopScopePopped),
         }
     }
 }
