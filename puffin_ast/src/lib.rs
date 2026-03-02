@@ -10,7 +10,7 @@ pub mod markup;
 
 use declaration::{Declaration};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum VarType {
     Let,
     Const,
@@ -26,6 +26,10 @@ impl Ast {
         Self {
             declarations,
         }
+    }
+
+    pub fn dump(&self) {
+        dbg!(self);
     }
 }
 

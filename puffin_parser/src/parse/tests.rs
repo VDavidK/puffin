@@ -1,6 +1,10 @@
 use std::error::Error;
 use crate::run_parser_str;
 use colored::Colorize;
+use puffin_ast::declaration::{Declaration};
+use puffin_ast::{VarType};
+use puffin_ast::expression::{Expression};
+use puffin_ast::statement;
 
 #[test]
 fn test_component_methods() {
@@ -123,10 +127,59 @@ fn test_accessor() {
         fn foo() {
             foo = bar.baz.qux;
             thing = func().field.other().field;
+            x[1] = 2;
         }
     "#);
     if let Err(e) = &foo {
         println!("{}", format!("parse error: {:}", e).red());
     }
-    assert!(foo.is_ok())
+    assert!(foo.is_ok());
+}
+
+#[test]
+fn test_dictionary() {
+    let input = r#"
+        let dict = {
+            foo: "One",
+            bar: "Two",
+            baz: "Three",
+        };
+    "#;
+    let result = run_parser_str(input);
+    if let Err(e) = &result {
+        println!("{}", format!("parse error: {:}", e).red());
+    }
+    assert!(result.is_ok());
+    let res = result.unwrap();
+    let iter = res.declarations;
+    assert_eq!(iter.len(), 1);
+
+    match iter.first().unwrap() {
+        Declaration::Var(inner) => {
+            assert_eq!(inner.name.lexeme, "dict");
+            assert_eq!(inner.var_type, VarType::Let);
+            match &*inner.value {
+                Expression::Dictionary(expr) => {
+                    let entries = &expr.entries;
+                    assert_eq!(entries.len(), 3);
+                    assert_eq!(entries[0].0.lexeme, "foo");
+                    assert_eq!(entries[1].0.lexeme, "bar");
+                    assert_eq!(entries[2].0.lexeme, "baz");
+                    let mut exprs = vec![];
+                    for (_, expr) in entries {
+                        if let Expression::Literal(e) = expr {
+                            exprs.push(e);
+                        } else {
+                            assert!(false, "Mismatched types (expected LiteralExpression)")
+                        }
+                    }
+                    assert_eq!(exprs[0].token.lexeme, "\"One\"");
+                    assert_eq!(exprs[1].token.lexeme, "\"Two\"");
+                    assert_eq!(exprs[2].token.lexeme, "\"Three\"");
+                },
+                _ => assert!(false, "Mismatched types (expected DictionaryExpression)"),
+            }
+        },
+        _ => assert!(false, "Mismatched types (expected VarDeclaration)")
+    }
 }

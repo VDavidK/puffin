@@ -593,7 +593,22 @@ impl<'a> PuffinParser<'a> {
             },
             TokenType::LeftBrace => {
                 // Dictionary
-                todo!();
+                self.next_token()?;
+                let mut pairs = vec![];
+                while !self.peek_is(TokenType::RightBrace)? {
+                    let name = self.expect(&[TokenType::Identifier])?;
+                    self.expect(&[TokenType::Colon])?;
+                    let value = self.expression()?;
+                    pairs.push((name, value));
+                    if self.peek_is(TokenType::Comma)? {
+                        self.next_token()?;
+                    } else {
+                        break;
+                    }
+                }
+                let expr = DictionaryExpression::new(pairs).into();
+                self.expect(&[TokenType::RightBrace])?;
+                return Ok(expr);
             }
             _ => Err(ParserError::ExpectedLiteralError(pos))
         }?;
