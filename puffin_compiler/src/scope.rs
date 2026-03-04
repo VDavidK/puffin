@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use puffin_runtime::chunk::LocalOffset;
 
+#[derive(Default)]
 pub struct Scope<'a> {
     local_table: HashMap<&'a str, LocalOffset>,
     local_count: usize,
@@ -24,10 +25,17 @@ impl<'a> Scope<'a> {
         self.parent.take()
     }
 
-    pub fn define_local(&mut self, name: &'a str) {
-        let local_count = self.total_local_count();
-        self.local_table.insert(name, local_count as LocalOffset);
+    pub fn define_local(&mut self, name: &'a str) -> LocalOffset {
+        let local_count = self.total_local_count() as LocalOffset;
+        self.local_table.insert(name, local_count);
         self.local_count += 1;
+        local_count
+    }
+
+    pub fn define_unnamed_local(&mut self) -> LocalOffset {
+        let local_count = self.total_local_count() as LocalOffset;
+        self.local_count += 1;
+        local_count
     }
 
     pub fn local_count(&self) -> usize {

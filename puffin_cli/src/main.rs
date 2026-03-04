@@ -79,6 +79,13 @@ fn main() -> color_eyre::Result<()> {
             vm.open_lib::<libs::OsLib>();
 
             vm.run()?;
+
+            let func = vm.get_global("main")
+                .expect("Expected main function")
+                .clone()
+                .take_function()?;
+
+            vm.call(func)?;
         },
     }
 

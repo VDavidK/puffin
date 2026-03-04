@@ -5,6 +5,7 @@ use crate::{RuntimeError, Value, chunk::Chunk, op::OpCode, value::new_object};
 use crate::chunk::{InstructionOffset, ConstantOffset, LocalOffset};
 use crate::library::Library;
 use crate::runtime::{CallFrame, Runtime};
+use crate::value::FunctionType;
 
 #[derive(Debug)]
 pub struct Vm {
@@ -52,13 +53,21 @@ impl Vm {
         Ok(())
     }
 
+    pub fn call(&mut self, func: FunctionType) -> Result<(), RuntimeError> {
+        log::debug!("Executing function '{}'", func.identifier);
+        self.runtime.call(func.chunk.clone(), func.arity);
+        self.run()?;
+
+        Ok(())
+    }
+
     pub fn is_running(&self) -> bool {
         self.running && !self.runtime.call_stack_empty() && self.runtime.pc().unwrap() < self.runtime.chunk().unwrap().byte_len()
     }
 
     pub fn execute(&mut self) -> Result<(), RuntimeError> {
         let op = self.fetch_op()?;
-        
+
         #[cfg(feature = "debug_tracing")]
         {
             self.runtime.log_stack();
