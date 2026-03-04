@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::rc::Rc;
 use puffin_ast::Ast;
 use puffin_ast::declaration::Declaration;
 use puffin_ast::expression::Expression;
@@ -7,7 +8,7 @@ use puffin_ast::token::{Token, TokenType};
 use puffin_runtime::{Chunk, Value};
 use puffin_runtime::chunk::{ConstantOffset, LocalOffset};
 use puffin_runtime::op::OpCode;
-use puffin_runtime::value::{FloatType, IntType};
+use puffin_runtime::value::{FloatType, Function, IntType};
 use crate::scope::Scope;
 
 #[derive(thiserror::Error, Debug)]
@@ -66,7 +67,27 @@ impl<'a> Compiler<'a> {
             // Declaration::Layout(_) => {}
             // Declaration::Signal(_) => {}
             Declaration::Method(method) => {
-                self.compile_statement(&method.block)?;
+                let mut chunk = Chunk::new(method.name.lexeme.clone());
+                let mut method_compiler = Compiler::new(&mut chunk);
+
+                for arg in &method.parameters {
+                    method_compiler.scope.define_local(&arg.lexeme);
+                }
+
+                method_compiler.compile_statement(&method.block)?;
+                method_compiler.ensure_return()?;
+
+                let func = Function {
+                    chunk: Rc::new(chunk),
+                    identifier: method.name.lexeme.clone(),
+                    arity: method.parameters.len(),
+                };
+                let constant = self.chunk.new_constant(func);
+                self.chunk.push_op(OpCode::Constant);
+                self.chunk.push_constant_offset(constant);
+                self.chunk.push_op(OpCode::SetGlobal);
+                let name = self.token_to_constant(&method.name)?;
+                self.chunk.push_constant_offset(name);
             }
             // Declaration::Require(_) => {}
             // Declaration::Use(_) => {}
@@ -128,11 +149,11 @@ impl<'a> Compiler<'a> {
                     //   jumpi :loop
                     // end:
 
+                    self.push_scope();
                     self.compile_expression(&stmt.iterable)?;
-                    let start_local = self.scope.total_local_count() as LocalOffset;
-                    self.scope.define_local(&stmt.var_name.lexeme);
+                    let start_local = self.scope.define_local(&stmt.var_name.lexeme);
                     self.compile_expression(&end)?;
-                    let end_local = self.scope.total_local_count() as LocalOffset;
+                    let end_local = self.scope.define_unnamed_local();
 
                     self.chunk.push_op(OpCode::GetLocal);
                     self.chunk.push_local_offset(end_local);
@@ -160,6 +181,7 @@ impl<'a> Compiler<'a> {
                     self.chunk.push_jump_im(OpCode::JumpIf, loop_addr);
 
                     self.chunk.patch_jump(end_jump, self.chunk.addr());
+                    self.pop_scope()?;
                 } else {
                     todo!("Generic for loops not supported yet");
                 }
@@ -187,7 +209,16 @@ impl<'a> Compiler<'a> {
                 self.compile_expression(&expr_stmt.expression)?;
                 self.chunk.push_op(OpCode::Pop);
             }
-            // Statement::Return(_) => {}
+            Statement::Return(ret) => {
+                if let Some(expr) = &ret.expression {
+                    self.compile_expression(expr)?;
+                } else {
+                    let null = self.add_to_constants(Value::Null)?;
+                    self.chunk.push_op(OpCode::Constant);
+                    self.chunk.push_constant_offset(null);
+                }
+                self.chunk.push_op(OpCode::Return);
+            }
             // Statement::Match(_) => {}
             Statement::VariableDeclaration(var) => {
                 self.compile_expression(&var.value)?;
@@ -246,11 +277,33 @@ impl<'a> Compiler<'a> {
                 self.chunk.push_constant_offset(name);
             }
             // Expression::Array(_) => {}
-            // Expression::Dictionary(_) => {}
+            Expression::Dictionary(dict) => {
+                self.chunk.push_op(OpCode::NewObject);
+                let obj = self.scope.define_unnamed_local();
+
+                for (key, value) in &dict.entries {
+                    self.chunk.push_op(OpCode::GetLocal);
+                    self.chunk.push_local_offset(obj);
+                    self.compile_expression(value)?;
+                    self.chunk.push_op(OpCode::SetField);
+                    let name = self.token_to_constant(key)?;
+                    self.chunk.push_constant_offset(name);
+                }
+            }
             // Expression::Match(_) => {}
             _ => (),
         }
 
+        Ok(())
+    }
+
+    fn ensure_return(&mut self) -> Result<(), CompileError> {
+        if !self.chunk.last_op_is(OpCode::Return) {
+            self.chunk.push_op(OpCode::Constant);
+            let null = self.add_to_constants(Value::Null)?;
+            self.chunk.push_constant_offset(null);
+            self.chunk.push_op(OpCode::Return);
+        }
         Ok(())
     }
 

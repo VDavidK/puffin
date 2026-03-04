@@ -27,3 +27,9 @@ impl TryFrom<Value> for FunctionType {
         }
     }
 }
+
+impl From<Function> for Value {
+    fn from(function: Function) -> Self {
+        Value::Function(Rc::new(function))
+    }
+}

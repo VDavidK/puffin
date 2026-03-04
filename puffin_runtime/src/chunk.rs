@@ -24,6 +24,10 @@ impl Chunk {
             constants: vec![],
         }
     }
+    
+    pub fn get_name(&self) -> &str {
+        &self.name
+    }
 
     pub fn byte_len(&self) -> usize {
         self.bytes.len()
@@ -135,6 +139,10 @@ impl Chunk {
     pub fn get_constant(&self, offset: usize) -> Option<&Value> {
         self.constants.get(offset)
     }
+
+    pub fn last_op_is(&self, matches: OpCode) -> bool {
+        matches!(self.bytes.last(), Some(&op) if op == matches.into())
+    }
 }
 
 impl Display for Chunk {
@@ -147,6 +155,7 @@ struct ChunkFormatter<'a> {
     chunk: &'a Chunk,
     inst: Vec<String>,
     idx: usize,
+    indent: usize,
 }
 
 impl<'a> From<&'a Chunk> for ChunkFormatter<'a> {
@@ -155,6 +164,7 @@ impl<'a> From<&'a Chunk> for ChunkFormatter<'a> {
             chunk: value,
             inst: vec![],
             idx: 0,
+            indent: 0,
         }
     }
 }
@@ -163,7 +173,6 @@ impl<'a> ChunkFormatter<'a> {
     fn format_string(mut self) -> String {
         while self.idx < self.chunk.byte_len() {
             let byte = self.chunk.bytes[self.idx];
-            self.idx += 1;
 
             match OpCode::try_from_primitive(byte) {
                 Ok(code) => match code {
@@ -212,24 +221,48 @@ impl<'a> ChunkFormatter<'a> {
                 },
                 Err(_) => self.inst.push(format!("{:<4x}| unknown [0x{:x}]", byte, self.idx)),
             }
+            self.idx += 1;
         }
 
-        let mut string = format!("Chunk '{}'", self.chunk.name);
+        let indent = self.get_indent();
+
+        let mut string = format!("{indent}Chunk '{}'", self.chunk.name);
+        let mut inner_functions = vec![];
 
         let constants = self.chunk.constants
             .iter()
             .enumerate()
-            .map(|(i, constant)| format!("0x{i:x} {constant}"))
+            .map(|(i, constant)| {
+                if let Value::Function(func) = &constant {
+                    inner_functions.push(func.clone());
+                }
+
+                format!("{indent}0x{i:x} {constant}")
+            })
             .collect::<Vec<_>>();
 
         if !constants.is_empty() {
-            string.push_str("\n== CONSTANTS ==\n");
+            string.push_str(&format!("\n{indent}== CONSTANTS ==\n"));
             string.push_str(&constants.join("\n"));
         }
 
         if !self.inst.is_empty() {
-            string.push_str("\n== INSTRUCTIONS ==\n");
+            string.push_str(&format!("\n{indent}== INSTRUCTIONS ==\n"));
             string.push_str(&self.inst.join("\n"));
+        }
+
+        if !inner_functions.is_empty() {
+            string.push_str(&format!("\n{indent}== FUNCTION CONSTANTS ==\n"));
+
+            for func in inner_functions {
+                let formatter = ChunkFormatter {
+                    chunk: &func.chunk,
+                    inst: vec![],
+                    idx: 0,
+                    indent: self.indent + 1,
+                };
+                string.push_str(&format!("{}\n", formatter.format_string()));
+            }
         }
 
         string
@@ -240,7 +273,7 @@ impl<'a> ChunkFormatter<'a> {
     }
     
     fn push_with_constant(&mut self, name: &'static str) {
-        if let Some(offset) = self.chunk.read_constant_offset(self.idx) {
+        if let Some(offset) = self.chunk.read_constant_offset(self.idx + 1) {
             if let Some(value) = self.chunk.get_constant(offset as usize) {
                 self.push_line(format!("{name} [0x{offset:x}] ({value})"));
                 self.idx += size_of::<ConstantOffset>();
@@ -253,7 +286,7 @@ impl<'a> ChunkFormatter<'a> {
     }
     
     fn push_with_local_offset(&mut self, name: &'static str) {
-        if let Some(offset) = self.chunk.read_local_offset(self.idx) {
+        if let Some(offset) = self.chunk.read_local_offset(self.idx + 1) {
             self.push_line(format!("{name} [0x{offset:x}]"));
             self.idx += size_of::<LocalOffset>();
         } else {
@@ -262,7 +295,7 @@ impl<'a> ChunkFormatter<'a> {
     }
 
     fn push_with_instruction_offset(&mut self, name: &'static str) {
-        if let Some(offset) = self.chunk.read_instruction_offset(self.idx) {
+        if let Some(offset) = self.chunk.read_instruction_offset(self.idx + 1) {
             self.push_line(format!("{name} [0x{offset:x}]"));
             self.idx += size_of::<InstructionOffset>();
         } else {
@@ -271,6 +304,10 @@ impl<'a> ChunkFormatter<'a> {
     }
 
     fn push_line(&mut self, line: impl AsRef<str>) {
-        self.inst.push(format!("0x{:<6x} | {}", self.idx, line.as_ref()));
+        self.inst.push(format!("{}0x{:<6x} | {}", self.get_indent(), self.idx, line.as_ref()));
+    }
+
+    fn get_indent(&self) -> String {
+        ">\t".repeat(self.indent)
     }
 }

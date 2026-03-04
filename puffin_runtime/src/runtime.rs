@@ -109,7 +109,7 @@ impl Runtime {
 
         let frame = CallFrame {
             chunk,
-            stack_offset: self.stack.len(),
+            stack_offset: self.stack.len() - arity,
             local_count: 0,
             pc: 0,
         };
@@ -118,12 +118,12 @@ impl Runtime {
     }
 
     pub(crate) fn ret(&mut self) -> Result<(), RuntimeError> {
-        if let Some(frame) = self.call_stack.pop() {
-            let ret_value = self.pop_expecting()?;
+        let ret_value = self.pop_expecting()?;
 
+        if let Some(frame) = self.call_stack.pop() {
             // Pop all values pushed in the current call frame
-            for _ in 0..frame.local_count - 1 {
-                self.pop_expecting()?;
+            for _ in 0..frame.local_count {
+                self.stack.pop();
             }
 
             self.push_value(ret_value);
@@ -160,6 +160,10 @@ impl Runtime {
         self.call_stack.last()
             .map(|frame| frame.chunk.as_ref())
             .ok_or(RuntimeError::StackEmpty)
+    }
+
+    pub fn chunk_name(&self) -> Result<&str, RuntimeError> {
+        Ok(self.chunk()?.get_name())
     }
 
     pub fn pc(&self) -> Result<usize, RuntimeError> {
