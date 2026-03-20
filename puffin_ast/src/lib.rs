@@ -18,14 +18,21 @@ pub enum VarType {
 
 #[derive(Debug)]
 pub struct Ast {
+    pub component_name: String,
     pub declarations: Vec<Declaration>,
 }
 
 impl Ast {
-    pub fn new(declarations: Vec<Declaration>) -> Self {
+    pub fn new(component_name: String) -> Self {
         Self {
-            declarations,
+            component_name,
+            declarations: vec![],
         }
+    }
+
+    pub fn add_decl(&mut self, decl: Declaration) -> &mut Self {
+        self.declarations.push(decl);
+        self
     }
 
     pub fn dump(&self) {

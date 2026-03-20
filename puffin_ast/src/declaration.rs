@@ -6,9 +6,15 @@ use crate::markup::Markup;
 
 #[derive(Debug)]
 pub struct ComponentDeclaration {
-    pub name: Option<Token>,
-    pub parameters: Vec<Token>,
+    pub name: Token,
+    pub constructor: Option<Box<Declaration>>,
     pub declarations: Vec<Declaration>,
+}
+
+#[derive(Debug)]
+pub struct ConstructorDeclaration {
+    pub parameters: Vec<Token>,
+    pub block: Box<Statement>,
 }
 
 #[derive(Debug)]
@@ -20,7 +26,6 @@ pub struct VarDeclaration {
 
 #[derive(Debug)]
 pub struct LayoutDeclaration {
-    /* TODO: Figure out what layout members are exactly */
     pub markup: Vec<Markup>,
     pub name: Option<Token>,
     pub parameters: Vec<Token>,
@@ -68,8 +73,14 @@ pub struct EnumDeclaration {
 }
 
 #[derive(Debug)]
+pub struct ErrorDeclaration {
+    pub members: Vec<Token>,
+}
+
+#[derive(Debug)]
 pub enum Declaration {
     Component(ComponentDeclaration),
+    Constructor(ConstructorDeclaration),
     Var(VarDeclaration),
     Layout(LayoutDeclaration),
     Signal(SignalDeclaration),
@@ -78,6 +89,121 @@ pub enum Declaration {
     Use(UseDeclaration),
     Export(ExportDeclaration),
     Enum(EnumDeclaration),
+    Error(ErrorDeclaration),
+}
+
+impl TryInto<ComponentDeclaration> for Declaration {
+    type Error = ();
+    fn try_into(self) -> Result<ComponentDeclaration, ()> {
+        match self {
+            Declaration::Component(c) => Ok(c),
+            _ => Err(()),
+        }
+    }
+}
+
+impl<'a> TryInto<&'a ComponentDeclaration> for &'a Declaration {
+
+    type Error = ();
+    fn try_into(self) -> Result<&'a ComponentDeclaration, ()> {
+        match self {
+            Declaration::Component(c) => Ok(c),
+            _ => Err(()),
+        }
+    }
+}
+
+impl TryInto<VarDeclaration> for Declaration {
+    type Error = ();
+    fn try_into(self) -> Result<VarDeclaration, ()> {
+        match self {
+            Declaration::Var(c) => Ok(c),
+            _ => Err(()),
+        }
+    }
+}
+
+impl TryInto<LayoutDeclaration> for Declaration {
+    type Error = ();
+    fn try_into(self) -> Result<LayoutDeclaration, ()> {
+        match self {
+            Declaration::Layout(c) => Ok(c),
+            _ => Err(()),
+        }
+    }
+}
+impl TryInto<SignalDeclaration> for Declaration {
+    type Error = ();
+    fn try_into(self) -> Result<SignalDeclaration, ()> {
+        match self {
+            Declaration::Signal(c) => Ok(c),
+            _ => Err(()),
+        }
+    }
+}
+impl TryInto<MethodDeclaration> for Declaration {
+    type Error = ();
+    fn try_into(self) -> Result<MethodDeclaration, ()> {
+        match self {
+            Declaration::Method(c) => Ok(c),
+            _ => Err(()),
+        }
+    }
+}
+impl<'a> TryInto<&'a MethodDeclaration> for &'a Declaration {
+
+    type Error = ();
+    fn try_into(self) -> Result<&'a MethodDeclaration, ()> {
+        match self {
+            Declaration::Method(c) => Ok(c),
+            _ => Err(()),
+        }
+    }
+}
+impl TryInto<RequireDeclaration> for Declaration {
+    type Error = ();
+    fn try_into(self) -> Result<RequireDeclaration, ()> {
+        match self {
+            Declaration::Require(c) => Ok(c),
+            _ => Err(()),
+        }
+    }
+}
+impl TryInto<UseDeclaration> for Declaration {
+    type Error = ();
+    fn try_into(self) -> Result<UseDeclaration, ()> {
+        match self {
+            Declaration::Use(c) => Ok(c),
+            _ => Err(()),
+        }
+    }
+}
+impl TryInto<ExportDeclaration> for Declaration {
+    type Error = ();
+    fn try_into(self) -> Result<ExportDeclaration, ()> {
+        match self {
+            Declaration::Export(c) => Ok(c),
+            _ => Err(()),
+        }
+    }
+}
+impl TryInto<EnumDeclaration> for Declaration {
+    type Error = ();
+    fn try_into(self) -> Result<EnumDeclaration, ()> {
+        match self {
+            Declaration::Enum(c) => Ok(c),
+            _ => Err(()),
+        }
+    }
+}
+impl TryInto<ErrorDeclaration> for Declaration {
+    type Error = ();
+    fn try_into(self) -> Result<ErrorDeclaration, ()> {
+        match self {
+            Declaration::Error(c) => Ok(c),
+            _ => Err(()),
+        }
+    }
 }
 
 impl Decorator {
@@ -85,6 +211,14 @@ impl Decorator {
         Self {
             name,
             parameters,
+        }
+    }
+}
+
+impl ErrorDeclaration {
+    pub fn new(members: Vec<Token>) -> Self {
+        Self {
+            members,
         }
     }
 }
@@ -106,17 +240,26 @@ impl UseDeclaration {
 }
 
 impl ComponentDeclaration {
-    pub fn new(parameters: Vec<Token>, declarations: Vec<Declaration>) -> Self {
+    pub fn new(name: Token, declarations: Vec<Declaration>) -> Self {
         Self {
-            name: None,
-            parameters,
+            name,
+            constructor: None,
             declarations,
         }
     }
 
-    pub fn with_name(mut self, name: Token) -> Self {
-        self.name = Some(name);
+    pub fn with_constructor(mut self, constructor: Declaration) -> Self {
+        self.constructor = Some(Box::new(constructor));
         self
+    }
+}
+
+impl ConstructorDeclaration {
+    pub fn new(parameters: Vec<Token>, block: Statement) -> Self {
+        Self {
+            parameters,
+            block: Box::new(block),
+        }
     }
 }
 impl VarDeclaration {
@@ -184,9 +327,19 @@ impl EnumDeclaration {
     }
 }
 
+impl From<ErrorDeclaration> for Declaration {
+    fn from(value: ErrorDeclaration) -> Self {
+        Declaration::Error(value)
+    }
+}
 impl From<ComponentDeclaration> for Declaration {
     fn from(value: ComponentDeclaration) -> Self {
         Declaration::Component(value)
+    }
+}
+impl From<ConstructorDeclaration> for Declaration {
+    fn from(value: ConstructorDeclaration) -> Self {
+        Declaration::Constructor(value)
     }
 }
 impl From<VarDeclaration> for Declaration {

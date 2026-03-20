@@ -15,6 +15,7 @@ pub enum TokenType {
     KwIn, // "in"
     KwLayout, // "layout"
     KwComponent, // "component"
+    KwNew, // "new"
     KwSignal, // "signal"
     KwLet, // "let"
     KwConst, // "const"
@@ -32,6 +33,9 @@ pub enum TokenType {
     KwWith, // "with"
     KwEnum, // "enum"
     KwDefault, // "default"
+    KwError, // "error"
+    KwCatch, // "catch"
+    KwRaise, // "raise"
 
     LeftBrace, // "{"
     RightBrace, // "}"

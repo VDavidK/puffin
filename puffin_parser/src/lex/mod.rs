@@ -1,3 +1,4 @@
+use std::path::Path;
 use crate::lex::LexerError::{UnterminatedBlockComment, UnterminatedStringLiteral};
 use puffin_ast::{span::Span, token::Token, token::TokenType, position::Position};
 
@@ -95,6 +96,7 @@ impl<'a> Iterator for PuffinLexer<'a> {
                     "in" => self.token(TokenType::KwIn),
                     "layout" => self.token(TokenType::KwLayout),
                     "component" => self.token(TokenType::KwComponent),
+                    "new" => self.token(TokenType::KwNew),
                     "signal" => self.token(TokenType::KwSignal),
                     "let" => self.token(TokenType::KwLet),
                     "const" => self.token(TokenType::KwConst),
@@ -113,6 +115,9 @@ impl<'a> Iterator for PuffinLexer<'a> {
                     "enum" => self.token(TokenType::KwEnum),
                     "default" => self.token(TokenType::KwDefault),
                     "null" => self.token(TokenType::KwNull),
+                    "error" => self.token(TokenType::KwError),
+                    "catch" => self.token(TokenType::KwCatch),
+                    "raise" => self.token(TokenType::KwRaise),
                     _ => self.token(TokenType::Identifier),
                 }
             },
@@ -222,5 +227,15 @@ impl<'a> PuffinLexer<'a> {
 
     pub(crate) fn attach_snippet(&self, span: Span) -> Span {
         span.with_snippet(self.src, self.src_name, 1)
+    }
+
+    pub(crate) fn get_src_name(&self) -> String {
+        Path::new(self.src_name).file_stem().unwrap().to_str().unwrap().to_owned()
+        /*Path::new(self.src_name)
+            .file_name()
+            .unwrap()
+            .to_os_string()
+            .into_string()
+            .unwrap()*/
     }
 }
