@@ -1,13 +1,11 @@
-use std::cell::{RefCell, RefMut};
-use std::ops::{Deref, DerefMut};
+use std::cell::RefCell;
 use std::rc::Rc;
 use num_enum::TryFromPrimitive;
 
 use crate::{RuntimeError, chunk::Chunk, op::OpCode, value::{Value, new_instance}};
 use crate::chunk::{InstructionOffset, ConstantOffset, LocalOffset};
-use crate::library::Library;
 use crate::runtime::{CallFrame, Runtime};
-use crate::value::{new_class, FunctionType, InstanceType, Module};
+use crate::value::{FunctionType, InstanceType, Module};
 
 #[derive(Debug)]
 pub struct Vm {
