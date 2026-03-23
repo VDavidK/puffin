@@ -1169,6 +1169,7 @@ dependencies = [
  "puffin_compiler",
  "puffin_parser",
  "puffin_runtime",
+ "puffin_stdlib",
  "simplelog",
 ]
 

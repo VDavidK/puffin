@@ -1,9 +1,11 @@
-pub mod vm;
-pub mod op;
+mod baselibs;
+
 pub mod chunk;
-pub mod value;
-pub mod runtime;
 pub mod library;
+pub mod op;
+pub mod runtime;
+pub mod value;
+pub mod vm;
 
 pub use chunk::Chunk;
 
@@ -28,7 +30,11 @@ pub enum RuntimeError {
     InvalidConstantAccess { at: usize, pc: usize },
 
     #[error("Unable to perform binary {op} operation on {lhs_type} and {rhs_type}")]
-    InvalidBinaryOperation { op: String, lhs_type: String, rhs_type: String },
+    InvalidBinaryOperation {
+        op: String,
+        lhs_type: String,
+        rhs_type: String,
+    },
 
     #[error("Unable to perform unary {op} operation on {rhs_type}")]
     InvalidUnaryOperation { op: String, rhs_type: String },
@@ -51,5 +57,3 @@ pub enum RuntimeError {
     #[error("Attempting to execute instructions with an empty call stack")]
     CallStackEmpty,
 }
-
-

@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use num_enum::TryFromPrimitive;
 
-use crate::{RuntimeError, chunk::Chunk, op::OpCode, value::{Value, new_instance}};
+use crate::{RuntimeError, baselibs::define_print_function, chunk::Chunk, op::OpCode, value::{Value, new_instance}};
 use crate::chunk::{InstructionOffset, ConstantOffset, LocalOffset};
 use crate::runtime::{CallFrame, Runtime};
 use crate::value::{FunctionType, InstanceType, Module};
@@ -23,14 +23,18 @@ impl Vm {
             pc: 0,
         };
 
-        Self {
+        let mut vm = Self {
             runtime: Runtime::new(main_frame),
             running: true,
             root: None,
-        }
+        };
+
+        define_print_function(&mut vm);
+
+        vm
     }
 
-    pub fn open_module(&mut self, module: Module) {
+    pub fn include_module(&mut self, module: Module) {
         let name = module.get_name().to_owned();
         let module = Rc::new(RefCell::new(module));
         self.add_global(name, module);
@@ -131,7 +135,7 @@ impl Vm {
                 let name = self.fetch_constant()?.to_string();
 
                 let value = match self.runtime.pop_expecting()? {
-                    Value::Class(class) => {
+                    Value::Class(_class) => {
                         todo!()
                     }
                     Value::Module(module) => {

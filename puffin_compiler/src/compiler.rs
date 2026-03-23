@@ -1,16 +1,16 @@
-use std::collections::HashMap;
-use std::rc::Rc;
+use crate::scope::Scope;
 use puffin_ast::Ast;
 use puffin_ast::declaration::Declaration;
 use puffin_ast::expression::Expression;
 use puffin_ast::markup::Markup;
 use puffin_ast::statement::Statement;
 use puffin_ast::token::{Token, TokenType};
-use puffin_runtime::{Chunk, Value};
 use puffin_runtime::chunk::{ConstantOffset, LocalOffset};
 use puffin_runtime::op::OpCode;
 use puffin_runtime::value::{FloatType, Function, IntType};
-use crate::scope::Scope;
+use puffin_runtime::{Chunk, value::Value};
+use std::collections::HashMap;
+use std::rc::Rc;
 
 #[derive(thiserror::Error, Debug)]
 pub enum CompileError {
@@ -66,12 +66,9 @@ impl<'a> Compiler<'a> {
                 self.chunk.push_constant_offset(name);
             }
             Declaration::Layout(layout) => {
-
                 for markup in &layout.markup {
                     self.compile_markup(markup)?;
-
                 }
-
             }
             // Declaration::Signal(_) => {}
             Declaration::Method(method) => {
@@ -138,7 +135,6 @@ impl<'a> Compiler<'a> {
             // Statement::Continue(_) => {}
             Statement::For(stmt) => {
                 if let Some(end) = &stmt.end_range {
-
                     //   <start> #start_local
                     //   <end>   #end_local
                     //   getl #start_local
@@ -247,7 +243,7 @@ impl<'a> Compiler<'a> {
                             let global = self.token_to_constant(&literal.token)?;
                             self.chunk.push_op(OpCode::GetGlobal);
                             self.chunk.push_constant_offset(global);
-                        },
+                        }
                         Some(addr) => {
                             self.chunk.push_op(OpCode::GetLocal);
                             self.chunk.push_local_offset(addr);
@@ -338,22 +334,21 @@ impl<'a> Compiler<'a> {
                 };
                 let name = self.token_to_constant(&accessor.field)?;
                 Ok(VariableTarget::Object(name))
-            },
+            }
 
-            Expression::Literal(literal) => match self.scope.lookup_local(literal.token.lexeme.as_str()) {
-                None => {
-                    let global = self.token_to_constant(&literal.token)?;
-                    Ok(VariableTarget::Global(global))
-                },
-                Some(addr) => {
-                    Ok(VariableTarget::Local(addr))
+            Expression::Literal(literal) => {
+                match self.scope.lookup_local(literal.token.lexeme.as_str()) {
+                    None => {
+                        let global = self.token_to_constant(&literal.token)?;
+                        Ok(VariableTarget::Global(global))
+                    }
+                    Some(addr) => Ok(VariableTarget::Local(addr)),
                 }
-            },
+            }
 
             _ => Err(CompileError::InvalidTarget),
         }
     }
-
 
     fn token_to_value(&self, token: &Token) -> Result<Value, CompileError> {
         match token.ty {
@@ -361,20 +356,24 @@ impl<'a> Compiler<'a> {
             TokenType::KwFalse => Ok(Value::Bool(false)),
             TokenType::KwNull => Ok(Value::Null),
             TokenType::Integer => {
-                let val = token.lexeme
+                let val = token
+                    .lexeme
                     .parse::<IntType>()
                     .map_err(|_| CompileError::InvalidLiteral(token.lexeme.clone()))?;
 
                 Ok(Value::Int(val))
-            },
+            }
             TokenType::Float => {
-                let val = token.lexeme
+                let val = token
+                    .lexeme
                     .parse::<FloatType>()
                     .map_err(|_| CompileError::InvalidLiteral(token.lexeme.clone()))?;
 
                 Ok(Value::Float(val))
-            },
-            TokenType::String => Ok(Value::String(token.lexeme[1..token.lexeme.len() - 1].to_owned())),
+            }
+            TokenType::String => Ok(Value::String(
+                token.lexeme[1..token.lexeme.len() - 1].to_owned(),
+            )),
             TokenType::Identifier => Ok(Value::String(token.lexeme.to_owned())),
 
             _ => Err(CompileError::InvalidLiteral(token.lexeme.clone())),
@@ -413,7 +412,10 @@ impl<'a> Compiler<'a> {
         self.add_to_constants(constant)
     }
 
-    fn add_to_constants(&mut self, constant: impl Into<Value>) -> Result<ConstantOffset, CompileError> {
+    fn add_to_constants(
+        &mut self,
+        constant: impl Into<Value>,
+    ) -> Result<ConstantOffset, CompileError> {
         let constant = constant.into();
 
         if let Some(addr) = self.constant_table.get(&constant) {
@@ -439,7 +441,7 @@ impl<'a> Compiler<'a> {
 
                 self.scope = *parent;
                 Ok(())
-            },
+            }
             None => Err(CompileError::TopScopePopped),
         }
     }

@@ -3,7 +3,7 @@ use crate::declaration::Declaration;
 
 pub mod element;
 
-pub fn create_module() -> Module {
+pub fn module() -> Module {
     let mut module = Module::new("dom");
     element::TextElement::declare(&mut module);
 

@@ -1,15 +1,13 @@
-mod libs;
-
-use std::{fs::File, path::PathBuf};
-use std::io::Read;
-use std::rc::Rc;
 use clap::{Parser, Subcommand};
 use color_eyre::eyre::OptionExt;
 use puffin_runtime::Chunk;
+use std::io::Read;
+use std::rc::Rc;
+use std::{fs::File, path::PathBuf};
 
+use puffin_runtime::vm::Vm;
 #[cfg(feature = "logging")]
 use simplelog::{Config, LevelFilter, WriteLogger};
-use puffin_runtime::vm::Vm;
 
 #[derive(Subcommand, Debug)]
 enum Operation {
@@ -26,14 +24,18 @@ enum Operation {
 #[command(version, about, long_about = None)]
 struct Args {
     #[command(subcommand)]
-    op: Operation
+    op: Operation,
 }
 
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
-    
+
     #[cfg(feature = "logging")]
-    WriteLogger::init(LevelFilter::Debug, Config::default(), File::create("latest.log")?)?;
+    WriteLogger::init(
+        LevelFilter::Debug,
+        Config::default(),
+        File::create("latest.log")?,
+    )?;
 
     let args = Args::parse();
 
@@ -41,7 +43,8 @@ fn main() -> color_eyre::Result<()> {
         Operation::Compile { input, output } => {
             // Open input file
             let mut input_file = File::open(&input)?;
-            let input_path_str = input.to_str()
+            let input_path_str = input
+                .to_str()
                 .ok_or_eyre("File name must be valid UTF-8 name")?;
 
             // Read source
@@ -55,13 +58,16 @@ fn main() -> color_eyre::Result<()> {
             // Write compiled output to disk
             let file = File::create(output.unwrap_or("out.pfb".into()))?;
             ciborium::into_writer(&chunk, file)?;
-        },
+        }
         Operation::Run { input } => {
             let mut file = File::open(&input)?;
-            let input_path_str = input.to_str()
+            let input_path_str = input
+                .to_str()
                 .ok_or_eyre("File name must be valid UTF-8 name")?;
 
-            let chunk = if let Some(ext) = input.extension() && ext == "pfb" {
+            let chunk = if let Some(ext) = input.extension()
+                && ext == "pfb"
+            {
                 ciborium::from_reader::<Chunk, File>(file)?
             } else {
                 let mut file_contents = String::new();
@@ -75,18 +81,18 @@ fn main() -> color_eyre::Result<()> {
 
             let mut vm = Vm::new(Rc::new(chunk));
 
-            vm.open_lib::<libs::CoreLib>();
-            vm.open_lib::<libs::OsLib>();
+            vm.include_module(puffin_stdlib::core::dom::module());
 
             vm.run()?;
 
-            let func = vm.get_global("main")
+            let func = vm
+                .get_global("main")
                 .expect("Expected main function")
                 .clone()
                 .take_function()?;
 
             vm.call(func)?;
-        },
+        }
     }
 
     Ok(())

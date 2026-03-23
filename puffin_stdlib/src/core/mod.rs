@@ -1,7 +1,1 @@
-mod dom;
-
-use puffin_runtime::vm::Vm;
-
-pub fn open(vm: &mut Vm) {
-
-}
+pub mod dom;
