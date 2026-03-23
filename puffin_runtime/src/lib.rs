@@ -1,5 +1,3 @@
-
-pub mod layout;
 pub mod vm;
 pub mod op;
 pub mod chunk;
@@ -8,7 +6,6 @@ pub mod runtime;
 pub mod library;
 
 pub use chunk::Chunk;
-pub use value::Value;
 
 #[derive(Debug, thiserror::Error)]
 pub enum RuntimeError {

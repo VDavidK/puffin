@@ -3,7 +3,7 @@ use std::fmt::Display;
 use num_enum::TryFromPrimitive;
 use serde_derive::{Deserialize, Serialize};
 
-use crate::{Value, op::OpCode};
+use crate::{value::Value, op::OpCode};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Chunk {
@@ -189,7 +189,7 @@ impl<'a> ChunkFormatter<'a> {
 
                     // Object Manipulation
 
-                    OpCode::NewObject => self.push("newobj"),
+                    OpCode::NewInstance => self.push("newobj"),
                     OpCode::GetField => self.push_with_local_offset("getf"),
                     OpCode::SetField => self.push_with_local_offset("setf"),
 
@@ -218,6 +218,9 @@ impl<'a> ChunkFormatter<'a> {
                     OpCode::Exit => self.push("exit"),
                     OpCode::Poll => self.push("poll"),
                     OpCode::Render => self.push("render"),
+
+                    // Layout
+                    OpCode::SetRoot => self.push("setroot"),
                 },
                 Err(_) => self.inst.push(format!("{:<4x}| unknown [0x{:x}]", byte, self.idx)),
             }

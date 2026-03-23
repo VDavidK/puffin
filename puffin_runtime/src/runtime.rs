@@ -2,7 +2,8 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use ratatui::DefaultTerminal;
 use crate::chunk::LocalOffset;
-use crate::{Chunk, RuntimeError, Value};
+use crate::{Chunk, RuntimeError, value::Value};
+use crate::value::InstanceType;
 
 #[derive(Debug, Clone)]
 pub struct CallFrame {
@@ -184,8 +185,8 @@ impl Runtime {
         }
     }
 
-    pub fn render(&mut self, value: Value) -> Result<(), RuntimeError> {
-        self.term.draw(|frame| frame.render_widget(value.to_string(), frame.area()))?;
+    pub fn render(&mut self, elem: &InstanceType) -> Result<(), RuntimeError> {
+        // self.term.draw(|frame| frame.render_widget(elem, frame.area()))?;
         Ok(())
     }
 
@@ -194,8 +195,8 @@ impl Runtime {
         Ok(())
     }
 
-    pub fn add_global(&mut self, name: impl AsRef<str>, value: impl Into<Value>) {
-        self.globals.insert(name.as_ref().to_owned(), value.into());
+    pub fn add_global(&mut self, name: impl Into<String>, value: impl Into<Value>) {
+        self.globals.insert(name.into(), value.into());
     }
 
     pub fn remove_global(&mut self, name: impl AsRef<str>) {

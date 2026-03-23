@@ -1,7 +1,8 @@
 use std::fmt::Display;
+use std::rc::Rc;
 use crate::runtime::Runtime;
-use crate::{RuntimeError, Value};
-use crate::value::NativeFunctionType;
+use crate::RuntimeError;
+use crate::value::{Value, NativeFunctionType};
 
 pub type NativeCallable = fn(runtime: &mut Runtime) -> Result<Value, RuntimeError>;
 
@@ -23,6 +24,12 @@ impl NativeFunction {
             fun: callable,
             arity: num_args,
         }
+    }
+}
+
+impl From<NativeFunction> for Value {
+    fn from(value: NativeFunction) -> Self {
+        Value::NativeFunction(Rc::new(value))
     }
 }
 

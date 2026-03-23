@@ -1,12 +1,16 @@
 mod function;
-mod object;
+mod instance;
 mod native_function;
+mod class;
+mod module;
 
 use std::{cell::RefCell, fmt::Display, hash::Hash, rc::Rc};
 
-pub use object::{Object, new_object};
+pub use instance::{new_instance, Instance};
 pub use function::Function;
 pub use native_function::NativeFunction;
+pub use class::{new_class, Class};
+pub use module::{new_module, Module};
 
 use serde_derive::{Deserialize, Serialize};
 use crate::RuntimeError;
@@ -15,7 +19,9 @@ pub type IntType = i64;
 pub type FloatType = f64;
 pub type BoolType = bool;
 pub type StringType = String;
-pub type ObjectType = Rc<RefCell<Object>>;
+pub type InstanceType = Rc<RefCell<Instance>>;
+pub type ClassType = Rc<RefCell<Class>>;
+pub type ModuleType = Rc<RefCell<Module>>;
 pub type FunctionType = Rc<Function>;
 pub type NativeFunctionType = Rc<NativeFunction>;
 
@@ -26,10 +32,12 @@ pub enum Value {
     Bool(BoolType),
     String(StringType),
     Function(FunctionType),
+    Class(ClassType),
+    Module(ModuleType),
     Null,
 
     #[serde(skip)]
-    Object(ObjectType),
+    Instance(InstanceType),
 
     #[serde(skip)]
     NativeFunction(NativeFunctionType),
@@ -42,9 +50,11 @@ impl PartialEq for Value {
             (Self::Float(l0), Self::Float(r0)) => l0 == r0,
             (Self::Bool(l0), Self::Bool(r0)) => l0 == r0,
             (Self::String(l0), Self::String(r0)) => l0 == r0,
-            (Self::Object(l0), Self::Object(r0)) => l0.as_ptr() == r0.as_ptr(),
+            (Self::Instance(l0), Self::Instance(r0)) => l0.as_ptr() == r0.as_ptr(),
             (Self::Function(l0), Self::Function(r0)) => Rc::as_ptr(l0) == Rc::as_ptr(r0),
             (Self::NativeFunction(l0), Self::NativeFunction(r0)) => Rc::as_ptr(l0) == Rc::as_ptr(r0),
+            (Self::Class(l0), Self::Class(r0)) => Rc::as_ptr(l0) == Rc::as_ptr(r0),
+            (Self::Module(l0), Self::Module(r0)) => Rc::as_ptr(l0) == Rc::as_ptr(r0),
             _ => false,
         }
     }
@@ -132,15 +142,15 @@ impl<'a> From<&'a str> for Value {
     }
 }
 
-impl From<ObjectType> for Value {
-    fn from(value: ObjectType) -> Self {
-        Value::Object(value)
+impl From<InstanceType> for Value {
+    fn from(value: InstanceType) -> Self {
+        Value::Instance(value)
     }
 }
 
-impl From<Object> for Value {
-    fn from(value: Object) -> Self {
-        Value::Object(Rc::new(RefCell::new(value)))
+impl From<Instance> for Value {
+    fn from(value: Instance) -> Self {
+        Value::Instance(Rc::new(RefCell::new(value)))
     }
 }
 
@@ -156,12 +166,6 @@ impl From<i32> for Value {
     }
 }
 
-impl From<NativeFunction> for Value {
-    fn from(value: NativeFunction) -> Self {
-        Value::NativeFunction(Rc::new(value))
-    }
-}
-
 impl Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -169,9 +173,11 @@ impl Display for Value {
             Value::Float(v) => f.write_fmt(format_args!("{v}")),
             Value::Bool(v) => f.write_fmt(format_args!("{v}")),
             Value::String(v) => f.write_fmt(format_args!("{v}")),
-            Value::Object(v) => f.write_fmt(format_args!("{}", v.borrow())),
+            Value::Instance(v) => f.write_fmt(format_args!("{}", v.borrow())),
             Value::Function(v) => f.write_fmt(format_args!("{}", v)),
             Value::NativeFunction(v) => f.write_fmt(format_args!("{}", v)),
+            Value::Class(v) => f.write_fmt(format_args!("{}", v.borrow())),
+            Value::Module(v) => f.write_fmt(format_args!("{}", v.borrow())),
             Value::Null => f.write_fmt(format_args!("null")),
         }
     }
@@ -298,8 +304,8 @@ impl Value {
                 _ => false,
             },
 
-            Value::Object(lhs) => match rhs {
-                Value::Object(rhs) => lhs.as_ptr() == rhs.as_ptr(),
+            Value::Instance(lhs) => match rhs {
+                Value::Instance(rhs) => lhs.as_ptr() == rhs.as_ptr(),
 
                 _ => false,
             }
@@ -312,6 +318,18 @@ impl Value {
 
             Value::NativeFunction(lhs) => match rhs {
                 Value::NativeFunction(rhs) => Rc::as_ptr(lhs) == Rc::as_ptr(rhs),
+
+                _ => false,
+            }
+
+            Value::Class(lhs) => match rhs {
+                Value::Class(rhs) => Rc::as_ptr(lhs) == Rc::as_ptr(rhs),
+
+                _ => false,
+            }
+
+            Value::Module(lhs) => match rhs {
+                Value::Module(rhs) => Rc::as_ptr(lhs) == Rc::as_ptr(rhs),
 
                 _ => false,
             }
@@ -392,9 +410,11 @@ impl Value {
             Value::Float(val) => *val != 0.0,
             Value::Bool(val) => *val,
             Value::String(val) => !val.is_empty(),
-            Value::Object(_) => true,
+            Value::Instance(_) => true,
             Value::Function(_) => true,
             Value::NativeFunction(_) => true,
+            Value::Class(_) => true,
+            Value::Module(_) => true,
             Value::Null => false,
         }
     }
@@ -405,9 +425,11 @@ impl Value {
             Value::Float(_) => "float",
             Value::Bool(_) => "bool",
             Value::String(_) => "string",
-            Value::Object(_) => "object",
+            Value::Instance(_) => "instance",
             Value::Function(_) => "function",
             Value::NativeFunction(_) => "native_function",
+            Value::Class(_) => "class",
+            Value::Module(_) => "module",
             Value::Null => "null",
         }
     }
@@ -428,8 +450,8 @@ impl Value {
         TryInto::<BoolType>::try_into(self)
     }
 
-    pub fn take_object(self) -> Result<ObjectType, RuntimeError> {
-        TryInto::<ObjectType>::try_into(self)
+    pub fn take_instance(self) -> Result<InstanceType, RuntimeError> {
+        TryInto::<InstanceType>::try_into(self)
     }
 
     pub fn take_function(self) -> Result<FunctionType, RuntimeError> {
@@ -438,5 +460,13 @@ impl Value {
 
     pub fn take_native_function(self) -> Result<NativeFunctionType, RuntimeError> {
         TryInto::<NativeFunctionType>::try_into(self)
+    }
+
+    pub fn take_class(self) -> Result<ClassType, RuntimeError> {
+        TryInto::<ClassType>::try_into(self)
+    }
+
+    pub fn take_module(self) -> Result<ModuleType, RuntimeError> {
+        TryInto::<ModuleType>::try_into(self)
     }
 }

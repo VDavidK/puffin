@@ -1,16 +1,19 @@
+use std::cell::{RefCell, RefMut};
+use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 use num_enum::TryFromPrimitive;
 
-use crate::{RuntimeError, Value, chunk::Chunk, op::OpCode, value::new_object};
+use crate::{RuntimeError, chunk::Chunk, op::OpCode, value::{Value, new_instance}};
 use crate::chunk::{InstructionOffset, ConstantOffset, LocalOffset};
 use crate::library::Library;
 use crate::runtime::{CallFrame, Runtime};
-use crate::value::FunctionType;
+use crate::value::{new_class, FunctionType, InstanceType, Module};
 
 #[derive(Debug)]
 pub struct Vm {
     running: bool,
     runtime: Runtime,
+    root: Option<InstanceType>,
 }
 
 impl Vm {
@@ -25,13 +28,14 @@ impl Vm {
         Self {
             runtime: Runtime::new(main_frame),
             running: true,
+            root: None,
         }
     }
 
-    pub fn open_lib<T: Library>(&mut self) {
-        let lib = new_object();
-        T::create(lib.borrow_mut());
-        self.add_global(T::name(), lib);
+    pub fn open_module(&mut self, module: Module) {
+        let name = module.get_name().to_owned();
+        let module = Rc::new(RefCell::new(module));
+        self.add_global(name, module);
     }
 
     pub fn run(&mut self) -> Result<(), RuntimeError> {
@@ -118,25 +122,39 @@ impl Vm {
                 self.runtime.pop_expecting()?;
             },
 
-            OpCode::NewObject => {
-                self.runtime.push_value(new_object());
+            OpCode::NewInstance => {
+                let class = self.runtime.pop_expecting()?
+                    .take_class()?;
+
+                self.runtime.push_value(new_instance(class));
             }
 
             OpCode::GetField => {
                 let name = self.fetch_constant()?.to_string();
 
-                let obj = self.runtime.pop_expecting()?.take_object()?;
-                let obj = obj.borrow();
+                let value = match self.runtime.pop_expecting()? {
+                    Value::Class(class) => {
+                        todo!()
+                    }
+                    Value::Module(module) => {
+                        module.borrow().get_item(&name)
+                            .ok_or(RuntimeError::NoFieldMatchingName { name })?.to_owned()
+                    }
+                    Value::Instance(inst) => {
+                        inst.borrow().get_field(&name)
+                            .ok_or(RuntimeError::NoFieldMatchingName { name })?.to_owned()
+                    }
+                    v => {
+                        return Err(RuntimeError::IncorrectType { ty: v.type_name().into(), expected: "instance, module, class, dictionary or array".into() })
+                    }
+                };
 
-                let field = obj.get_field(&name)
-                    .ok_or(RuntimeError::NoFieldMatchingName { name })?;
-
-                self.runtime.push_value(field.to_owned());
+                self.runtime.push_value(value);
             },
 
             OpCode::SetField => {
                 let value = self.runtime.pop_expecting()?;
-                let obj = self.runtime.pop_expecting()?.take_object()?;
+                let obj = self.runtime.pop_expecting()?.take_instance()?;
                 let name = self.fetch_constant()?.to_string();
 
                 obj.borrow_mut().set_field(name, value.to_owned());
@@ -267,22 +285,31 @@ impl Vm {
 
             OpCode::Exit => {
                 self.running = false;
-            }
+            },
 
             OpCode::Poll => {
                 self.runtime.poll()?;
             },
             
             OpCode::Render => {
-                let value = self.runtime.pop_expecting()?;
-                self.runtime.render(value)?;
-            }
+                if let Some(root) = &self.root {
+                    self.runtime.render(root)?;
+                }
+            },
+
+            OpCode::SetRoot => {
+                let element = self.runtime
+                    .pop_expecting()?
+                    .take_instance()?;
+
+                self.root = Some(element);
+            },
         }
 
         Ok(())
     }
 
-    pub fn add_global(&mut self, name: impl AsRef<str>, value: impl Into<Value>) {
+    pub fn add_global(&mut self, name: impl Into<String>, value: impl Into<Value>) {
         self.runtime.add_global(name, value);
     }
 
@@ -295,10 +322,7 @@ impl Vm {
     }
 
     pub fn fetch_op(&mut self) -> Result<OpCode, RuntimeError> {
-        let byte = self.runtime.chunk()?
-            .read_u8(self.runtime.pc()?)
-            .ok_or(RuntimeError::AccessOutOfBounds { at: self.runtime.pc()?, pc: self.runtime.pc()? })?;
-
+        let byte = self.read_u8()?;
         self.runtime.move_pc(1);
 
         OpCode::try_from_primitive(byte)
@@ -306,9 +330,7 @@ impl Vm {
     }
 
     pub fn fetch_u8(&mut self) -> Result<u8, RuntimeError> {
-        let byte =  self.runtime.chunk()?
-            .read_u8(self.runtime.pc()?)
-            .ok_or(RuntimeError::AccessOutOfBounds { at: self.runtime.pc()?, pc: self.runtime.pc()? })?;
+        let byte = self.read_u8()?;
         self.runtime.move_pc(1);
         Ok(byte)
     }
@@ -355,6 +377,12 @@ impl Vm {
             .ok_or(RuntimeError::InvalidConstantAccess { at: offset, pc: self.runtime.pc()? })?;
 
         Ok(value)
+    }
+
+    pub fn read_u8(&mut self) -> Result<u8, RuntimeError> {
+        self.runtime.chunk()?
+            .read_u8(self.runtime.pc()?)
+            .ok_or(RuntimeError::AccessOutOfBounds { at: self.runtime.pc()?, pc: self.runtime.pc()? })
     }
 }
 

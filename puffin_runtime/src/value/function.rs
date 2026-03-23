@@ -1,8 +1,8 @@
 use std::fmt::Display;
 use std::rc::Rc;
 use serde_derive::{Deserialize, Serialize};
-use crate::{Chunk, RuntimeError, Value};
-use crate::value::FunctionType;
+use crate::{Chunk, RuntimeError};
+use crate::value::{Value, FunctionType};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Function {

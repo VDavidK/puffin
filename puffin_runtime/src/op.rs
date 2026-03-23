@@ -39,9 +39,9 @@ pub enum OpCode {
     // Object Manipulation Instructions
     // ----------------------------
 
-    // : newobj
-    // Pushes a new object to the top of the stack
-    NewObject,
+    // : new
+    // Pushes a new instance of a class to the top of the stack
+    NewInstance,
 
     // : setf [offset:4B]
     // Pops the top two values off the stack. Assigns the field with the given name at the offset of the latter value to the first value
@@ -151,5 +151,8 @@ pub enum OpCode {
     // Layout Instructions
     // ----------------------------
 
-    
+    // :setroot
+    // Pops the top element off the stack and sets it as the root element for the render loop
+    SetRoot,
+
 }

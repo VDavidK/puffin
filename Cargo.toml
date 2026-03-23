@@ -6,6 +6,7 @@ members = [
     "puffin_ast",
     "puffin_compiler",
     "puffin_runtime",
+    "puffin_stdlib",
 ]
 
 [workspace.lints.clippy]

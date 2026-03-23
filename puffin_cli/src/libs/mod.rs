@@ -1,20 +1,20 @@
 use std::cell::RefMut;
 use puffin_runtime::library::Library;
 use puffin_runtime::Value;
-use puffin_runtime::value::{NativeFunction, Object};
+use puffin_runtime::value::{NativeFunction, Instance};
 
 pub struct CoreLib;
 
 impl Library for CoreLib {
     fn name() -> &'static str { "core" }
 
-    fn create(mut lib: RefMut<Object>) {
+    fn create(mut lib: RefMut<Instance>) {
         lib.set_field("print", NativeFunction::new(|runtime| {
             // Get value
             let value = runtime.get_local(-1)?;
 
             // Render value
-            runtime.render(value.clone())?;
+            println!("{}", value);
 
             // Wait for user input
             runtime.poll()?;
@@ -30,7 +30,7 @@ pub struct OsLib;
 impl Library for OsLib {
     fn name() -> &'static str { "os" }
 
-    fn create(mut lib: RefMut<Object>) {
+    fn create(mut lib: RefMut<Instance>) {
         lib.set_field("read_file", NativeFunction::new(|runtime| {
             let path = runtime.get_local(-1)?.clone().take_string()?;
             let content = std::fs::read_to_string(path);
