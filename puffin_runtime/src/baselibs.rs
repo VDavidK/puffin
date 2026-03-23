@@ -1,7 +1,7 @@
-use crate::{value::{NativeFunction, Value}, vm::Vm};
+use crate::{runtime::Runtime, value::{NativeFunction, Value}};
 
-pub fn define_print_function(vm: &mut Vm) {
-    vm.add_global("print", NativeFunction::new(|runtime| {
+pub fn define_print_function(runtime: &mut Runtime) {
+    runtime.add_global("print", NativeFunction::new(|runtime| {
         // Get value
         let value = runtime.get_local(-1)?;
 

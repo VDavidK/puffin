@@ -1,9 +1,12 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 use ratatui::DefaultTerminal;
+use crate::baselibs::define_print_function;
 use crate::chunk::LocalOffset;
+use crate::vm::Vm;
 use crate::{Chunk, RuntimeError, value::Value};
-use crate::value::InstanceType;
+use crate::value::{FunctionType, InstanceType, Module};
 
 #[derive(Debug, Clone)]
 pub struct CallFrame {
@@ -22,16 +25,64 @@ pub struct Runtime {
 }
 
 impl Runtime {
-    pub fn new(starting_frame: CallFrame) -> Self {
+    pub fn new() -> Self {
         let term = ratatui::init();
 
-        Runtime {
+        let mut runtime = Runtime {
             stack: vec![],
-            call_stack: vec![starting_frame],
+            call_stack: vec![],
             globals: HashMap::new(),
             term,
-        }
+        };
+
+        define_print_function(&mut runtime);
+
+        runtime
     }
+
+    pub fn execute(&mut self, chunk: Rc<Chunk>) -> Result<Value, RuntimeError> {
+        log::debug!("Executing chunk '{}'", chunk.get_name());
+
+        self.push_call_frame(chunk.clone(), 0);
+
+        let ret_value = Vm::new(self)
+            .run()?;
+
+        Ok(ret_value)
+    }
+
+    pub fn call(&mut self, func: FunctionType) -> Result<Value, RuntimeError> {
+        log::debug!("Executing function '{}'", func.identifier);
+
+        self.push_call_frame(func.chunk.clone(), func.arity);
+
+        let ret_value = Vm::new(self)
+            .run()?;
+
+        Ok(ret_value)
+    }
+
+    pub fn include_module(&mut self, module: Module) {
+        let name = module.get_name().to_owned();
+        let module = Rc::new(RefCell::new(module));
+        self.add_global(name, module);
+    }
+
+    pub(crate) fn push_call_frame(&mut self, chunk: Rc<Chunk>, arity: usize) {
+        if let Some(frame) = self.call_stack.last_mut() {
+            frame.local_count -= arity as usize;
+        }
+
+        let frame = CallFrame {
+            chunk,
+            stack_offset: self.stack.len() - arity,
+            local_count: 0,
+            pc: 0,
+        };
+
+        self.call_stack.push(frame);
+    }
+
 
     pub fn call_stack_empty(&self) -> bool {
         self.call_stack.is_empty()
@@ -103,22 +154,7 @@ impl Runtime {
         log::debug!("stack> {values}");
     }
 
-    pub(crate) fn call(&mut self, chunk: Rc<Chunk>, arity: usize) {
-        if let Some(frame) = self.call_stack.last_mut() {
-            frame.local_count -= arity as usize;
-        }
-
-        let frame = CallFrame {
-            chunk,
-            stack_offset: self.stack.len() - arity,
-            local_count: 0,
-            pc: 0,
-        };
-
-        self.call_stack.push(frame);
-    }
-
-    pub(crate) fn ret(&mut self) -> Result<(), RuntimeError> {
+    pub(crate) fn ret(&mut self) -> Result<Value, RuntimeError> {
         let ret_value = self.pop_expecting()?;
 
         if let Some(frame) = self.call_stack.pop() {
@@ -127,8 +163,7 @@ impl Runtime {
                 self.stack.pop();
             }
 
-            self.push_value(ret_value);
-            Ok(())
+            Ok(ret_value)
         } else {
             Err(RuntimeError::CallStackEmpty)
         }
@@ -205,5 +240,12 @@ impl Runtime {
 
     pub fn get_global(&self, name: impl AsRef<str>) -> Option<&Value> {
         self.globals.get(name.as_ref())
+    }
+}
+
+
+impl Drop for Runtime {
+    fn drop(&mut self) {
+        ratatui::restore();
     }
 }

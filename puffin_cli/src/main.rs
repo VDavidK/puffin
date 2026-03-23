@@ -5,7 +5,7 @@ use std::io::Read;
 use std::rc::Rc;
 use std::{fs::File, path::PathBuf};
 
-use puffin_runtime::vm::Vm;
+use puffin_runtime::runtime::Runtime;
 #[cfg(feature = "logging")]
 use simplelog::{Config, LevelFilter, WriteLogger};
 
@@ -79,19 +79,18 @@ fn main() -> color_eyre::Result<()> {
             #[cfg(feature = "logging")]
             log::debug!("-- Running chunk --\n{chunk}");
 
-            let mut vm = Vm::new(Rc::new(chunk));
+            let mut runtime = Runtime::new();
 
-            vm.include_module(puffin_stdlib::core::dom::module());
+            runtime.include_module(puffin_stdlib::core::dom::module());
+            runtime.execute(Rc::new(chunk))?;
 
-            vm.run()?;
-
-            let func = vm
+            let func = runtime
                 .get_global("main")
                 .expect("Expected main function")
                 .clone()
                 .take_function()?;
 
-            vm.call(func)?;
+            runtime.call(func)?;
         }
     }
 

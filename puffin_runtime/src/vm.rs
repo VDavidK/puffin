@@ -1,77 +1,54 @@
-use std::cell::RefCell;
-use std::rc::Rc;
 use num_enum::TryFromPrimitive;
 
-use crate::{RuntimeError, baselibs::define_print_function, chunk::Chunk, op::OpCode, value::{Value, new_instance}};
+use crate::{RuntimeError, op::OpCode, value::{Value, new_instance}};
 use crate::chunk::{InstructionOffset, ConstantOffset, LocalOffset};
-use crate::runtime::{CallFrame, Runtime};
-use crate::value::{FunctionType, InstanceType, Module};
+use crate::runtime::Runtime;
 
 #[derive(Debug)]
-pub struct Vm {
+pub(crate) struct Vm<'a> {
     running: bool,
-    runtime: Runtime,
-    root: Option<InstanceType>,
+    runtime: &'a mut Runtime,
 }
 
-impl Vm {
-    pub fn new(chunk: Rc<Chunk>) -> Self {
-        let main_frame = CallFrame {
-            chunk,
-            stack_offset: 0,
-            local_count: 0,
-            pc: 0,
-        };
-
-        let mut vm = Self {
-            runtime: Runtime::new(main_frame),
+impl<'a> Vm<'a> {
+    pub fn new(runtime: &'a mut Runtime) -> Self {
+        Self {
+            runtime: runtime,
             running: true,
-            root: None,
-        };
-
-        define_print_function(&mut vm);
-
-        vm
+        }
     }
 
-    pub fn include_module(&mut self, module: Module) {
-        let name = module.get_name().to_owned();
-        let module = Rc::new(RefCell::new(module));
-        self.add_global(name, module);
-    }
-
-    pub fn run(&mut self) -> Result<(), RuntimeError> {
+    pub fn run(&mut self) -> Result<Value, RuntimeError> {
         #[cfg(feature = "debug_tracing")]
         log::debug!("Starting execution");
 
-        while self.is_running() {
+        let ret_value = loop {
+            if !self.is_running() {
+                break Value::Null;
+            }
+
             match self.execute() {
                 Err(err) => {
                     log::error!("Runtime error occurred: {}", err);
                     return Err(err);
                 }
-                _ => (),
+
+                Ok(Some(value)) => break value,
+
+                _ => continue,
             }
-        }
+        };
 
         log::debug!("Execution finished without errors");
 
-        Ok(())
-    }
-
-    pub fn call(&mut self, func: FunctionType) -> Result<(), RuntimeError> {
-        log::debug!("Executing function '{}'", func.identifier);
-        self.runtime.call(func.chunk.clone(), func.arity);
-        self.run()?;
-
-        Ok(())
+        Ok(ret_value)
     }
 
     pub fn is_running(&self) -> bool {
         self.running && !self.runtime.call_stack_empty() && self.runtime.pc().unwrap() < self.runtime.chunk().unwrap().byte_len()
     }
 
-    pub fn execute(&mut self) -> Result<(), RuntimeError> {
+    pub fn execute(&mut self) -> Result<Option<Value>, RuntimeError> {
         let op = self.fetch_op()?;
 
         #[cfg(feature = "debug_tracing")]
@@ -107,7 +84,7 @@ impl Vm {
                     .to_owned()
                     .take_string()?;
 
-                let global = self.get_global(&constant).ok_or(RuntimeError::GlobalNotFound { name: constant })?.clone();
+                let global = self.runtime.get_global(&constant).ok_or(RuntimeError::GlobalNotFound { name: constant })?.clone();
                 self.runtime.push_value(global);
             },
 
@@ -117,7 +94,7 @@ impl Vm {
                     .take_string()?;
 
                 let top = self.runtime.pop_expecting()?;
-                self.add_global(constant, top);
+                self.runtime.add_global(constant, top);
             },
 
             OpCode::Pop => {
@@ -275,14 +252,15 @@ impl Vm {
                         self.runtime.push_value(value);
                     },
                     Value::Function(func) => {
-                        self.runtime.call(func.chunk.clone(), func.arity);
+                        let ret_value = self.runtime.call(func)?;
+                        self.runtime.push_value(ret_value);
                     },
                     v => return Err(RuntimeError::IncorrectType { ty: v.type_name().to_string(), expected: "function".to_string() }),
                 }
             },
 
             OpCode::Return => {
-                self.runtime.ret()?;
+                return Ok(Some(self.runtime.ret()?));
             },
 
             OpCode::Exit => {
@@ -294,33 +272,21 @@ impl Vm {
             },
             
             OpCode::Render => {
-                if let Some(root) = &self.root {
-                    self.runtime.render(root)?;
-                }
+                // if let Some(root) = &self.root {
+                //     self.runtime.render(root)?;
+                // }
             },
 
             OpCode::SetRoot => {
-                let element = self.runtime
-                    .pop_expecting()?
-                    .take_instance()?;
+                // let element = self.runtime
+                //     .pop_expecting()?
+                //     .take_instance()?;
 
-                self.root = Some(element);
+                // self.root = Some(element);
             },
         }
 
-        Ok(())
-    }
-
-    pub fn add_global(&mut self, name: impl Into<String>, value: impl Into<Value>) {
-        self.runtime.add_global(name, value);
-    }
-
-    pub fn get_global(&mut self, name: impl AsRef<str>) -> Option<&Value> {
-        self.runtime.get_global(name)
-    }
-
-    pub fn remove_global(&mut self, name: impl AsRef<str>) {
-        self.runtime.remove_global(name);
+        Ok(None)
     }
 
     pub fn fetch_op(&mut self) -> Result<OpCode, RuntimeError> {
@@ -385,11 +351,5 @@ impl Vm {
         self.runtime.chunk()?
             .read_u8(self.runtime.pc()?)
             .ok_or(RuntimeError::AccessOutOfBounds { at: self.runtime.pc()?, pc: self.runtime.pc()? })
-    }
-}
-
-impl Drop for Vm {
-    fn drop(&mut self) {
-        ratatui::restore();
     }
 }
