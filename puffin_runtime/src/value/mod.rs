@@ -334,11 +334,7 @@ impl Value {
                 _ => false,
             }
 
-            Value::Null => match rhs {
-                Value::Null => true,
-
-                _ => false,
-            }
+            Value::Null => matches!(rhs, Value::Null),
         }
     }
 

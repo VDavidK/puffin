@@ -156,7 +156,7 @@ impl<'a> Compiler<'a> {
                     self.push_scope();
                     self.compile_expression(&stmt.iterable)?;
                     let start_local = self.scope.define_local(&stmt.var_name.lexeme);
-                    self.compile_expression(&end)?;
+                    self.compile_expression(end)?;
                     let end_local = self.scope.define_unnamed_local();
 
                     self.chunk.push_op(OpCode::GetLocal);

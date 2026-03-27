@@ -24,10 +24,11 @@ pub struct Runtime {
     globals: HashMap<String, Value>,
 }
 
-impl Runtime {
-    pub fn new() -> Self {
+impl Default for Runtime {
+    fn default() -> Self {
         let term = ratatui::init();
 
+        #[allow(clippy::new_without_default)]
         let mut runtime = Runtime {
             stack: vec![],
             call_stack: vec![],
@@ -39,7 +40,9 @@ impl Runtime {
 
         runtime
     }
+}
 
+impl Runtime {
     pub fn execute(&mut self, chunk: Rc<Chunk>) -> Result<Value, RuntimeError> {
         log::debug!("Executing chunk '{}'", chunk.get_name());
 
@@ -70,7 +73,7 @@ impl Runtime {
 
     pub(crate) fn push_call_frame(&mut self, chunk: Rc<Chunk>, arity: usize) {
         if let Some(frame) = self.call_stack.last_mut() {
-            frame.local_count -= arity as usize;
+            frame.local_count -= arity;
         }
 
         let frame = CallFrame {

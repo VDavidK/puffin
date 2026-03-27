@@ -45,7 +45,14 @@ impl<'a> Vm<'a> {
     }
 
     pub fn is_running(&self) -> bool {
-        self.running && !self.runtime.call_stack_empty() && self.runtime.pc().unwrap() < self.runtime.chunk().unwrap().byte_len()
+        let not_at_end = match (self.runtime.pc(), self.runtime.chunk()) {
+            (Ok(pc), Ok(chunk)) => pc < chunk.byte_len(),
+            _ => false,
+        };
+
+        self.running
+            && !self.runtime.call_stack_empty()
+            && not_at_end
     }
 
     pub fn execute(&mut self) -> Result<Option<Value>, RuntimeError> {
@@ -247,7 +254,7 @@ impl<'a> Vm<'a> {
                     Value::NativeFunction(func) => {
                         let callable = &func.fun;
                         let local_count = self.runtime.local_count()? - func.arity;
-                        let value = callable(&mut self.runtime)?;
+                        let value = callable(self.runtime)?;
                         self.runtime.pop_until(local_count)?;
                         self.runtime.push_value(value);
                     },
@@ -255,7 +262,7 @@ impl<'a> Vm<'a> {
                         let ret_value = self.runtime.call(func)?;
                         self.runtime.push_value(ret_value);
                     },
-                    v => return Err(RuntimeError::IncorrectType { ty: v.type_name().to_string(), expected: "function".to_string() }),
+                    v => return Err(RuntimeError::IncorrectType { ty: v.type_name().to_owned(), expected: "function".to_owned() }),
                 }
             },
 
@@ -293,34 +300,12 @@ impl<'a> Vm<'a> {
         let byte = self.read_u8()?;
         self.runtime.move_pc(1);
 
+        let pc = self.runtime.pc()?;
+
         OpCode::try_from_primitive(byte)
-            .map_err(|_| RuntimeError::UnrecognizedOpCode { op: byte, pc: self.runtime.pc().unwrap() })
+            .map_err(|_| RuntimeError::UnrecognizedOpCode { op: byte, pc })
     }
 
-    pub fn fetch_u8(&mut self) -> Result<u8, RuntimeError> {
-        let byte = self.read_u8()?;
-        self.runtime.move_pc(1);
-        Ok(byte)
-    }
-
-    pub fn fetch_u16(&mut self) -> Result<u16, RuntimeError> {
-        let val =  self.runtime.chunk()?.read_u16(self.runtime.pc()?).ok_or(RuntimeError::AccessOutOfBounds { at: self.runtime.pc()?, pc: self.runtime.pc()? })?;
-        self.runtime.move_pc(2);
-        Ok(val)
-    }
-
-    pub fn fetch_u32(&mut self) -> Result<u32, RuntimeError> {
-        let val =  self.runtime.chunk()?.read_u32(self.runtime.pc()?).ok_or(RuntimeError::AccessOutOfBounds { at: self.runtime.pc()?, pc: self.runtime.pc()? })?;
-        self.runtime.move_pc(4);
-        Ok(val)
-    }
-
-    pub fn fetch_u64(&mut self) -> Result<u64, RuntimeError> {
-        let val =  self.runtime.chunk()?.read_u64(self.runtime.pc()?).ok_or(RuntimeError::AccessOutOfBounds { at: self.runtime.pc()?, pc: self.runtime.pc()? })?;
-        self.runtime.move_pc(8);
-        Ok(val)
-    }
-    
     pub fn fetch_constant_offset(&mut self) -> Result<ConstantOffset, RuntimeError> {
         let val =  self.runtime.chunk()?.read_constant_offset(self.runtime.pc()?).ok_or(RuntimeError::AccessOutOfBounds { at: self.runtime.pc()?, pc: self.runtime.pc()? })?;
         self.runtime.move_pc(size_of::<ConstantOffset>());

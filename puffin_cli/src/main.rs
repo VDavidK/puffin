@@ -79,7 +79,7 @@ fn main() -> color_eyre::Result<()> {
             #[cfg(feature = "logging")]
             log::debug!("-- Running chunk --\n{chunk}");
 
-            let mut runtime = Runtime::new();
+            let mut runtime = Runtime::default();
 
             runtime.include_module(puffin_stdlib::core::dom::module());
             runtime.execute(Rc::new(chunk))?;

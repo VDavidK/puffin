@@ -272,7 +272,7 @@ impl<'a> ChunkFormatter<'a> {
     }
     
     fn push(&mut self, name: &'static str) {
-        self.push_line(format!("{name}"));
+        self.push_line(name);
     }
     
     fn push_with_constant(&mut self, name: &'static str) {
