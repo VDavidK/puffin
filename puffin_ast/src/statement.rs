@@ -1,6 +1,7 @@
 use crate::token::{Token};
 use crate::expression::{Expression};
 use crate::{VarType};
+use crate::declaration::{Declaration, MethodDeclaration};
 
 #[derive(Debug)]
 pub struct BlockStatement {
@@ -10,7 +11,8 @@ pub struct BlockStatement {
 #[derive(Debug)]
 pub struct AssignStatement {
     pub lhs: Box<Expression>,
-    pub rhs: Box<Expression>
+    pub rhs: Box<Expression>,
+    pub catch_block: Option<Box<Statement>>,
 }
 
 #[derive(Debug)]
@@ -18,6 +20,11 @@ pub struct BreakStatement;
 
 #[derive(Debug)]
 pub struct ContinueStatement;
+
+#[derive(Debug)]
+pub struct ThrowStatement {
+    pub expression: Box<Expression>,
+}
 
 /*
 #[derive(Debug)]
@@ -43,6 +50,7 @@ pub struct IfStatement {
 #[derive(Debug)]
 pub struct ExpressionStatement {
     pub expression: Box<Expression>,
+    pub catch_block: Option<Box<Statement>>,
 }
 
 #[derive(Debug)]
@@ -62,6 +70,7 @@ pub struct VariableDeclarationStatement {
     pub name: Token,
     pub value: Box<Expression>,
     pub var_type: VarType,
+    pub catch_block: Option<Box<Statement>>,
 }
 
 #[derive(Debug)]
@@ -82,6 +91,15 @@ pub struct OpAssignStatement {
 }
 
 #[derive(Debug)]
+pub struct RaiseStatement;
+
+#[derive(Debug)]
+pub struct CatchStatement {
+    pub cases: Vec<(Expression, Statement)>,
+    pub default_case: Option<(Option<Token>, Box<Statement>)>,
+}
+
+#[derive(Debug)]
 pub enum Statement {
     Block(BlockStatement),
     Assign(AssignStatement),
@@ -97,8 +115,27 @@ pub enum Statement {
     Increment(IncrementStatement),
     Decrement(DecrementStatement),
     OpAssign(OpAssignStatement),
+    Throw(ThrowStatement),
+    Catch(CatchStatement),
+    Raise(RaiseStatement),
 }
 
+impl From<RaiseStatement> for Statement {
+    fn from(m: RaiseStatement) -> Self {
+        Statement::Raise(m)
+    }
+}
+
+impl From<CatchStatement> for Statement {
+    fn from(m: CatchStatement) -> Self {
+        Statement::Catch(m)
+    }
+}
+impl From<ThrowStatement> for Statement {
+    fn from(m: ThrowStatement) -> Self {
+        Statement::Throw(m)
+    }
+}
 impl From<BlockStatement> for Statement {
     fn from(m: BlockStatement) -> Self {
         Statement::Block(m)
@@ -139,6 +176,59 @@ impl From<ReturnStatement> for Statement {
         Statement::Return(m)
     }
 }
+impl<'a> TryInto<&'a ReturnStatement> for &'a Statement {
+    type Error = ();
+    fn try_into(self) -> Result<&'a ReturnStatement, ()> {
+        match self {
+            Statement::Return(c) => Ok(c),
+            _ => Err(()),
+        }
+    }
+}
+
+impl<'a> TryInto<&'a BlockStatement> for &'a Statement {
+
+    type Error = ();
+    fn try_into(self) -> Result<&'a BlockStatement, ()> {
+        match self {
+            Statement::Block(c) => Ok(c),
+            _ => Err(()),
+        }
+    }
+}
+
+impl<'a> TryInto<&'a ExpressionStatement> for &'a Statement {
+
+    type Error = ();
+    fn try_into(self) -> Result<&'a ExpressionStatement, ()> {
+        match self {
+            Statement::Expression(c) => Ok(c),
+            _ => Err(()),
+        }
+    }
+}
+
+impl<'a> TryInto<&'a AssignStatement> for &'a Statement {
+
+    type Error = ();
+    fn try_into(self) -> Result<&'a AssignStatement, ()> {
+        match self {
+            Statement::Assign(c) => Ok(c),
+            _ => Err(()),
+        }
+    }
+}
+
+impl<'a> TryInto<&'a VariableDeclarationStatement> for &'a Statement {
+
+    type Error = ();
+    fn try_into(self) -> Result<&'a VariableDeclarationStatement, ()> {
+        match self {
+            Statement::VariableDeclaration(c) => Ok(c),
+            _ => Err(()),
+        }
+    }
+}
 
 impl From<MatchStatement> for Statement {
     fn from(m: MatchStatement) -> Self {
@@ -170,6 +260,26 @@ impl From<OpAssignStatement> for Statement {
     }
 }
 
+impl CatchStatement {
+    pub fn new(cases: Vec<(Expression, Statement)>) -> Self {
+        Self {
+            cases,
+            default_case: None,
+        }
+    }
+    pub fn with_default(mut self, case: (Option<Token>, Statement)) -> Self {
+        self.default_case = Some((case.0, Box::new(case.1)));
+        self
+    }
+}
+
+impl ThrowStatement {
+    pub fn new(expression: Expression) -> Self {
+        Self {
+            expression: Box::new(expression),
+        }
+    }
+}
 impl BlockStatement {
     pub fn new(statements: Vec<Statement>) -> Self {
         Self {
@@ -181,8 +291,14 @@ impl AssignStatement {
     pub fn new(lhs: Expression, rhs: Expression) -> Self {
         Self {
             lhs: Box::new(lhs),
-            rhs: Box::new(rhs)
+            rhs: Box::new(rhs),
+            catch_block: None,
         }
+    }
+
+    pub fn with_catch(mut self, catch_block: Statement) -> Self {
+        self.catch_block = Some(Box::new(catch_block));
+        self
     }
 }
 impl ForStatement {
@@ -208,7 +324,13 @@ impl ExpressionStatement {
     pub fn new(expression: Expression) -> Self {
         Self {
             expression: Box::new(expression),
+            catch_block: None,
         }
+    }
+
+    pub fn with_catch(mut self, catch_block: Statement) -> Self {
+        self.catch_block = Some(Box::new(catch_block));
+        self
     }
 }
 impl ReturnStatement {
@@ -235,7 +357,12 @@ impl VariableDeclarationStatement {
             name,
             value: Box::new(value),
             var_type,
+            catch_block: None,
         }
+    }
+    pub fn with_catch(mut self, catch_block: Statement) -> Self {
+        self.catch_block = Some(Box::new(catch_block));
+        self
     }
 }
 

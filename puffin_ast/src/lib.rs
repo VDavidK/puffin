@@ -1,7 +1,7 @@
 #![allow(unused, dead_code)] // TODO: Remove this before going to prod (please)
 pub mod position;
 pub mod span;
-mod snippet;
+pub mod snippet;
 pub mod expression;
 pub mod token;
 pub mod statement;
@@ -10,7 +10,7 @@ pub mod markup;
 
 use declaration::{Declaration};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum VarType {
     Let,
     Const,
@@ -18,14 +18,25 @@ pub enum VarType {
 
 #[derive(Debug)]
 pub struct Ast {
+    pub component_name: String,
     pub declarations: Vec<Declaration>,
 }
 
 impl Ast {
-    pub fn new(declarations: Vec<Declaration>) -> Self {
+    pub fn new(component_name: String) -> Self {
         Self {
-            declarations,
+            component_name,
+            declarations: vec![],
         }
+    }
+
+    pub fn add_decl(&mut self, decl: Declaration) -> &mut Self {
+        self.declarations.push(decl);
+        self
+    }
+
+    pub fn dump(&self) {
+        dbg!(self);
     }
 }
 

@@ -6,6 +6,7 @@ pub fn define_print_function(runtime: &mut Runtime) {
         let value = runtime.get_local(-1)?;
 
         // Render value
+        // TODO: Fix
         println!("{}", value);
 
         // Wait for user input

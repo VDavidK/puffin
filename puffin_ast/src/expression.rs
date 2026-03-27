@@ -1,3 +1,4 @@
+use crate::statement::{ReturnStatement, Statement};
 use crate::token::{Token};
 
 #[derive(Debug)]
@@ -71,10 +72,30 @@ impl From<LiteralExpression> for Expression {
         Expression::Literal(m)
     }
 }
+impl<'a> TryInto<&'a LiteralExpression> for &'a Expression {
+
+    type Error = ();
+    fn try_into(self) -> Result<&'a LiteralExpression, ()> {
+        match self {
+            Expression::Literal(c) => Ok(c),
+            _ => Err(()),
+        }
+    }
+}
 
 impl From<BinaryExpression> for Expression {
     fn from(m: BinaryExpression) -> Self {
         Expression::Binary(m)
+    }
+}
+impl<'a> TryInto<&'a BinaryExpression> for &'a Expression {
+
+    type Error = ();
+    fn try_into(self) -> Result<&'a BinaryExpression, ()> {
+        match self {
+            Expression::Binary(c) => Ok(c),
+            _ => Err(()),
+        }
     }
 }
 

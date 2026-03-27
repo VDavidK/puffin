@@ -13,7 +13,7 @@ pub(crate) struct Vm<'a> {
 impl<'a> Vm<'a> {
     pub fn new(runtime: &'a mut Runtime) -> Self {
         Self {
-            runtime: runtime,
+            runtime,
             running: true,
         }
     }
