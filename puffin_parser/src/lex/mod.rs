@@ -1,15 +1,16 @@
 use std::path::Path;
 use crate::lex::LexerError::{UnterminatedBlockComment, UnterminatedStringLiteral};
 use puffin_ast::{span::Span, token::Token, token::TokenType, position::Position};
+use puffin_ast::snippet::{Snippet, IntoSnippet};
 
 #[derive(Debug, thiserror::Error)]
 pub enum LexerError {
     #[error("Unrecognized character '{1}' found at '{0}'")]
-    UnrecognizedCharacter(Position, char),
+    UnrecognizedCharacter(Box<Snippet>, char),
     #[error("Unterminated string literal found at '{0}'")]
-    UnterminatedStringLiteral(Position),
+    UnterminatedStringLiteral(Box<Snippet>),
     #[error("Unterminated block comment found at '{0}'")]
-    UnterminatedBlockComment(Position),
+    UnterminatedBlockComment(Box<Snippet>),
 }
 
 #[derive(Debug)]
@@ -48,7 +49,8 @@ impl<'a> Iterator for PuffinLexer<'a> {
                 self.next()?
             }
             '/' if self.match_while("/*") => {
-                if let Err(err) = self.find_and_skip("*/", UnterminatedBlockComment(self.start.clone())) {
+                self.next_char()?;
+                if let Err(err) = self.find_and_skip("*/", UnterminatedBlockComment(self.get_snippet())) {
                     Err(err)
                 } else {
                 self.next()?
@@ -65,7 +67,7 @@ impl<'a> Iterator for PuffinLexer<'a> {
             '@' => self.simple_token(TokenType::At),
             '"' => {
                 self.next_char();
-                if let Err(err) = self.match_while_not('"', UnterminatedStringLiteral(self.start.clone())) {
+                if let Err(err) = self.match_while_not('"', UnterminatedStringLiteral(self.get_snippet())) {
                     Err(err)
                 } else {
                     self.simple_token(TokenType::String)
@@ -80,7 +82,7 @@ impl<'a> Iterator for PuffinLexer<'a> {
             '<' if self.match_while("<=") => self.simple_token(TokenType::LessOrEqual),
             '<' => self.simple_token(TokenType::LessThan),
             c if c.is_alphabetic() => {
-                while let Some(c) = self.peek(0) && (c.is_ascii_alphanumeric() || c == '_') {
+                while let Some(c) = self.peek(1) && (c.is_alphabetic() || c.is_ascii_digit() || c == '_') {
                     self.next_char();
                 }
                 match self.lexeme() {
@@ -121,13 +123,10 @@ impl<'a> Iterator for PuffinLexer<'a> {
                     _ => self.token(TokenType::Identifier),
                 }
             },
-            c if c.is_numeric() => {
+            c if c.is_ascii_digit() => {
                 let mut dot_found = false;
-                while let Some(c) = self.peek(0) && (c.is_numeric() || c == '.') {
+                while let Some(c) = self.peek(1) && (c.is_ascii_digit() || (c == '.' && !dot_found)) {
                     if c == '.' {
-                        if dot_found == true {
-                            break;
-                        }
                         dot_found = true;
                     }
                     self.next_char();
@@ -138,7 +137,7 @@ impl<'a> Iterator for PuffinLexer<'a> {
                 self.next_char();
                 return self.next();
             }
-            c => Err(LexerError::UnrecognizedCharacter(self.start.clone().with_snippet(self.src, self.src_name, 2), c))
+            c => Err(LexerError::UnrecognizedCharacter(self.get_snippet(), c))
         })
     }
 }
@@ -161,8 +160,12 @@ impl<'a> PuffinLexer<'a> {
         self.end.move_forward(self.src);
     }
 
+    fn get_snippet(&self) -> Box<Snippet> {
+        Box::new(self.start.into_snippet(self.src, Some(self.src_name), 1))
+    }
+
     fn advance(&mut self) {
-        self.start = self.end.clone();
+        self.start = self.end;
     }
 
     fn peek(&self, offset: usize) -> Option<char> {
@@ -177,7 +180,7 @@ impl<'a> PuffinLexer<'a> {
                 return false;
             }
         }
-        self.end.move_forward_by(self.src, pattern.len());
+        self.end.move_forward_by(self.src, pattern.len() - 1);
         true
     }
 
@@ -200,17 +203,16 @@ impl<'a> PuffinLexer<'a> {
     }
 
     fn simple_token(&mut self, ty: TokenType) -> Result<Token, LexerError> {
-        self.next_char();
         self.token(ty)
     }
 
     fn token(&mut self, ty: TokenType) -> Result<Token, LexerError> {
         let tok = Token::new(
-            self.lexeme().to_string(),
-            Span::from_positions(self.start.clone(), self.end.clone()),
-                /*.with_snippet(&self.src.to_owned(), &self.src_name.to_owned(), 1),*/
+            self.lexeme(),
+            Span::from_positions(self.start, self.end),
             ty
         );
+        self.next_char();
         self.advance();
         Ok(tok)
     }
@@ -222,20 +224,21 @@ impl<'a> PuffinLexer<'a> {
     }
 
     fn lexeme(&self) -> &str {
-        &self.src[self.start.idx()..self.end.idx()]
+        &self.src[self.start.idx()..=self.end.idx()]
     }
 
-    pub(crate) fn attach_snippet(&self, span: Span) -> Span {
-        span.with_snippet(self.src, self.src_name, 1)
+    pub fn get_src_ref(&self) -> &str {
+       self.src
     }
 
-    pub(crate) fn get_src_name(&self) -> String {
-        Path::new(self.src_name).file_stem().unwrap().to_str().unwrap().to_owned()
-        /*Path::new(self.src_name)
-            .file_name()
-            .unwrap()
-            .to_os_string()
-            .into_string()
-            .unwrap()*/
+    pub fn get_span(&self) -> Span {
+        Span::from_positions(self.start, self.end)
+    }
+
+    pub(crate) fn get_src_name(&self) -> Option<String> {
+        Some(Path::new(self.src_name)
+            .file_stem()?
+            .to_str()?
+            .to_owned())
     }
 }

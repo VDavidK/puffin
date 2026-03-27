@@ -1,4 +1,5 @@
 use puffin_ast::{Ast, VarType};
+use puffin_ast::snippet::{IntoSnippet, Snippet};
 use puffin_ast::span::Span;
 use puffin_ast::token::{Token, TokenType};
 use puffin_ast::statement::{Statement, AssignStatement, ExpressionStatement, BreakStatement, ContinueStatement, ForStatement, IfStatement, BlockStatement, ReturnStatement, MatchStatement, VariableDeclarationStatement, IncrementStatement, DecrementStatement, OpAssignStatement, ThrowStatement, CatchStatement, RaiseStatement};
@@ -7,7 +8,7 @@ use puffin_ast::expression::{AccessorExpression, BinaryExpression, Expression, F
 use puffin_ast::expression::Expression::FunctionCall;
 use puffin_ast::markup::{Markup, LambdaFunctionBinding, MarkupBinding, DirectBindings, ComponentRender, IterativeRender, IfConditionalRender, MatchConditionalRender, LayoutRender, StyleRender};
 use crate::lex::{PuffinLexer, LexerError};
-use crate::parse::ParserError::DuplicateConstructorError;
+use crate::parse::ParserError::{DuplicateConstructor, MissingComponentFileName};
 
 fn get_op_precedence(ty: TokenType) -> usize {
     match ty {
@@ -24,7 +25,7 @@ fn get_op_precedence(ty: TokenType) -> usize {
 #[inline]
 fn get_option_inner_type(opt: &Option<TokenType>) -> String {
     opt.map_or_else(
-        || "None".to_string(),
+        || "None".to_owned(),
         |f| f.to_string()
     ).to_owned()
 }
@@ -32,45 +33,47 @@ fn get_option_inner_type(opt: &Option<TokenType>) -> String {
 #[derive(Debug, thiserror::Error)]
 pub enum ParserError {
     #[error(transparent)]
-    FileNotFoundError(#[from] std::io::Error),
+    FileNotFound(#[from] std::io::Error),
     #[error(transparent)]
     LexerError(#[from] LexerError),
     #[error("Expected binary operator at {0}")]
-    ExpectedBinaryOperatorError(Span),
+    ExpectedBinaryOperator(Box<Snippet>),
     #[error("Expected literal, received {:?} at {}", get_option_inner_type(.1), .0)]
-    ExpectedLiteralError(Span, Option<TokenType>),
+    ExpectedLiteral(Box<Snippet>, Option<TokenType>),
     #[error("Expected literal or parenthesis expression at {0}")]
-    ExpectedLiteralOrParenError(Span),
+    ExpectedLiteralOrParen(Box<Snippet>),
     #[error("Expected unary operator at {0}")]
-    ExpectedUnaryOperatorError(Span),
+    ExpectedUnaryOperator(Box<Snippet>),
     #[error("Expected {0:?} found '{1}' at {2}")]
-    UnexpectedTokenError(TokenType, TokenType, Span),
-    #[error("Expected one of {expected:?} found '{received}' at {span}")]
-    UnexpectedOneOfTokenError {
-        span: Span,
+    UnexpectedToken(TokenType, TokenType, Box<Snippet>),
+    #[error("Expected one of {expected:?} found '{received}' at {snippet}")]
+    UnexpectedOneOfToken {
+        snippet: Box<Snippet>,
         expected: Vec<TokenType>,
         received: TokenType,
     },
     #[error("Unexpected end of file")]
-    UnexpectedEofError(),
+    UnexpectedEof(),
     #[error("Expected declaration at {0}")]
-    ExpectedDeclarationError(Span),
+    ExpectedDeclaration(Box<Snippet>),
     #[error("Expected identifier at {0}")]
-    ExpectedIdentifierError(Span),
+    ExpectedIdentifier(Box<Snippet>),
     #[error("Expected statement at {0}")]
-    ExpectedStatementError(Span),
+    ExpectedStatement(Box<Snippet>),
     #[error("Expected method declaration at {0}")]
-    ExpectedMethodError(Span),
+    ExpectedMethod(Box<Snippet>),
     #[error("Expected let/const at {0}, received {1}")]
-    ExpectedVarTypeError(Span, TokenType),
+    ExpectedVarType(Box<Snippet>, TokenType),
     #[error("Expected literal or event binding at {0}")]
-    ExpectedLiteralOrEventBindingError(Span),
+    ExpectedLiteralOrEventBinding(Box<Snippet>),
     #[error("Expected literal or expression at {0}")]
-    ExpectedLiteralOrExpressionError(Span),
+    ExpectedLiteralOrExpression(Box<Snippet>),
     #[error("Syntax error at {0}")]
-    SyntaxError(Span),
+    SyntaxError(Box<Snippet>),
     #[error("Duplicate constructor declaration at {0}")]
-    DuplicateConstructorError(Span),
+    DuplicateConstructor(Box<Snippet>),
+    #[error("Missing component file name")]
+    MissingComponentFileName(),
 }
 
 #[cfg(test)]
@@ -92,7 +95,7 @@ impl<'a> PuffinParser<'a> {
 
     /// Returns the position of the parser's current token if it is assigned, or a default position if it is ```None```.
     fn pos(&self) -> Span {
-        self.current_token.as_ref().map(|t| self.lexer.attach_snippet(t.span.clone())).unwrap_or_default()
+        self.current_token.as_ref().map(|t| t.span).unwrap_or_default()
     }
 
     /// Returns an indicator of whether the lexer's tokens have been exhausted.
@@ -102,14 +105,16 @@ impl<'a> PuffinParser<'a> {
 
     /// Peeks the next token and returns it if it exists. Does not consume the currently active token.
     fn safe_peek(&mut self) -> Result<Option<&Token>, ParserError> {
-        if self.current_token.is_some() {
-            Ok(self.current_token.as_ref())
-        } else {
-            if let Some(tok) = self.lexer.next() {
-                self.current_token = Some(tok?);
-                Ok(self.current_token.as_ref())
-            } else {
-                Ok(None)
+        match self.current_token.as_ref() {
+            Some(token) => Ok(self.current_token.as_ref()),
+            None => {
+                match self.lexer.next() {
+                    Some(t) => {
+                        self.current_token = Some(t?);
+                        Ok(self.current_token.as_ref())
+                    },
+                    None => Ok(None),
+                }
             }
         }
     }
@@ -117,10 +122,9 @@ impl<'a> PuffinParser<'a> {
     /// Peeks the next token and returns it if it exists without consuming it. If the token is None,
     /// this method will return a ParserError.
     fn peek(&mut self) -> Result<&Token, ParserError> {
-        let token = self.safe_peek()?;
-        match token {
+        match self.safe_peek()? {
             Some(tok) => Ok(tok),
-            None => Err(ParserError::UnexpectedEofError()),
+            None => Err(ParserError::UnexpectedEof()),
         }
     }
 
@@ -130,17 +134,17 @@ impl<'a> PuffinParser<'a> {
     }
 
     fn next_token(&mut self) -> Result<Token, ParserError> {
-        self.next_token_or_none()?.ok_or(ParserError::UnexpectedEofError())
+        self.next_token_or_none()?.ok_or(ParserError::UnexpectedEof())
     }
 
     fn next_token_or_none(&mut self) -> Result<Option<Token>, ParserError> {
-        self.safe_peek()?;
-        if self.current_token.is_some() {
-            let tok = self.current_token.take().unwrap();
-            self.current_token = None;
-            Ok(Some(tok))
-        } else {
-            Ok(None)
+        match self.safe_peek()? {
+            Some(token) => {
+                let tok = self.current_token.take().ok_or(ParserError::UnexpectedEof())?;
+                self.current_token = None;
+                Ok(Some(tok))
+            },
+            None => Ok(None),
         }
     }
 
@@ -149,10 +153,10 @@ impl<'a> PuffinParser<'a> {
         if res.ty == ty {
             Ok(res)
         } else {
-            Err(ParserError::UnexpectedTokenError(
+            Err(ParserError::UnexpectedToken(
                 ty,
                 res.ty,
-                self.lexer.attach_snippet(res.span.to_owned())
+                self.get_lex_snippet(),
             ))
         }
     }
@@ -164,12 +168,27 @@ impl<'a> PuffinParser<'a> {
         if types.contains(&res.ty) {
             Ok(res)
         } else {
-            Err(ParserError::UnexpectedOneOfTokenError {
-                span: self.lexer.attach_snippet(res.span.to_owned()),
-                expected: types.iter().cloned().collect::<Vec<_>>(),
+            Err(ParserError::UnexpectedOneOfToken {
+                snippet: self.get_lex_snippet(),
+                expected: types.to_vec(),
                 received: res.ty,
             })
         }
+    }
+
+    fn get_lex_snippet(&self) -> Box<Snippet> {
+        let span = match &self.current_token {
+            Some(tok) => tok.span,
+            None => self.lexer
+                .get_span()
+        };
+        let snippet = span
+            .into_snippet(
+                self.lexer.get_src_ref(),
+                self.lexer.get_src_name(),
+                1
+        );
+        Box::new(snippet)
     }
 
     /// Consumes tokens while they match one of the token types provided in `expected`,
@@ -190,7 +209,7 @@ impl<'a> PuffinParser<'a> {
 
     /// Runs the parser on the source file provided when it was initialized.
     pub(crate) fn run(mut self) -> Result<Ast, ParserError> {
-        let component_name = self.lexer.get_src_name();
+        let component_name = self.lexer.get_src_name().ok_or(MissingComponentFileName())?;
         let mut ast = Ast::new(component_name);
         while !self.eof() {
             ast.add_decl(self.declaration()?);
@@ -217,7 +236,7 @@ impl<'a> PuffinParser<'a> {
             TokenType::KwExport => self.export_decl(),
             TokenType::KwEnum => self.enum_decl(),
             TokenType::KwError => self.error_decl(),
-            _ => return Err(ParserError::ExpectedDeclarationError(self.pos()))
+            _ => return Err(ParserError::ExpectedDeclaration(self.get_lex_snippet()))
         }?;
         Ok(decl)
     }
@@ -251,9 +270,9 @@ impl<'a> PuffinParser<'a> {
 
     fn require_decl(&mut self) -> Result<Declaration, ParserError> {
         self.expect(TokenType::KwRequire)?;
-        let decl = Declaration::Require(RequireDeclaration::new(self.expect(TokenType::String)?));
+        let module_name = self.expect(TokenType::String)?;
         self.expect(TokenType::Semicolon)?;
-        Ok(decl)
+        Ok(RequireDeclaration::new(module_name).into())
     }
 
     fn use_decl(&mut self) -> Result<Declaration, ParserError> {
@@ -305,7 +324,7 @@ impl<'a> PuffinParser<'a> {
             m.decorator = Some(Decorator::new(decorator_name, params));
             Ok(method)
         } else {
-            Err(ParserError::ExpectedMethodError(self.pos()))
+            Err(ParserError::ExpectedMethod(self.get_lex_snippet()))
         }
     }
 
@@ -357,8 +376,7 @@ impl<'a> PuffinParser<'a> {
     fn name_list(&mut self) -> Result<Vec<Token>, ParserError> {
         let mut names: Vec<Token> = vec![];
         while self.peek_is(TokenType::Identifier)? {
-            // Safe unwrap, as peek_is has verified the token's existence.
-            names.push(self.next_token_or_none()?.unwrap().clone());
+            names.push(self.next_token()?);
             // A comma indicates another identifier. Trailing commas are currently not allowed.
             if !self.peek_is(TokenType::Comma)? {
                 break;
@@ -419,7 +437,7 @@ impl<'a> PuffinParser<'a> {
         match self.expect_one_of(&[TokenType::KwConst, TokenType::KwLet])?.ty {
             TokenType::KwConst => Ok(VarType::Const),
             TokenType::KwLet => Ok(VarType::Let),
-            t => Err(ParserError::ExpectedVarTypeError(self.pos(), t))
+            t => Err(ParserError::ExpectedVarType(self.get_lex_snippet(), t))
         }
     }
 
@@ -527,7 +545,7 @@ impl<'a> PuffinParser<'a> {
                     }
                     break;
                 },
-                _ => return Err(ParserError::ExpectedStatementError(self.pos())),
+                _ => return Err(ParserError::ExpectedStatement(self.get_lex_snippet())),
             }
         }
         self.expect(TokenType::RightBrace)?;
@@ -567,8 +585,7 @@ impl<'a> PuffinParser<'a> {
         } else {
             None
         };
-        let stat = ReturnStatement::new(expr).into();
-        Ok(stat)
+        Ok(ReturnStatement::new(expr).into())
     }
 
     /// \<if_stat\> ::= "if", \<expression\>, "{", \<block\>, "}", {"else", \<if_stat}>}, \[\"else\", \<block\>\]
@@ -582,8 +599,7 @@ impl<'a> PuffinParser<'a> {
                 match self.peek()?.ty {
                     TokenType::KwIf => Some(self.if_stat()?),
                     _ => {
-                        let stat = Some(self.block_stat()?);
-                        stat
+                        Some(self.block_stat()?)
                     }
                 }
             },
@@ -680,7 +696,7 @@ impl<'a> PuffinParser<'a> {
                 let rhs = self.expression()?;
                 Ok(OpAssignStatement::new(expr, op, rhs).into())
             },
-            _ => Err(ParserError::ExpectedStatementError(self.pos()))
+            _ => Err(ParserError::ExpectedStatement(self.get_lex_snippet()))
         }
     }
 
@@ -704,7 +720,8 @@ impl<'a> PuffinParser<'a> {
 
     fn unary_expr(&mut self) -> Result<Expression, ParserError> {
         let pos = self.pos();
-        match self.safe_peek()?.ok_or(ParserError::ExpectedUnaryOperatorError(pos))?.ty {
+        let snippet = self.get_lex_snippet();
+        match self.safe_peek()?.ok_or(ParserError::ExpectedUnaryOperator(snippet))?.ty {
             TokenType::Plus | TokenType::Minus | TokenType::KwNot => {
                 Ok(UnaryExpression::new(self.next_token()?, self.unary_expr()?).into())
             },
@@ -715,7 +732,6 @@ impl<'a> PuffinParser<'a> {
     /// <primary_exp> ::= (\<literal\> | \<paren_exp\>), \[\<call_exp\>\]<br>
     /// <paren_exp> ::= "(", \<expression\>, ")"
     fn primary_expr(&mut self) -> Result<Expression, ParserError> {
-        let pos = self.lexer.attach_snippet(self.pos().clone());
         let tok = self.peek()?;
         let mut expr = match tok.ty {
             TokenType::String | TokenType::Integer | TokenType::Float
@@ -762,7 +778,7 @@ impl<'a> PuffinParser<'a> {
                 self.expect(TokenType::RightBrace)?;
                 return Ok(expr);
             },
-            _ => Err(ParserError::ExpectedLiteralError(pos, self.current_token.as_ref().map(|t| t.ty)))
+            _ => Err(ParserError::ExpectedLiteral(self.get_lex_snippet(), self.current_token.as_ref().map(|t| t.ty)))
         }?;
         loop {
             match self.peek()?.ty {

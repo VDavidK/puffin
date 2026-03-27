@@ -1,7 +1,7 @@
 #![allow(unused, dead_code)] // TODO: Remove this before going to prod (please)
 pub mod position;
 pub mod span;
-mod snippet;
+pub mod snippet;
 pub mod expression;
 pub mod token;
 pub mod statement;
