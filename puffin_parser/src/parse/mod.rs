@@ -3,12 +3,12 @@ use puffin_ast::snippet::{IntoSnippet, Snippet};
 use puffin_ast::span::Span;
 use puffin_ast::token::{Token, TokenType};
 use puffin_ast::statement::{Statement, AssignStatement, ExpressionStatement, BreakStatement, ContinueStatement, ForStatement, IfStatement, BlockStatement, ReturnStatement, MatchStatement, VariableDeclarationStatement, IncrementStatement, DecrementStatement, OpAssignStatement, ThrowStatement, CatchStatement, RaiseStatement};
-use puffin_ast::declaration::{Declaration, VarDeclaration, Decorator, ComponentDeclaration, MethodDeclaration, SignalDeclaration, LayoutDeclaration, RequireDeclaration, UseDeclaration, ExportDeclaration, EnumDeclaration, ErrorDeclaration, ConstructorDeclaration};
+use puffin_ast::declaration::{Declaration, VarDeclaration, Decorator, ComponentDeclaration, MethodDeclaration, SignalDeclaration, LayoutDeclaration, RequireDeclaration, UseDeclaration, EnumDeclaration, ErrorDeclaration, ConstructorDeclaration};
 use puffin_ast::expression::{AccessorExpression, BinaryExpression, Expression, FunctionCallExpression, LiteralExpression, UnaryExpression, ArrayExpression, DictionaryExpression, MatchExpression, IndexExpression};
 use puffin_ast::expression::Expression::FunctionCall;
 use puffin_ast::markup::{Markup, LambdaFunctionBinding, MarkupBinding, DirectBindings, ComponentRender, IterativeRender, IfConditionalRender, MatchConditionalRender, LayoutRender, StyleRender};
 use crate::lex::{PuffinLexer, LexerError};
-use crate::parse::ParserError::{DuplicateConstructor, MissingComponentFileName};
+use crate::parse::ParserError::{DuplicateConstructor, InvalidExport, MissingComponentFileName};
 
 fn get_op_precedence(ty: TokenType) -> usize {
     match ty {
@@ -74,6 +74,8 @@ pub enum ParserError {
     DuplicateConstructor(Box<Snippet>),
     #[error("Missing component file name")]
     MissingComponentFileName(),
+    #[error("Invalid export at {0}, {1} cannot be exported")]
+    InvalidExport(Box<Snippet>, TokenType),
 }
 
 #[cfg(test)]
@@ -224,21 +226,33 @@ impl<'a> PuffinParser<'a> {
     /// declaration ::= \<constructor_decl\>
     fn declaration(&mut self) -> Result<Declaration, ParserError> {
         let decl  = match self.peek()?.ty {
-            TokenType::KwLet | TokenType::KwConst => self.var_decl(),
+            TokenType::KwLet | TokenType::KwConst => self.var_decl(false),
             TokenType::KwSignal => self.signal_decl(),
             TokenType::At => self.decorated_method_decl(),
-            TokenType::KwFn => self.method_decl(),
+            TokenType::KwFn => self.method_decl(false, None),
             TokenType::KwComponent => self.component_decl(),
             TokenType::KwNew => self.constructor_decl(),
             TokenType::KwLayout => self.layout_decl(),
             TokenType::KwRequire => self.require_decl(),
             TokenType::KwUse => self.use_decl(),
             TokenType::KwExport => self.export_decl(),
-            TokenType::KwEnum => self.enum_decl(),
+            TokenType::KwEnum => self.enum_decl(false),
             TokenType::KwError => self.error_decl(),
             _ => return Err(ParserError::ExpectedDeclaration(self.get_lex_snippet()))
         }?;
         Ok(decl)
+    }
+
+    fn decorated_method_decl(&mut self) -> Result<Declaration, ParserError> {
+        let decorator = self.decorator()?;
+        let exported = match self.peek()?.ty {
+            TokenType::KwExport => {
+                self.next_token()?;
+                true
+            },
+            _ => false,
+        };
+        self.method_decl(exported, Some(decorator))
     }
 
     fn error_decl(&mut self) -> Result<Declaration, ParserError> {
@@ -255,17 +269,22 @@ impl<'a> PuffinParser<'a> {
 
     fn export_decl(&mut self) -> Result<Declaration, ParserError> {
         self.expect(TokenType::KwExport)?;
-        let decl = Declaration::Export(ExportDeclaration::new(self.declaration()?));
-        Ok(decl)
+        let decl = match self.peek()?.ty {
+            TokenType::KwConst | TokenType::KwLet => self.var_decl(true)?,
+            TokenType::KwFn => self.method_decl(true, None)?,
+            TokenType::KwEnum => self.enum_decl(true)?,
+            t => return Err(InvalidExport(self.get_lex_snippet(), t)),
+        };
+        Ok(decl.into())
     }
 
-    fn enum_decl(&mut self) -> Result<Declaration, ParserError> {
+    fn enum_decl(&mut self, exported: bool) -> Result<Declaration, ParserError> {
         self.expect(TokenType::KwEnum)?;
         let name = self.expect(TokenType::Identifier)?;
         self.expect(TokenType::LeftBrace)?;
         let members = self.consume_while_not(&[TokenType::Identifier], TokenType::RightBrace, TokenType::Comma)?;
         self.expect(TokenType::RightBrace)?;
-        Ok(EnumDeclaration::new(name, members).into())
+        Ok(EnumDeclaration::new(name, members, exported).into())
     }
 
     fn require_decl(&mut self) -> Result<Declaration, ParserError> {
@@ -314,21 +333,15 @@ impl<'a> PuffinParser<'a> {
         Ok(ConstructorDeclaration::new(params, block).into())
     }
 
-    /// \<decorated_method_decl\> ::= "@", \<identifier\>, \<parameters\>, \<method_decl\>
-    fn decorated_method_decl(&mut self) -> Result<Declaration, ParserError> {
+    /// \<decorator\> ::= "@", \<identifier\>, \<parameters\>
+    fn decorator(&mut self) -> Result<Decorator, ParserError> {
         self.expect(TokenType::At)?;
         let decorator_name = self.expect(TokenType::Identifier)?;
         let params = self.parameters()?;
-        let mut method = self.method_decl()?;
-        if let Declaration::Method(m) = &mut method {
-            m.decorator = Some(Decorator::new(decorator_name, params));
-            Ok(method)
-        } else {
-            Err(ParserError::ExpectedMethod(self.get_lex_snippet()))
-        }
+        Ok(Decorator::new(decorator_name, params))
     }
 
-    fn method_decl(&mut self) -> Result<Declaration, ParserError> {
+    fn method_decl(&mut self, exported: bool, decorator: Option<Decorator>) -> Result<Declaration, ParserError> {
         self.expect(TokenType::KwFn)?;
         let name = self.expect(TokenType::Identifier)?;
         let params = self.parameters()?;
@@ -350,13 +363,16 @@ impl<'a> PuffinParser<'a> {
     }
 
     /// \<var_decl\> ::= "const" | "let", \<identifier\>, "=", \<expression\>, ";"
-    fn var_decl(&mut self) -> Result<Declaration, ParserError> {
+    fn var_decl(&mut self, exported: bool) -> Result<Declaration, ParserError> {
         let ty = self.var_type()?;
         let name = self
             .expect(TokenType::Identifier)?
             .clone();
         self.expect(TokenType::Assign)?;
-        let decl = VarDeclaration::new(name, self.expression()?, ty).into();
+        let decl = match ty {
+            VarType::Let => VarDeclaration::new_let(name, self.expression()?, exported),
+            VarType::Const => VarDeclaration::new_const(name, self.expression()?, exported),
+        }.into();
         self.expect(TokenType::Semicolon)?;
         Ok(decl)
     }

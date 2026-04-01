@@ -269,7 +269,7 @@ fn test_dictionary() -> Result<(), TestError> {
         };
     "#;
     let mut parser = PuffinParser::new(input, "<test_dictionary>");
-    let result = parser.var_decl();
+    let result = parser.var_decl(false);
     if let Err(e) = &result {
         println!("{}", format!("parse error: {:}", e).red());
     }

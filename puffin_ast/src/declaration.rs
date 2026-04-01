@@ -22,6 +22,7 @@ pub struct VarDeclaration {
     pub name: Token,
     pub value: Box<Expression>,
     pub var_type: VarType,
+    pub exported: bool,
 }
 
 #[derive(Debug)]
@@ -56,11 +57,6 @@ pub struct UseDeclaration {
 }
 
 #[derive(Debug)]
-pub struct ExportDeclaration {
-    exported: Box<Declaration>,
-}
-
-#[derive(Debug)]
 pub struct Decorator {
     pub name: Token,
     pub parameters: Vec<Token>,
@@ -70,6 +66,7 @@ pub struct Decorator {
 pub struct EnumDeclaration {
     pub name: Token,
     pub members: Vec<Token>,
+    pub exported: bool,
 }
 
 #[derive(Debug)]
@@ -87,7 +84,6 @@ pub enum Declaration {
     Method(MethodDeclaration),
     Require(RequireDeclaration),
     Use(UseDeclaration),
-    Export(ExportDeclaration),
     Enum(EnumDeclaration),
     Error(ErrorDeclaration),
 }
@@ -178,15 +174,6 @@ impl TryInto<UseDeclaration> for Declaration {
         }
     }
 }
-impl TryInto<ExportDeclaration> for Declaration {
-    type Error = ();
-    fn try_into(self) -> Result<ExportDeclaration, ()> {
-        match self {
-            Declaration::Export(c) => Ok(c),
-            _ => Err(()),
-        }
-    }
-}
 impl TryInto<EnumDeclaration> for Declaration {
     type Error = ();
     fn try_into(self) -> Result<EnumDeclaration, ()> {
@@ -263,11 +250,21 @@ impl ConstructorDeclaration {
     }
 }
 impl VarDeclaration {
-    pub fn new(name: Token, value: Expression, var_type: VarType) -> Self {
+    pub fn new_const(name: Token, value: Expression, exported: bool) -> Self {
         Self {
             name,
             value: Box::new(value),
-            var_type,
+            var_type: VarType::Const,
+            exported,
+        }
+    }
+
+    pub fn new_let(name: Token, value: Expression, exported: bool) -> Self {
+        Self {
+            name,
+            value: Box::new(value),
+            var_type: VarType::Let,
+            exported,
         }
     }
 }
@@ -310,19 +307,12 @@ impl MethodDeclaration {
     }
 }
 
-impl ExportDeclaration {
-    pub fn new(exported: Declaration) -> Self {
-        Self {
-            exported: Box::new(exported),
-        }
-    }
-}
-
 impl EnumDeclaration {
-    pub fn new(name: Token, members: Vec<Token>) -> Self {
+    pub fn new(name: Token, members: Vec<Token>, exported: bool) -> Self {
         Self {
             name,
             members,
+            exported,
         }
     }
 }
@@ -370,11 +360,6 @@ impl From<RequireDeclaration> for Declaration {
 impl From<UseDeclaration> for Declaration {
     fn from(value: UseDeclaration) -> Self {
         Declaration::Use(value)
-    }
-}
-impl From<ExportDeclaration> for Declaration {
-    fn from(value: ExportDeclaration) -> Self {
-        Declaration::Export(value)
     }
 }
 impl From<EnumDeclaration> for Declaration {
