@@ -67,11 +67,12 @@ pub enum Expression {
     Index(IndexExpression),
 }
 
-impl From<LiteralExpression> for Expression {
-    fn from(m: LiteralExpression) -> Self {
-        Expression::Literal(m)
+impl Into<Expression> for LiteralExpression {
+    fn into(self) -> Expression {
+        Expression::Literal(self)
     }
 }
+
 impl<'a> TryInto<&'a LiteralExpression> for &'a Expression {
 
     type Error = ();
@@ -83,11 +84,12 @@ impl<'a> TryInto<&'a LiteralExpression> for &'a Expression {
     }
 }
 
-impl From<BinaryExpression> for Expression {
-    fn from(m: BinaryExpression) -> Self {
-        Expression::Binary(m)
+impl Into<Expression> for BinaryExpression {
+    fn into(self) -> Expression {
+        Expression::Binary(self)
     }
 }
+
 impl<'a> TryInto<&'a BinaryExpression> for &'a Expression {
 
     type Error = ();
@@ -99,45 +101,45 @@ impl<'a> TryInto<&'a BinaryExpression> for &'a Expression {
     }
 }
 
-impl From<UnaryExpression> for Expression {
-    fn from(m: UnaryExpression) -> Self {
-        Expression::Unary(m)
+impl Into<Expression> for UnaryExpression {
+    fn into(self) -> Expression {
+        Expression::Unary(self)
     }
 }
 
-impl From<FunctionCallExpression> for Expression {
-    fn from(m: FunctionCallExpression) -> Self {
-        Expression::FunctionCall(m)
+impl Into<Expression> for FunctionCallExpression {
+    fn into(self) -> Expression {
+        Expression::FunctionCall(self)
     }
 }
 
-impl From<AccessorExpression> for Expression {
-    fn from(m: AccessorExpression) -> Self {
-        Expression::Accessor(m)
+impl Into<Expression> for AccessorExpression {
+    fn into(self) -> Expression {
+        Expression::Accessor(self)
     }
 }
 
-impl From<ArrayExpression> for Expression {
-    fn from(m: ArrayExpression) -> Self {
-        Expression::Array(m)
+impl Into<Expression> for ArrayExpression {
+    fn into(self) -> Expression {
+        Expression::Array(self)
     }
 }
 
-impl From<DictionaryExpression> for Expression {
-    fn from(m: DictionaryExpression) -> Self {
-        Expression::Dictionary(m)
+impl Into<Expression> for DictionaryExpression {
+    fn into(self) -> Expression {
+        Expression::Dictionary(self)
     }
 }
 
-impl From<MatchExpression> for Expression {
-    fn from(m: MatchExpression) -> Self {
-        Expression::Match(m)
+impl Into<Expression> for MatchExpression {
+    fn into(self) -> Expression {
+        Expression::Match(self)
     }
 }
 
-impl From<IndexExpression> for Expression {
-    fn from(m: IndexExpression) -> Self {
-        Expression::Index(m)
+impl Into<Expression> for IndexExpression {
+    fn into(self) -> Expression {
+        Expression::Index(self)
     }
 }
 

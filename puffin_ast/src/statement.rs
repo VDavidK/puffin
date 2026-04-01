@@ -120,62 +120,102 @@ pub enum Statement {
     Raise(RaiseStatement),
 }
 
-impl From<RaiseStatement> for Statement {
-    fn from(m: RaiseStatement) -> Self {
-        Statement::Raise(m)
+impl Into<Statement> for RaiseStatement {
+    fn into(self) -> Statement {
+        Statement::Raise(self)
     }
 }
 
-impl From<CatchStatement> for Statement {
-    fn from(m: CatchStatement) -> Self {
-        Statement::Catch(m)
+impl Into<Statement> for CatchStatement {
+    fn into(self) -> Statement {
+        Statement::Catch(self)
     }
 }
-impl From<ThrowStatement> for Statement {
-    fn from(m: ThrowStatement) -> Self {
-        Statement::Throw(m)
+
+impl Into<Statement> for ThrowStatement {
+    fn into(self) -> Statement {
+        Statement::Throw(self)
     }
 }
-impl From<BlockStatement> for Statement {
-    fn from(m: BlockStatement) -> Self {
-        Statement::Block(m)
+
+impl Into<Statement> for BlockStatement {
+    fn into(self) -> Statement {
+        Statement::Block(self)
     }
 }
-impl From<AssignStatement> for Statement {
-    fn from(m: AssignStatement) -> Self {
-        Statement::Assign(m)
+
+impl Into<Statement> for AssignStatement {
+    fn into(self) -> Statement {
+        Statement::Assign(self)
     }
 }
-impl From<BreakStatement> for Statement {
-    fn from(m: BreakStatement) -> Self {
-        Statement::Break(m)
+
+impl Into<Statement> for BreakStatement {
+    fn into(self) -> Statement {
+        Statement::Break(self)
     }
 }
-impl From<ContinueStatement> for Statement {
-    fn from(m: ContinueStatement) -> Self {
-        Statement::Continue(m)
+
+impl Into<Statement> for ContinueStatement {
+    fn into(self) -> Statement {
+        Statement::Continue(self)
     }
 }
-impl From<ForStatement> for Statement {
-    fn from(m: ForStatement) -> Self {
-        Statement::For(m)
+
+impl Into<Statement> for ForStatement {
+    fn into(self) -> Statement {
+        Statement::For(self)
     }
 }
-impl From<IfStatement> for Statement {
-    fn from(m: IfStatement) -> Self {
-        Statement::If(m)
+
+impl Into<Statement> for IfStatement {
+    fn into(self) -> Statement {
+        Statement::If(self)
     }
 }
-impl From<ExpressionStatement> for Statement {
-    fn from(m: ExpressionStatement) -> Self {
-        Statement::Expression(m)
+
+impl Into<Statement> for ExpressionStatement {
+    fn into(self) -> Statement {
+        Statement::Expression(self)
     }
 }
-impl From<ReturnStatement> for Statement {
-    fn from(m: ReturnStatement) -> Self {
-        Statement::Return(m)
+
+impl Into<Statement> for ReturnStatement {
+    fn into(self) -> Statement {
+        Statement::Return(self)
     }
 }
+
+impl Into<Statement> for MatchStatement {
+    fn into(self) -> Statement {
+        Statement::Match(self)
+    }
+}
+
+impl Into<Statement> for VariableDeclarationStatement {
+    fn into(self) -> Statement {
+        Statement::VariableDeclaration(self)
+    }
+}
+
+impl Into<Statement> for IncrementStatement {
+    fn into(self) -> Statement {
+        Statement::Increment(self)
+    }
+}
+
+impl Into<Statement> for DecrementStatement {
+    fn into(self) -> Statement {
+        Statement::Decrement(self)
+    }
+}
+
+impl Into<Statement> for OpAssignStatement {
+    fn into(self) -> Statement {
+        Statement::OpAssign(self)
+    }
+}
+
 impl<'a> TryInto<&'a ReturnStatement> for &'a Statement {
     type Error = ();
     fn try_into(self) -> Result<&'a ReturnStatement, ()> {
@@ -227,36 +267,6 @@ impl<'a> TryInto<&'a VariableDeclarationStatement> for &'a Statement {
             Statement::VariableDeclaration(c) => Ok(c),
             _ => Err(()),
         }
-    }
-}
-
-impl From<MatchStatement> for Statement {
-    fn from(m: MatchStatement) -> Self {
-        Statement::Match(m)
-    }
-}
-
-impl From<VariableDeclarationStatement> for Statement {
-    fn from(m: VariableDeclarationStatement) -> Self {
-        Statement::VariableDeclaration(m)
-    }
-}
-
-impl From<IncrementStatement> for Statement {
-    fn from(m: IncrementStatement) -> Self {
-        Statement::Increment(m)
-    }
-}
-
-impl From<DecrementStatement> for Statement {
-    fn from(m: DecrementStatement) -> Self {
-        Statement::Decrement(m)
-    }
-}
-
-impl From<OpAssignStatement> for Statement {
-    fn from(m: OpAssignStatement) -> Self {
-        Statement::OpAssign(m)
     }
 }
 
