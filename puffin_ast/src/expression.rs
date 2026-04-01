@@ -1,4 +1,4 @@
-use crate::statement::{ReturnStatement, Statement};
+use crate::statement::{ExpressionStatement, ReturnStatement, Statement};
 use crate::token::{Token};
 
 #[derive(Debug)]
@@ -73,12 +73,11 @@ impl Into<Expression> for LiteralExpression {
     }
 }
 
-impl<'a> TryInto<&'a LiteralExpression> for &'a Expression {
-
+impl<'a> TryFrom<&'a Expression> for &'a LiteralExpression {
     type Error = ();
-    fn try_into(self) -> Result<&'a LiteralExpression, ()> {
-        match self {
-            Expression::Literal(c) => Ok(c),
+    fn try_from(value: &'a Expression) -> Result<Self, Self::Error> {
+        match value {
+            Expression::Literal(l) => Ok(l),
             _ => Err(()),
         }
     }
@@ -89,13 +88,11 @@ impl Into<Expression> for BinaryExpression {
         Expression::Binary(self)
     }
 }
-
-impl<'a> TryInto<&'a BinaryExpression> for &'a Expression {
-
+impl<'a> TryFrom<&'a Expression> for &'a BinaryExpression {
     type Error = ();
-    fn try_into(self) -> Result<&'a BinaryExpression, ()> {
-        match self {
-            Expression::Binary(c) => Ok(c),
+    fn try_from(value: &'a Expression) -> Result<Self, Self::Error> {
+        match value {
+            Expression::Binary(b) => Ok(b),
             _ => Err(()),
         }
     }

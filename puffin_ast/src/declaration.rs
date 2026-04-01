@@ -87,107 +87,101 @@ pub enum Declaration {
     Enum(EnumDeclaration),
     Error(ErrorDeclaration),
 }
-
-impl TryInto<ComponentDeclaration> for Declaration {
+impl TryFrom<Declaration> for ComponentDeclaration {
     type Error = ();
-    fn try_into(self) -> Result<ComponentDeclaration, ()> {
-        match self {
+    fn try_from(value: Declaration) -> Result<Self, Self::Error> {
+        match value {
             Declaration::Component(c) => Ok(c),
             _ => Err(()),
         }
     }
 }
 
-impl<'a> TryInto<&'a ComponentDeclaration> for &'a Declaration {
-
+impl TryFrom<Declaration> for VarDeclaration {
     type Error = ();
-    fn try_into(self) -> Result<&'a ComponentDeclaration, ()> {
-        match self {
-            Declaration::Component(c) => Ok(c),
+    fn try_from(value: Declaration) -> Result<Self, Self::Error> {
+        match value {
+            Declaration::Var(v) => Ok(v),
             _ => Err(()),
         }
     }
 }
 
-impl TryInto<VarDeclaration> for Declaration {
+impl TryFrom<Declaration> for LayoutDeclaration {
     type Error = ();
-    fn try_into(self) -> Result<VarDeclaration, ()> {
-        match self {
-            Declaration::Var(c) => Ok(c),
+    fn try_from(value: Declaration) -> Result<Self, Self::Error> {
+        match value {
+            Declaration::Layout(l) => Ok(l),
             _ => Err(()),
         }
     }
 }
 
-impl TryInto<LayoutDeclaration> for Declaration {
+impl TryFrom<Declaration> for SignalDeclaration {
     type Error = ();
-    fn try_into(self) -> Result<LayoutDeclaration, ()> {
-        match self {
-            Declaration::Layout(c) => Ok(c),
+    fn try_from(value: Declaration) -> Result<Self, Self::Error> {
+        match value {
+            Declaration::Signal(s) => Ok(s),
             _ => Err(()),
         }
     }
 }
-impl TryInto<SignalDeclaration> for Declaration {
-    type Error = ();
-    fn try_into(self) -> Result<SignalDeclaration, ()> {
-        match self {
-            Declaration::Signal(c) => Ok(c),
-            _ => Err(()),
-        }
-    }
-}
-impl TryInto<MethodDeclaration> for Declaration {
-    type Error = ();
-    fn try_into(self) -> Result<MethodDeclaration, ()> {
-        match self {
-            Declaration::Method(c) => Ok(c),
-            _ => Err(()),
-        }
-    }
-}
-impl<'a> TryInto<&'a MethodDeclaration> for &'a Declaration {
 
+impl TryFrom<Declaration> for MethodDeclaration {
     type Error = ();
-    fn try_into(self) -> Result<&'a MethodDeclaration, ()> {
-        match self {
-            Declaration::Method(c) => Ok(c),
+    fn try_from(value: Declaration) -> Result<Self, Self::Error> {
+        match value {
+            Declaration::Method(m) => Ok(m),
             _ => Err(()),
         }
     }
 }
-impl TryInto<RequireDeclaration> for Declaration {
+
+impl<'a> TryFrom<&'a Declaration> for &'a MethodDeclaration {
     type Error = ();
-    fn try_into(self) -> Result<RequireDeclaration, ()> {
-        match self {
-            Declaration::Require(c) => Ok(c),
+    fn try_from(value: &'a Declaration) -> Result<Self, Self::Error> {
+        match value {
+            Declaration::Method(m) => Ok(m),
             _ => Err(()),
         }
     }
 }
-impl TryInto<UseDeclaration> for Declaration {
+
+impl TryFrom<Declaration> for RequireDeclaration {
     type Error = ();
-    fn try_into(self) -> Result<UseDeclaration, ()> {
-        match self {
-            Declaration::Use(c) => Ok(c),
+    fn try_from(value: Declaration) -> Result<Self, Self::Error> {
+        match value {
+            Declaration::Require(r) => Ok(r),
             _ => Err(()),
         }
     }
 }
-impl TryInto<EnumDeclaration> for Declaration {
+
+impl TryFrom<Declaration> for UseDeclaration {
     type Error = ();
-    fn try_into(self) -> Result<EnumDeclaration, ()> {
-        match self {
-            Declaration::Enum(c) => Ok(c),
+    fn try_from(value: Declaration) -> Result<Self, Self::Error> {
+        match value {
+            Declaration::Use(u) => Ok(u),
             _ => Err(()),
         }
     }
 }
-impl TryInto<ErrorDeclaration> for Declaration {
+
+impl TryFrom<Declaration> for EnumDeclaration {
     type Error = ();
-    fn try_into(self) -> Result<ErrorDeclaration, ()> {
-        match self {
-            Declaration::Error(c) => Ok(c),
+    fn try_from(value: Declaration) -> Result<Self, Self::Error> {
+        match value {
+            Declaration::Enum(e) => Ok(e),
+            _ => Err(()),
+        }
+    }
+}
+
+impl TryFrom<Declaration> for ErrorDeclaration {
+    type Error = ();
+    fn try_from(value: Declaration) -> Result<Self, Self::Error> {
+        match value {
+            Declaration::Error(e) => Ok(e),
             _ => Err(()),
         }
     }

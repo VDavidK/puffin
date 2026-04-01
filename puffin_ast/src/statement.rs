@@ -216,54 +216,50 @@ impl Into<Statement> for OpAssignStatement {
     }
 }
 
-impl<'a> TryInto<&'a ReturnStatement> for &'a Statement {
+impl<'a> TryFrom<&'a Statement> for &'a ReturnStatement {
     type Error = ();
-    fn try_into(self) -> Result<&'a ReturnStatement, ()> {
-        match self {
+    fn try_from(value: &'a Statement) -> Result<Self, ()> {
+        match value {
             Statement::Return(c) => Ok(c),
             _ => Err(()),
         }
     }
 }
 
-impl<'a> TryInto<&'a BlockStatement> for &'a Statement {
-
+impl<'a> TryFrom<&'a Statement> for &'a BlockStatement {
     type Error = ();
-    fn try_into(self) -> Result<&'a BlockStatement, ()> {
-        match self {
+    fn try_from(value: &'a Statement) -> Result<Self, ()> {
+        match value {
             Statement::Block(c) => Ok(c),
             _ => Err(()),
         }
     }
 }
 
-impl<'a> TryInto<&'a ExpressionStatement> for &'a Statement {
-
+impl<'a> TryFrom<&'a Statement> for &'a ExpressionStatement {
     type Error = ();
-    fn try_into(self) -> Result<&'a ExpressionStatement, ()> {
-        match self {
+    fn try_from(value: &'a Statement) -> Result<Self, ()> {
+        match value {
             Statement::Expression(c) => Ok(c),
             _ => Err(()),
         }
     }
 }
 
-impl<'a> TryInto<&'a AssignStatement> for &'a Statement {
-
+impl<'a> TryFrom<&'a Statement> for &'a AssignStatement {
     type Error = ();
-    fn try_into(self) -> Result<&'a AssignStatement, ()> {
-        match self {
+    fn try_from(value: &'a Statement) -> Result<Self, ()> {
+        match value {
             Statement::Assign(c) => Ok(c),
             _ => Err(()),
         }
     }
 }
 
-impl<'a> TryInto<&'a VariableDeclarationStatement> for &'a Statement {
-
+impl<'a> TryFrom<&'a Statement> for &'a VariableDeclarationStatement {
     type Error = ();
-    fn try_into(self) -> Result<&'a VariableDeclarationStatement, ()> {
-        match self {
+    fn try_from(value: &'a Statement) -> Result<Self, ()> {
+        match value {
             Statement::VariableDeclaration(c) => Ok(c),
             _ => Err(()),
         }
