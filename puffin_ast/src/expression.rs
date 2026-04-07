@@ -83,11 +83,22 @@ impl<'a> TryFrom<&'a Expression> for &'a LiteralExpression {
     }
 }
 
+impl TryFrom<Expression> for LiteralExpression {
+    type Error = ();
+    fn try_from(value: Expression) -> Result<Self, Self::Error> {
+        match value {
+            Expression::Literal(l) => Ok(l),
+            _ => Err(()),
+        }
+    }
+}
+
 impl Into<Expression> for BinaryExpression {
     fn into(self) -> Expression {
         Expression::Binary(self)
     }
 }
+
 impl<'a> TryFrom<&'a Expression> for &'a BinaryExpression {
     type Error = ();
     fn try_from(value: &'a Expression) -> Result<Self, Self::Error> {
@@ -101,6 +112,16 @@ impl<'a> TryFrom<&'a Expression> for &'a BinaryExpression {
 impl Into<Expression> for UnaryExpression {
     fn into(self) -> Expression {
         Expression::Unary(self)
+    }
+}
+
+impl<'a> TryFrom<&'a Expression> for &'a FunctionCallExpression {
+    type Error = ();
+    fn try_from(value: &'a Expression) -> Result<Self, Self::Error> {
+        match value {
+            Expression::FunctionCall(b) => Ok(b),
+            _ => Err(()),
+        }
     }
 }
 
@@ -119,6 +140,16 @@ impl Into<Expression> for AccessorExpression {
 impl Into<Expression> for ArrayExpression {
     fn into(self) -> Expression {
         Expression::Array(self)
+    }
+}
+
+impl<'a> TryFrom<&'a Expression> for &'a DictionaryExpression {
+    type Error = ();
+    fn try_from(value: &'a Expression) -> Result<Self, Self::Error> {
+        match value {
+            Expression::Dictionary(b) => Ok(b),
+            _ => Err(()),
+        }
     }
 }
 

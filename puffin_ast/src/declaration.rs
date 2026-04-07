@@ -1,5 +1,5 @@
 use crate::token::{Token};
-use crate::expression::{Expression};
+use crate::expression::{BinaryExpression, Expression};
 use crate::statement::{Statement};
 use crate::{VarType};
 use crate::markup::Markup;
@@ -187,6 +187,16 @@ impl TryFrom<Declaration> for ErrorDeclaration {
     }
 }
 
+impl<'a> TryFrom<&'a Declaration> for &'a ErrorDeclaration {
+    type Error = ();
+    fn try_from(value: &'a Declaration) -> Result<Self, Self::Error> {
+        match value {
+            Declaration::Error(e) => Ok(e),
+            _ => Err(()),
+        }
+    }
+}
+
 impl Decorator {
     pub fn new(name: Token, parameters: Vec<Token>) -> Self {
         Self {
@@ -326,6 +336,16 @@ impl Into<Declaration> for ComponentDeclaration {
 impl Into<Declaration> for ConstructorDeclaration {
     fn into(self) -> Declaration {
         Declaration::Constructor(self)
+    }
+}
+
+impl<'a> TryFrom<&'a Declaration> for &'a VarDeclaration {
+    type Error = ();
+    fn try_from(value: &'a Declaration) -> Result<Self, Self::Error> {
+        match value {
+            Declaration::Var(b) => Ok(b),
+            _ => Err(()),
+        }
     }
 }
 

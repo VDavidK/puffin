@@ -1,5 +1,5 @@
 use crate::token::{Token};
-use crate::expression::{Expression};
+use crate::expression::{DictionaryExpression, Expression};
 use crate::{VarType};
 use crate::declaration::{Declaration, MethodDeclaration};
 
@@ -159,6 +159,16 @@ impl Into<Statement> for BreakStatement {
 impl Into<Statement> for ContinueStatement {
     fn into(self) -> Statement {
         Statement::Continue(self)
+    }
+}
+
+impl<'a> TryFrom<&'a Statement> for &'a ForStatement {
+    type Error = ();
+    fn try_from(value: &'a Statement) -> Result<Self, Self::Error> {
+        match value {
+            Statement::For(b) => Ok(b),
+            _ => Err(()),
+        }
     }
 }
 
