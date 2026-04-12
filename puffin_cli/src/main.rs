@@ -81,16 +81,7 @@ fn main() -> color_eyre::Result<()> {
 
             let mut runtime = Runtime::default();
 
-            runtime.include_module(puffin_stdlib::core::dom::module());
             runtime.execute(Rc::new(chunk))?;
-
-            let func = runtime
-                .get_global("main")
-                .expect("Expected main function")
-                .clone()
-                .take_function()?;
-
-            runtime.call(func)?;
         }
     }
 

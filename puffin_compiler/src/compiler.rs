@@ -50,11 +50,21 @@ impl<'a> Compiler<'a> {
 
     pub fn compile(&mut self, ast: &'a Ast) -> Result<(), CompileError> {
         // TODO: New class
-        self.chunk.push_op(OpCode::NewInstance);
+        // self.chunk.push_op(OpCode::NewInstance);
 
         for decl in &ast.declarations {
             self.compile_declaration(decl)?;
         }
+
+        let loop_addr = self.chunk.addr();
+        let main = self.add_to_constants("<main>")?;
+        self.chunk.push_op(OpCode::GetGlobal);
+        self.chunk.push_constant_offset(main);
+        self.chunk.push_op(OpCode::Call);
+        self.chunk.push_op(OpCode::Pop);
+        self.chunk.push_op(OpCode::Render);
+        self.chunk.push_op(OpCode::Poll);
+        self.chunk.push_jump_im(OpCode::Jump, loop_addr);
 
         Ok(())
     }
@@ -69,6 +79,37 @@ impl<'a> Compiler<'a> {
                 self.chunk.push_constant_offset(name);
             }
             Declaration::Layout(layout) => {
+                let name = layout.name
+                    .as_ref()
+                    .map(|name| name.lexeme.as_str())
+                    .unwrap_or("<main>")
+                    .to_owned();
+
+                let mut chunk = Chunk::new(&name);
+                let mut layout_compiler = Compiler::new(&mut chunk);
+
+                for arg in &layout.parameters {
+                    layout_compiler.scope.define_local(&arg.lexeme);
+                }
+
+                for markup in &layout.markup {
+                    layout_compiler.compile_markup(markup)?;
+                }
+
+                layout_compiler.ensure_return()?;
+
+                let func = Function {
+                    chunk: Rc::new(chunk),
+                    identifier: name.to_owned(),
+                    arity: layout.parameters.len(),
+                };
+
+                let constant = self.chunk.new_constant(func);
+                self.chunk.push_op(OpCode::Constant);
+                self.chunk.push_constant_offset(constant);
+                self.chunk.push_op(OpCode::SetGlobal);
+                let name = self.add_to_constants(name)?;
+                self.chunk.push_constant_offset(name);
             }
             // Declaration::Signal(_) => {}
             Declaration::Method(method) => {
@@ -302,6 +343,27 @@ impl<'a> Compiler<'a> {
     }
 
     fn compile_markup(&mut self, markup: &Markup) -> Result<(), CompileError> {
+        match markup {
+            Markup::Component(component) => {
+                if let Some(string) = &component.string_literal {
+                    let constant = self.token_to_constant(string)?;
+                    self.chunk.push_op(OpCode::Constant);
+                    self.chunk.push_constant_offset(constant);
+                }
+
+                let global = self.token_to_constant(&component.name)?;
+                self.chunk.push_op(OpCode::GetGlobal);
+                self.chunk.push_constant_offset(global);
+                self.chunk.push_op(OpCode::Call);
+                self.chunk.push_op(OpCode::Pop);
+            }
+            // Markup::Layout(_) => {}
+            // Markup::Match(_) => {}
+            // Markup::If(_) => {}
+            // Markup::Iterative(_) => {}
+            // Markup::Style(_) => {}
+            _ => (),
+        }
 
         Ok(())
     }

@@ -2,10 +2,12 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 use ratatui::DefaultTerminal;
-use crate::baselibs::define_print_function;
+use crate::baselibs::{define_print_function, define_text_element};
 use crate::chunk::LocalOffset;
 use crate::vm::Vm;
 use crate::{Chunk, RuntimeError, value::Value};
+use crate::ui::{LayoutDirection, LayoutNode, Node};
+use crate::ui::Node::Layout;
 use crate::value::{FunctionType, InstanceType, Module};
 
 #[derive(Debug, Clone)]
@@ -22,6 +24,7 @@ pub struct Runtime {
     call_stack: Vec<CallFrame>,
     term: DefaultTerminal,
     globals: HashMap<String, Value>,
+    node_stack: Vec<Node>,
 }
 
 impl Default for Runtime {
@@ -34,9 +37,11 @@ impl Default for Runtime {
             call_stack: vec![],
             globals: HashMap::new(),
             term,
+            node_stack: vec![],
         };
 
         define_print_function(&mut runtime);
+        define_text_element(&mut runtime);
 
         runtime
     }
@@ -63,6 +68,10 @@ impl Runtime {
             .run()?;
 
         Ok(ret_value)
+    }
+
+    pub fn push_node(&mut self, node: impl Into<Node>) {
+        self.node_stack.push(node.into());
     }
 
     pub fn include_module(&mut self, module: Module) {
@@ -93,12 +102,12 @@ impl Runtime {
 
     pub fn get_local(&self, offset: LocalOffset) -> Result<&Value, RuntimeError> {
         let offset = if offset >= 0 {
-            offset
+            offset + self.stack_offset() as LocalOffset
         } else {
             self.stack.len() as LocalOffset + offset
         };
 
-        let value = self.stack.get(offset as usize + self.stack_offset())
+        let value = self.stack.get(offset as usize)
             .ok_or(RuntimeError::StackOutOfBounds { at: offset as usize, pc: self.pc()? })?;
 
         Ok(value)
@@ -224,7 +233,16 @@ impl Runtime {
     }
 
     pub fn render(&mut self, elem: &InstanceType) -> Result<(), RuntimeError> {
-        // self.term.draw(|frame| frame.render_widget(elem, frame.area()))?;
+        let stack = std::mem::take(&mut self.node_stack);
+        let layout = LayoutNode {
+            direction: LayoutDirection::Vertical,
+            nodes: stack,
+        };
+
+        self.term.draw(move |frame| {
+            frame.render_widget(layout, frame.area());
+        })?;
+
         Ok(())
     }
 
