@@ -232,7 +232,7 @@ impl Runtime {
         }
     }
 
-    pub fn render(&mut self, elem: &InstanceType) -> Result<(), RuntimeError> {
+    pub fn render(&mut self) -> Result<(), RuntimeError> {
         let stack = std::mem::take(&mut self.node_stack);
         let layout = LayoutNode {
             direction: LayoutDirection::Vertical,

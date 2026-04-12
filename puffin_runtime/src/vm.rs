@@ -279,9 +279,7 @@ impl<'a> Vm<'a> {
             },
             
             OpCode::Render => {
-                // if let Some(root) = &self.root {
-                //     self.runtime.render(root)?;
-                // }
+                self.runtime.render()?;
             },
 
             OpCode::SetRoot => {
