@@ -24,8 +24,16 @@ impl Class {
         }
     }
 
-    pub fn set_constructor(&mut self, value: Value) {
-        self.constructor = Some(value);
+    pub fn set_constructor(&mut self, value: impl Into<Value>) {
+        self.constructor = Some(value.into());
+    }
+
+    pub fn set_field(&mut self, name: &str, value: impl Into<Value>) {
+        self.fields.insert(name.into(), value.into());
+    }
+
+    pub fn set_method(&mut self, name: &str, value: impl Into<Value>) {
+        self.methods.insert(name.into(), value.into());
     }
 }
 

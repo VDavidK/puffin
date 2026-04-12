@@ -262,6 +262,10 @@ impl<'a> Vm<'a> {
                         let ret_value = self.runtime.call(func)?;
                         self.runtime.push_value(ret_value);
                     },
+                    Value::Class(cls) => {
+                        let instance = new_instance(cls);
+                        self.runtime.push_value(instance);
+                    },
                     v => return Err(RuntimeError::IncorrectType { ty: v.type_name().to_owned(), expected: "function".to_owned() }),
                 }
             },

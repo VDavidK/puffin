@@ -3,7 +3,7 @@ mod instance;
 mod native_function;
 mod class;
 mod module;
-mod user_value;
+mod native_value;
 
 use std::{cell::RefCell, fmt::Display, hash::Hash, rc::Rc};
 use std::sync::Arc;
@@ -12,7 +12,7 @@ pub use function::Function;
 pub use native_function::NativeFunction;
 pub use class::{new_class, Class};
 pub use module::{new_module, Module};
-pub use user_value::NativeValue;
+pub use native_value::{NativeValue, NativeValueTrait};
 
 use serde_derive::{Deserialize, Serialize};
 use crate::RuntimeError;
@@ -164,6 +164,18 @@ impl From<Instance> for Value {
 impl From<NativeValue> for Value {
     fn from(value: NativeValue) -> Self {
         Value::NativeValue(value)
+    }
+}
+
+impl From<ClassType> for Value {
+    fn from(value: ClassType) -> Self {
+        Value::Class(value)
+    }
+}
+
+impl From<Class> for Value {
+    fn from(value: Class) -> Self {
+        Value::Class(Rc::new(RefCell::new(value)))
     }
 }
 

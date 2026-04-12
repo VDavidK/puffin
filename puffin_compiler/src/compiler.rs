@@ -369,7 +369,6 @@ impl<'a> Compiler<'a> {
     }
 
     fn compile_component(&mut self, component: &ComponentRender) -> Result<(), CompileError> {
-
         Ok(())
     }
 
