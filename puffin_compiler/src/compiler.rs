@@ -2,7 +2,7 @@ use crate::scope::Scope;
 use puffin_ast::Ast;
 use puffin_ast::declaration::Declaration;
 use puffin_ast::expression::Expression;
-use puffin_ast::markup::Markup;
+use puffin_ast::markup::{ComponentRender, Markup};
 use puffin_ast::statement::Statement;
 use puffin_ast::token::{Token, TokenType};
 use puffin_runtime::chunk::{ConstantOffset, LocalOffset};
@@ -49,6 +49,9 @@ impl<'a> Compiler<'a> {
     }
 
     pub fn compile(&mut self, ast: &'a Ast) -> Result<(), CompileError> {
+        // TODO: New class
+        self.chunk.push_op(OpCode::NewInstance);
+
         for decl in &ast.declarations {
             self.compile_declaration(decl)?;
         }
@@ -66,9 +69,6 @@ impl<'a> Compiler<'a> {
                 self.chunk.push_constant_offset(name);
             }
             Declaration::Layout(layout) => {
-                for markup in &layout.markup {
-                    self.compile_markup(markup)?;
-                }
             }
             // Declaration::Signal(_) => {}
             Declaration::Method(method) => {
@@ -302,6 +302,12 @@ impl<'a> Compiler<'a> {
     }
 
     fn compile_markup(&mut self, markup: &Markup) -> Result<(), CompileError> {
+
+        Ok(())
+    }
+
+    fn compile_component(&mut self, component: &ComponentRender) -> Result<(), CompileError> {
+
         Ok(())
     }
 
