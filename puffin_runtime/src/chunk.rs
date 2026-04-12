@@ -189,7 +189,9 @@ impl<'a> ChunkFormatter<'a> {
 
                     // Object Manipulation
 
-                    OpCode::NewInstance => self.push("newobj"),
+                    OpCode::NewInstance => self.push_with_local_offset("newobj"),
+                    OpCode::NewClass => self.push_with_constant("class"),
+                    OpCode::SetConstructor => self.push("scons"),
                     OpCode::GetField => self.push_with_local_offset("getf"),
                     OpCode::SetField => self.push_with_local_offset("setf"),
 

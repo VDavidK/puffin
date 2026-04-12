@@ -3,6 +3,7 @@ use num_enum::TryFromPrimitive;
 use crate::{RuntimeError, op::OpCode, value::{Value, new_instance}};
 use crate::chunk::{InstructionOffset, ConstantOffset, LocalOffset};
 use crate::runtime::Runtime;
+use crate::value::new_class;
 
 #[derive(Debug)]
 pub(crate) struct Vm<'a> {
@@ -65,7 +66,7 @@ impl<'a> Vm<'a> {
         }
         
         match op {
-            OpCode::Invalid => return Err(RuntimeError::InvalidOpCode { pc: self.runtime.pc()? }),
+            OpCode::Invalid => return Err(RuntimeError::InvalidOpCode { pc: self.runtime.pc()? - 1 }),
 
             OpCode::Constant => {
                 let constant = self.fetch_constant()?
@@ -112,7 +113,33 @@ impl<'a> Vm<'a> {
                 let class = self.runtime.pop_expecting()?
                     .take_class()?;
 
-                self.runtime.push_value(new_instance(class));
+                let instance = new_instance(class.clone());
+
+                if let Some(constructor) = class.borrow().get_constructor() {
+                    self.runtime.push_value(instance.clone());
+                    self.runtime.call(constructor.clone().take_function()?)?;
+                }
+
+                self.runtime.push_value(instance);
+            }
+
+            OpCode::NewClass => {
+                let name = self.fetch_constant()?
+                    .to_owned()
+                    .take_string()?;
+
+                self.runtime.push_value(new_class(name));
+            }
+
+            OpCode::SetConstructor => {
+                let constr = self.runtime.pop_expecting()?
+                    .take_function()?;
+
+                let class = self.runtime.pop_expecting()?
+                    .take_class()?;
+
+                class.borrow_mut()
+                    .set_constructor(constr);
             }
 
             OpCode::GetField => {
@@ -140,10 +167,23 @@ impl<'a> Vm<'a> {
 
             OpCode::SetField => {
                 let value = self.runtime.pop_expecting()?;
-                let obj = self.runtime.pop_expecting()?.take_instance()?;
+                let obj = self.runtime.pop_expecting()?;
                 let name = self.fetch_constant()?.to_string();
 
-                obj.borrow_mut().set_field(name, value.to_owned());
+                match obj {
+                    Value::Instance(instance) => {
+                        instance
+                            .borrow_mut()
+                            .set_field(name, value.to_owned());
+                    }
+                    Value::Class(class) => {
+                        class
+                            .borrow_mut()
+                            .set_field(name, value.to_owned());
+                    }
+                    _ => panic!("Invalid assignment target"),
+                }
+
             },
 
             OpCode::Add => {
@@ -263,7 +303,13 @@ impl<'a> Vm<'a> {
                         self.runtime.push_value(ret_value);
                     },
                     Value::Class(cls) => {
-                        let instance = new_instance(cls);
+                        let instance = new_instance(cls.clone());
+
+                        if let Some(constructor) = cls.borrow().get_constructor() {
+                            self.runtime.push_value(instance.clone());
+                            self.runtime.call(constructor.clone().take_function()?)?;
+                        }
+
                         self.runtime.push_value(instance);
                     },
                     v => return Err(RuntimeError::IncorrectType { ty: v.type_name().to_owned(), expected: "function".to_owned() }),

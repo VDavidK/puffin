@@ -179,6 +179,12 @@ impl From<Class> for Value {
     }
 }
 
+impl From<FunctionType> for Value {
+    fn from(value: FunctionType) -> Self {
+        Value::Function(value)
+    }
+}
+
 impl From<usize> for Value {
     fn from(value: usize) -> Self {
         Value::Int(value as IntType)

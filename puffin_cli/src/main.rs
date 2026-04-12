@@ -80,8 +80,10 @@ fn main() -> color_eyre::Result<()> {
             log::debug!("-- Running chunk --\n{chunk}");
 
             let mut runtime = Runtime::default();
-
+            runtime.include_module(puffin_stdlib::core::fs::module());
             runtime.execute(Rc::new(chunk))?;
+
+            runtime.run_component("TestComponent")?;
         }
     }
 

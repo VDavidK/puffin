@@ -46,6 +46,14 @@ pub enum OpCode {
     // Pushes a new instance of a class to the top of the stack
     NewInstance,
 
+    // : class [offset:4B]
+    // Pushes a new class to the top of the stack with the specified name
+    NewClass,
+
+    // : scons
+    // Expected stack: TOP > [value: fn] > [cls: class]
+    SetConstructor,
+
     // : setf [offset:4B]
     // Pops the top two values off the stack. Assigns the field with the given name at the offset of the latter value to the first value
     // Expected stack: TOP > [value: any] > [obj: assignable]

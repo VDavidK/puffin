@@ -8,7 +8,7 @@ use crate::vm::Vm;
 use crate::{Chunk, RuntimeError, value::Value};
 use crate::ui::{LayoutDirection, LayoutNode, Node};
 use crate::ui::Node::Layout;
-use crate::value::{FunctionType, InstanceType, Module};
+use crate::value::{new_instance, FunctionType, InstanceType, Module};
 
 #[derive(Debug, Clone)]
 pub struct CallFrame {
@@ -57,6 +57,48 @@ impl Runtime {
             .run()?;
 
         Ok(ret_value)
+    }
+
+    pub fn run_component(&mut self, name: impl AsRef<str>) -> Result<(), RuntimeError> {
+        let component = self.get_global(name);
+
+        if let Some(component) = component {
+            let component = component.clone().take_class()?;
+
+            let instance = new_instance(component.clone());
+
+            if let Some(constructor) = component.borrow().get_constructor() {
+                self.push_value(instance.clone());
+                self.call(constructor.clone().take_function()?)?;
+            }
+
+            loop {
+                let main = instance.borrow()
+                    .get_field("<main>")
+                    .unwrap()
+                    .clone();
+
+                match main {
+                    Value::NativeFunction(func) => {
+                        let callable = &func.fun;
+                        let local_count = self.local_count()? - func.arity;
+                        let value = callable(self)?;
+                        self.pop_until(local_count)?;
+                        self.push_value(value);
+                    },
+                    Value::Function(func) => {
+                        let ret_value = self.call(func)?;
+                        self.push_value(ret_value);
+                    },
+                    _ => panic!(),
+                }
+
+                self.render()?;
+                self.poll()?;
+            }
+        }
+
+        Ok(())
     }
 
     pub fn call(&mut self, func: FunctionType) -> Result<Value, RuntimeError> {

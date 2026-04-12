@@ -52,7 +52,7 @@ pub enum RuntimeError {
     #[error("Global variable of name '{name}' not found")]
     GlobalNotFound { name: String },
 
-    #[error("Expected '{expected}' got {ty}")]
+    #[error("Expected {expected} got {ty}")]
     IncorrectType { ty: String, expected: String },
 
     #[error("Attempting to execute instructions with an empty call stack")]

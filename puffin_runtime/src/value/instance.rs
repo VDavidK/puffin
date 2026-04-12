@@ -47,5 +47,14 @@ impl TryFrom<Value> for InstanceType {
 }
 
 pub fn new_instance(class: ClassType) -> InstanceType {
-    Rc::new(RefCell::new(Instance::new(class)))
+    let mut instance = Instance::new(class.clone());
+
+    let class = class.borrow();
+    let fields = class.get_fields();
+
+    for (k, v) in fields.iter() {
+        instance.set_field(k, v.clone());
+    }
+
+    Rc::new(RefCell::new(instance))
 }

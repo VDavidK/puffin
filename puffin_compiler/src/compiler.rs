@@ -49,22 +49,16 @@ impl<'a> Compiler<'a> {
     }
 
     pub fn compile(&mut self, ast: &'a Ast) -> Result<(), CompileError> {
-        // TODO: New class
-        // self.chunk.push_op(OpCode::NewInstance);
+        let name = self.add_to_constants("TestComponent")?;
+        self.chunk.push_op(OpCode::NewClass);
+        self.chunk.push_constant_offset(name);
 
         for decl in &ast.declarations {
             self.compile_declaration(decl)?;
         }
 
-        let loop_addr = self.chunk.addr();
-        let main = self.add_to_constants("<main>")?;
-        self.chunk.push_op(OpCode::GetGlobal);
-        self.chunk.push_constant_offset(main);
-        self.chunk.push_op(OpCode::Call);
-        self.chunk.push_op(OpCode::Pop);
-        self.chunk.push_op(OpCode::Render);
-        self.chunk.push_op(OpCode::Poll);
-        self.chunk.push_jump_im(OpCode::Jump, loop_addr);
+        self.chunk.push_op(OpCode::SetGlobal);
+        self.chunk.push_constant_offset(name);
 
         Ok(())
     }
@@ -73,12 +67,19 @@ impl<'a> Compiler<'a> {
         match declaration {
             // Declaration::Component(_) => {}
             Declaration::Var(var) => {
+                self.chunk.push_op(OpCode::GetLocal);
+                self.chunk.push_constant_offset(0);
+
                 let name = self.chunk.new_constant(var.name.lexeme.clone());
                 self.compile_expression(&var.value)?;
-                self.chunk.push_op(OpCode::SetGlobal);
+
+                self.chunk.push_op(OpCode::SetField);
                 self.chunk.push_constant_offset(name);
             }
             Declaration::Layout(layout) => {
+                self.chunk.push_op(OpCode::GetLocal);
+                self.chunk.push_constant_offset(0);
+
                 let name = layout.name
                     .as_ref()
                     .map(|name| name.lexeme.as_str())
@@ -107,12 +108,15 @@ impl<'a> Compiler<'a> {
                 let constant = self.chunk.new_constant(func);
                 self.chunk.push_op(OpCode::Constant);
                 self.chunk.push_constant_offset(constant);
-                self.chunk.push_op(OpCode::SetGlobal);
+                self.chunk.push_op(OpCode::SetField);
                 let name = self.add_to_constants(name)?;
                 self.chunk.push_constant_offset(name);
             }
             // Declaration::Signal(_) => {}
             Declaration::Method(method) => {
+                self.chunk.push_op(OpCode::GetLocal);
+                self.chunk.push_constant_offset(0);
+
                 let mut chunk = Chunk::new(method.name.lexeme.clone());
                 let mut method_compiler = Compiler::new(&mut chunk);
 
@@ -131,9 +135,33 @@ impl<'a> Compiler<'a> {
                 let constant = self.chunk.new_constant(func);
                 self.chunk.push_op(OpCode::Constant);
                 self.chunk.push_constant_offset(constant);
-                self.chunk.push_op(OpCode::SetGlobal);
+                self.chunk.push_op(OpCode::SetField);
                 let name = self.token_to_constant(&method.name)?;
                 self.chunk.push_constant_offset(name);
+            }
+            Declaration::Constructor(constructor) => {
+                self.chunk.push_op(OpCode::GetLocal);
+                self.chunk.push_constant_offset(0);
+
+                let mut chunk = Chunk::new("constructor");
+                let mut method_compiler = Compiler::new(&mut chunk);
+
+                for arg in &constructor.parameters {
+                    method_compiler.scope.define_local(&arg.lexeme);
+                }
+
+                method_compiler.compile_statement(&constructor.block)?;
+                method_compiler.ensure_return()?;
+
+                let func = Function {
+                    chunk: Rc::new(chunk),
+                    identifier: "constructor".to_owned(),
+                    arity: constructor.parameters.len(),
+                };
+                let constant = self.chunk.new_constant(func);
+                self.chunk.push_op(OpCode::Constant);
+                self.chunk.push_constant_offset(constant);
+                self.chunk.push_op(OpCode::SetConstructor);
             }
             // Declaration::Require(_) => {}
             // Declaration::Use(_) => {}

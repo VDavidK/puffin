@@ -28,12 +28,20 @@ impl Class {
         self.constructor = Some(value.into());
     }
 
-    pub fn set_field(&mut self, name: &str, value: impl Into<Value>) {
+    pub fn get_constructor(&self) -> Option<&Value> {
+        self.constructor.as_ref()
+    }
+
+    pub fn set_field(&mut self, name: impl Into<String>, value: impl Into<Value>) {
         self.fields.insert(name.into(), value.into());
     }
 
-    pub fn set_method(&mut self, name: &str, value: impl Into<Value>) {
+    pub fn set_method(&mut self, name: impl Into<String>, value: impl Into<Value>) {
         self.methods.insert(name.into(), value.into());
+    }
+
+    pub fn get_fields(&self) -> &HashMap<String, Value> {
+        &self.fields
     }
 }
 
