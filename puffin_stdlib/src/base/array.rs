@@ -2,7 +2,7 @@ use puffin_runtime::runtime::Runtime;
 use puffin_runtime::value::{Class, NativeFunction, NativeValue, NativeValueTrait, Value};
 
 #[derive(Debug)]
-struct NativeVector(Vec<Value>);
+pub(crate) struct NativeVector(pub Vec<Value>);
 
 impl std::fmt::Display for NativeVector {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
