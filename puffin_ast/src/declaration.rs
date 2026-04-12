@@ -321,24 +321,6 @@ impl EnumDeclaration {
     }
 }
 
-impl Into<Declaration> for ErrorDeclaration {
-    fn into(self) -> Declaration {
-        Declaration::Error(self)
-    }
-}
-
-impl Into<Declaration> for ComponentDeclaration {
-    fn into(self) -> Declaration {
-        Declaration::Component(self)
-    }
-}
-
-impl Into<Declaration> for ConstructorDeclaration {
-    fn into(self) -> Declaration {
-        Declaration::Constructor(self)
-    }
-}
-
 impl<'a> TryFrom<&'a Declaration> for &'a VarDeclaration {
     type Error = ();
     fn try_from(value: &'a Declaration) -> Result<Self, Self::Error> {
@@ -349,44 +331,62 @@ impl<'a> TryFrom<&'a Declaration> for &'a VarDeclaration {
     }
 }
 
-impl Into<Declaration> for VarDeclaration {
-    fn into(self) -> Declaration {
-        Declaration::Var(self)
+impl From<ErrorDeclaration> for Declaration {
+    fn from(d: ErrorDeclaration) -> Self {
+        Declaration::Error(d)
     }
 }
 
-impl Into<Declaration> for LayoutDeclaration {
-    fn into(self) -> Declaration {
-        Declaration::Layout(self)
+impl From<ConstructorDeclaration> for Declaration {
+    fn from(d: ConstructorDeclaration) -> Self {
+        Declaration::Constructor(d)
     }
 }
 
-impl Into<Declaration> for SignalDeclaration {
-    fn into(self) -> Declaration {
-        Declaration::Signal(self)
+impl From<ComponentDeclaration> for Declaration {
+    fn from(d: ComponentDeclaration) -> Self {
+        Declaration::Component(d)
     }
 }
 
-impl Into<Declaration> for MethodDeclaration {
-    fn into(self) -> Declaration {
-        Declaration::Method(self)
+impl From<VarDeclaration> for Declaration {
+    fn from(d: VarDeclaration) -> Self {
+        Declaration::Var(d)
     }
 }
 
-impl Into<Declaration> for RequireDeclaration {
-    fn into(self) -> Declaration {
-        Declaration::Require(self)
+impl From<LayoutDeclaration> for Declaration {
+    fn from(d: LayoutDeclaration) -> Self {
+        Declaration::Layout(d)
     }
 }
 
-impl Into<Declaration> for UseDeclaration {
-    fn into(self) -> Declaration {
-        Declaration::Use(self)
+impl From<SignalDeclaration> for Declaration {
+    fn from(d: SignalDeclaration) -> Self {
+        Declaration::Signal(d)
     }
 }
 
-impl Into<Declaration> for EnumDeclaration {
-    fn into(self) -> Declaration {
-        Declaration::Enum(self)
+impl From<MethodDeclaration> for Declaration {
+    fn from(d: MethodDeclaration) -> Self {
+        Declaration::Method(d)
+    }
+}
+
+impl From<RequireDeclaration> for Declaration {
+    fn from(d: RequireDeclaration) -> Self {
+        Declaration::Require(d)
+    }
+}
+
+impl From<UseDeclaration> for Declaration {
+    fn from(d: UseDeclaration) -> Self {
+        Declaration::Use(d)
+    }
+}
+
+impl From<EnumDeclaration> for Declaration {
+    fn from(d: EnumDeclaration) -> Self {
+        Declaration::Enum(d)
     }
 }

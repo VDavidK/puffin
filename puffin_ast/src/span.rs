@@ -6,6 +6,7 @@ pub struct Span {
     pub start: Position,
     pub end: Position,
 }
+
 impl IntoSnippet for Span {
     fn into_snippet(self, src: impl AsRef<str>, src_name: Option<impl AsRef<str>>, ctx_ln_count: usize) -> Snippet {
         let snippet_start_line = i32::max(1, self.start.ln() as i32 - ctx_ln_count as i32) as usize;
