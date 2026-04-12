@@ -13,8 +13,7 @@ impl Declaration for FileSystem {
                 .take_string()?;
 
             let content = runtime.get_local(-1)?
-                .to_owned()
-                .take_string()?;
+                .to_string();
 
             std::fs::write(path, content)?;
 

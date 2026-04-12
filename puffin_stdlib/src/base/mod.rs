@@ -4,7 +4,6 @@ mod array;
 
 use array::define_array_class;
 
-pub fn define(runtime: &mut Runtime) -> Result<(), ()> {
+pub fn define(runtime: &mut Runtime) {
     define_array_class(runtime);
-    Ok(())
 }

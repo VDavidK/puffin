@@ -27,6 +27,10 @@ impl Instance {
     pub fn get_field(&self, name: impl AsRef<str>) -> Option<&Value> {
         self.fields.get(name.as_ref())
     }
+    
+    pub fn get_class(&self) -> ClassType {
+        self.class.clone()
+    }
 }
 
 impl Display for Instance {

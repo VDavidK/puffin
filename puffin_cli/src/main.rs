@@ -81,6 +81,9 @@ fn main() -> color_eyre::Result<()> {
 
             let mut runtime = Runtime::default();
             runtime.include_module(puffin_stdlib::core::fs::module());
+
+            puffin_stdlib::base::define(&mut runtime);
+
             runtime.execute(Rc::new(chunk))?;
 
             runtime.run_component("TestComponent")?;

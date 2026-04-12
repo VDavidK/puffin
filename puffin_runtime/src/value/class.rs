@@ -36,6 +36,14 @@ impl Class {
         self.fields.insert(name.into(), value.into());
     }
 
+    pub fn get_field(&self, name: impl AsRef<str>) -> Option<&Value> {
+        self.fields.get(name.as_ref())
+    }
+
+    pub fn get_method(&self, name: impl AsRef<str>) -> Option<&Value> {
+        self.methods.get(name.as_ref())
+    }
+
     pub fn set_method(&mut self, name: impl Into<String>, value: impl Into<Value>) {
         self.methods.insert(name.into(), value.into());
     }
