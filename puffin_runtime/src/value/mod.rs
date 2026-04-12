@@ -3,14 +3,16 @@ mod instance;
 mod native_function;
 mod class;
 mod module;
+mod user_value;
 
 use std::{cell::RefCell, fmt::Display, hash::Hash, rc::Rc};
-
+use std::sync::Arc;
 pub use instance::{new_instance, Instance};
 pub use function::Function;
 pub use native_function::NativeFunction;
 pub use class::{new_class, Class};
 pub use module::{new_module, Module};
+pub use user_value::NativeValue;
 
 use serde_derive::{Deserialize, Serialize};
 use crate::RuntimeError;
@@ -24,6 +26,7 @@ pub type ClassType = Rc<RefCell<Class>>;
 pub type ModuleType = Rc<RefCell<Module>>;
 pub type FunctionType = Rc<Function>;
 pub type NativeFunctionType = Rc<NativeFunction>;
+pub type NativeValueType = NativeValue;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Value {
@@ -38,6 +41,9 @@ pub enum Value {
 
     #[serde(skip)]
     Instance(InstanceType),
+
+    #[serde(skip)]
+    NativeValue(NativeValueType),
 
     #[serde(skip)]
     NativeFunction(NativeFunctionType),
@@ -55,6 +61,7 @@ impl PartialEq for Value {
             (Self::NativeFunction(l0), Self::NativeFunction(r0)) => Rc::as_ptr(l0) == Rc::as_ptr(r0),
             (Self::Class(l0), Self::Class(r0)) => Rc::as_ptr(l0) == Rc::as_ptr(r0),
             (Self::Module(l0), Self::Module(r0)) => Rc::as_ptr(l0) == Rc::as_ptr(r0),
+            (Self::NativeValue(l0), Self::NativeValue(r0)) => l0 == r0,
             _ => false,
         }
     }
@@ -154,6 +161,12 @@ impl From<Instance> for Value {
     }
 }
 
+impl From<NativeValue> for Value {
+    fn from(value: NativeValue) -> Self {
+        Value::NativeValue(value)
+    }
+}
+
 impl From<usize> for Value {
     fn from(value: usize) -> Self {
         Value::Int(value as IntType)
@@ -178,6 +191,7 @@ impl Display for Value {
             Value::NativeFunction(v) => f.write_fmt(format_args!("{}", v)),
             Value::Class(v) => f.write_fmt(format_args!("{}", v.borrow())),
             Value::Module(v) => f.write_fmt(format_args!("{}", v.borrow())),
+            Value::NativeValue(v) => f.write_fmt(format_args!("{}", v)),
             Value::Null => f.write_fmt(format_args!("null")),
         }
     }
@@ -334,6 +348,12 @@ impl Value {
                 _ => false,
             }
 
+            Value::NativeValue(lhs) => match rhs {
+                Value::NativeValue(rhs) => lhs == rhs,
+
+                _ => false,
+            }
+
             Value::Null => matches!(rhs, Value::Null),
         }
     }
@@ -411,6 +431,7 @@ impl Value {
             Value::NativeFunction(_) => true,
             Value::Class(_) => true,
             Value::Module(_) => true,
+            Value::NativeValue(_) => true,
             Value::Null => false,
         }
     }
@@ -426,6 +447,7 @@ impl Value {
             Value::NativeFunction(_) => "native_function",
             Value::Class(_) => "class",
             Value::Module(_) => "module",
+            Value::NativeValue(_) => "native_value",
             Value::Null => "null",
         }
     }
@@ -464,5 +486,9 @@ impl Value {
 
     pub fn take_module(self) -> Result<ModuleType, RuntimeError> {
         TryInto::<ModuleType>::try_into(self)
+    }
+
+    pub fn take_native_value(self) -> Result<NativeValueType, RuntimeError> {
+        TryInto::<NativeValueType>::try_into(self)
     }
 }
