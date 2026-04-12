@@ -49,7 +49,7 @@ impl<'a> Compiler<'a> {
     }
 
     pub fn compile(&mut self, ast: &'a Ast) -> Result<(), CompileError> {
-        let name = self.add_to_constants("TestComponent")?;
+        let name = self.add_to_constants(ast.component_name.to_owned())?;
         self.chunk.push_op(OpCode::NewClass);
         self.chunk.push_constant_offset(name);
 

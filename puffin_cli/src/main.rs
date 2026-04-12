@@ -84,9 +84,14 @@ fn main() -> color_eyre::Result<()> {
 
             puffin_stdlib::base::define(&mut runtime);
 
-            runtime.execute(Rc::new(chunk))?;
+            let main_component_name = input.file_stem()
+                .ok_or_eyre("File path must have a valid stem")?
+                .to_str()
+                .ok_or_eyre("File path must be a valid string")?
+                .to_owned();
 
-            runtime.run_component("TestComponent")?;
+            runtime.execute(Rc::new(chunk))?;
+            runtime.run_component(main_component_name)?;
         }
     }
 
