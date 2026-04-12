@@ -154,8 +154,16 @@ impl<'a> Vm<'a> {
                             .ok_or(RuntimeError::NoFieldMatchingName { name })?.to_owned()
                     }
                     Value::Instance(inst) => {
-                        inst.borrow().get_field(&name)
-                            .ok_or(RuntimeError::NoFieldMatchingName { name })?.to_owned()
+                        inst.borrow()
+                            .get_field(&name)
+                            .cloned()
+                            .or_else(|| inst.borrow()
+                                .get_class()
+                                .borrow()
+                                .get_method(&name)
+                                .cloned()
+                            )
+                            .ok_or(RuntimeError::NoFieldMatchingName { name })?
                     }
                     v => {
                         return Err(RuntimeError::IncorrectType { ty: v.type_name().into(), expected: "instance, module, class, dictionary or array".into() })
