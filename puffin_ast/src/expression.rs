@@ -1,4 +1,4 @@
-use crate::statement::{ReturnStatement, Statement};
+use crate::statement::{ExpressionStatement, ReturnStatement, Statement};
 use crate::token::{Token};
 
 #[derive(Debug)]
@@ -67,77 +67,107 @@ pub enum Expression {
     Index(IndexExpression),
 }
 
-impl From<LiteralExpression> for Expression {
-    fn from(m: LiteralExpression) -> Self {
-        Expression::Literal(m)
+impl Into<Expression> for LiteralExpression {
+    fn into(self) -> Expression {
+        Expression::Literal(self)
     }
 }
-impl<'a> TryInto<&'a LiteralExpression> for &'a Expression {
 
+impl<'a> TryFrom<&'a Expression> for &'a LiteralExpression {
     type Error = ();
-    fn try_into(self) -> Result<&'a LiteralExpression, ()> {
-        match self {
-            Expression::Literal(c) => Ok(c),
+    fn try_from(value: &'a Expression) -> Result<Self, Self::Error> {
+        match value {
+            Expression::Literal(l) => Ok(l),
             _ => Err(()),
         }
     }
 }
 
-impl From<BinaryExpression> for Expression {
-    fn from(m: BinaryExpression) -> Self {
-        Expression::Binary(m)
-    }
-}
-impl<'a> TryInto<&'a BinaryExpression> for &'a Expression {
-
+impl TryFrom<Expression> for LiteralExpression {
     type Error = ();
-    fn try_into(self) -> Result<&'a BinaryExpression, ()> {
-        match self {
-            Expression::Binary(c) => Ok(c),
+    fn try_from(value: Expression) -> Result<Self, Self::Error> {
+        match value {
+            Expression::Literal(l) => Ok(l),
             _ => Err(()),
         }
     }
 }
 
-impl From<UnaryExpression> for Expression {
-    fn from(m: UnaryExpression) -> Self {
-        Expression::Unary(m)
+impl Into<Expression> for BinaryExpression {
+    fn into(self) -> Expression {
+        Expression::Binary(self)
     }
 }
 
-impl From<FunctionCallExpression> for Expression {
-    fn from(m: FunctionCallExpression) -> Self {
-        Expression::FunctionCall(m)
+impl<'a> TryFrom<&'a Expression> for &'a BinaryExpression {
+    type Error = ();
+    fn try_from(value: &'a Expression) -> Result<Self, Self::Error> {
+        match value {
+            Expression::Binary(b) => Ok(b),
+            _ => Err(()),
+        }
     }
 }
 
-impl From<AccessorExpression> for Expression {
-    fn from(m: AccessorExpression) -> Self {
-        Expression::Accessor(m)
+impl Into<Expression> for UnaryExpression {
+    fn into(self) -> Expression {
+        Expression::Unary(self)
     }
 }
 
-impl From<ArrayExpression> for Expression {
-    fn from(m: ArrayExpression) -> Self {
-        Expression::Array(m)
+impl<'a> TryFrom<&'a Expression> for &'a FunctionCallExpression {
+    type Error = ();
+    fn try_from(value: &'a Expression) -> Result<Self, Self::Error> {
+        match value {
+            Expression::FunctionCall(b) => Ok(b),
+            _ => Err(()),
+        }
     }
 }
 
-impl From<DictionaryExpression> for Expression {
-    fn from(m: DictionaryExpression) -> Self {
-        Expression::Dictionary(m)
+impl Into<Expression> for FunctionCallExpression {
+    fn into(self) -> Expression {
+        Expression::FunctionCall(self)
     }
 }
 
-impl From<MatchExpression> for Expression {
-    fn from(m: MatchExpression) -> Self {
-        Expression::Match(m)
+impl Into<Expression> for AccessorExpression {
+    fn into(self) -> Expression {
+        Expression::Accessor(self)
     }
 }
 
-impl From<IndexExpression> for Expression {
-    fn from(m: IndexExpression) -> Self {
-        Expression::Index(m)
+impl Into<Expression> for ArrayExpression {
+    fn into(self) -> Expression {
+        Expression::Array(self)
+    }
+}
+
+impl<'a> TryFrom<&'a Expression> for &'a DictionaryExpression {
+    type Error = ();
+    fn try_from(value: &'a Expression) -> Result<Self, Self::Error> {
+        match value {
+            Expression::Dictionary(b) => Ok(b),
+            _ => Err(()),
+        }
+    }
+}
+
+impl Into<Expression> for DictionaryExpression {
+    fn into(self) -> Expression {
+        Expression::Dictionary(self)
+    }
+}
+
+impl Into<Expression> for MatchExpression {
+    fn into(self) -> Expression {
+        Expression::Match(self)
+    }
+}
+
+impl Into<Expression> for IndexExpression {
+    fn into(self) -> Expression {
+        Expression::Index(self)
     }
 }
 

@@ -1,5 +1,5 @@
 use crate::token::{Token};
-use crate::expression::{Expression};
+use crate::expression::{BinaryExpression, Expression};
 use crate::statement::{Statement};
 use crate::{VarType};
 use crate::markup::Markup;
@@ -22,6 +22,7 @@ pub struct VarDeclaration {
     pub name: Token,
     pub value: Box<Expression>,
     pub var_type: VarType,
+    pub exported: bool,
 }
 
 #[derive(Debug)]
@@ -56,11 +57,6 @@ pub struct UseDeclaration {
 }
 
 #[derive(Debug)]
-pub struct ExportDeclaration {
-    exported: Box<Declaration>,
-}
-
-#[derive(Debug)]
 pub struct Decorator {
     pub name: Token,
     pub parameters: Vec<Token>,
@@ -70,6 +66,7 @@ pub struct Decorator {
 pub struct EnumDeclaration {
     pub name: Token,
     pub members: Vec<Token>,
+    pub exported: bool,
 }
 
 #[derive(Debug)]
@@ -87,120 +84,114 @@ pub enum Declaration {
     Method(MethodDeclaration),
     Require(RequireDeclaration),
     Use(UseDeclaration),
-    Export(ExportDeclaration),
     Enum(EnumDeclaration),
     Error(ErrorDeclaration),
 }
-
-impl TryInto<ComponentDeclaration> for Declaration {
+impl TryFrom<Declaration> for ComponentDeclaration {
     type Error = ();
-    fn try_into(self) -> Result<ComponentDeclaration, ()> {
-        match self {
+    fn try_from(value: Declaration) -> Result<Self, Self::Error> {
+        match value {
             Declaration::Component(c) => Ok(c),
             _ => Err(()),
         }
     }
 }
 
-impl<'a> TryInto<&'a ComponentDeclaration> for &'a Declaration {
-
+impl TryFrom<Declaration> for VarDeclaration {
     type Error = ();
-    fn try_into(self) -> Result<&'a ComponentDeclaration, ()> {
-        match self {
-            Declaration::Component(c) => Ok(c),
+    fn try_from(value: Declaration) -> Result<Self, Self::Error> {
+        match value {
+            Declaration::Var(v) => Ok(v),
             _ => Err(()),
         }
     }
 }
 
-impl TryInto<VarDeclaration> for Declaration {
+impl TryFrom<Declaration> for LayoutDeclaration {
     type Error = ();
-    fn try_into(self) -> Result<VarDeclaration, ()> {
-        match self {
-            Declaration::Var(c) => Ok(c),
+    fn try_from(value: Declaration) -> Result<Self, Self::Error> {
+        match value {
+            Declaration::Layout(l) => Ok(l),
             _ => Err(()),
         }
     }
 }
 
-impl TryInto<LayoutDeclaration> for Declaration {
+impl TryFrom<Declaration> for SignalDeclaration {
     type Error = ();
-    fn try_into(self) -> Result<LayoutDeclaration, ()> {
-        match self {
-            Declaration::Layout(c) => Ok(c),
+    fn try_from(value: Declaration) -> Result<Self, Self::Error> {
+        match value {
+            Declaration::Signal(s) => Ok(s),
             _ => Err(()),
         }
     }
 }
-impl TryInto<SignalDeclaration> for Declaration {
-    type Error = ();
-    fn try_into(self) -> Result<SignalDeclaration, ()> {
-        match self {
-            Declaration::Signal(c) => Ok(c),
-            _ => Err(()),
-        }
-    }
-}
-impl TryInto<MethodDeclaration> for Declaration {
-    type Error = ();
-    fn try_into(self) -> Result<MethodDeclaration, ()> {
-        match self {
-            Declaration::Method(c) => Ok(c),
-            _ => Err(()),
-        }
-    }
-}
-impl<'a> TryInto<&'a MethodDeclaration> for &'a Declaration {
 
+impl TryFrom<Declaration> for MethodDeclaration {
     type Error = ();
-    fn try_into(self) -> Result<&'a MethodDeclaration, ()> {
-        match self {
-            Declaration::Method(c) => Ok(c),
+    fn try_from(value: Declaration) -> Result<Self, Self::Error> {
+        match value {
+            Declaration::Method(m) => Ok(m),
             _ => Err(()),
         }
     }
 }
-impl TryInto<RequireDeclaration> for Declaration {
+
+impl<'a> TryFrom<&'a Declaration> for &'a MethodDeclaration {
     type Error = ();
-    fn try_into(self) -> Result<RequireDeclaration, ()> {
-        match self {
-            Declaration::Require(c) => Ok(c),
+    fn try_from(value: &'a Declaration) -> Result<Self, Self::Error> {
+        match value {
+            Declaration::Method(m) => Ok(m),
             _ => Err(()),
         }
     }
 }
-impl TryInto<UseDeclaration> for Declaration {
+
+impl TryFrom<Declaration> for RequireDeclaration {
     type Error = ();
-    fn try_into(self) -> Result<UseDeclaration, ()> {
-        match self {
-            Declaration::Use(c) => Ok(c),
+    fn try_from(value: Declaration) -> Result<Self, Self::Error> {
+        match value {
+            Declaration::Require(r) => Ok(r),
             _ => Err(()),
         }
     }
 }
-impl TryInto<ExportDeclaration> for Declaration {
+
+impl TryFrom<Declaration> for UseDeclaration {
     type Error = ();
-    fn try_into(self) -> Result<ExportDeclaration, ()> {
-        match self {
-            Declaration::Export(c) => Ok(c),
+    fn try_from(value: Declaration) -> Result<Self, Self::Error> {
+        match value {
+            Declaration::Use(u) => Ok(u),
             _ => Err(()),
         }
     }
 }
-impl TryInto<EnumDeclaration> for Declaration {
+
+impl TryFrom<Declaration> for EnumDeclaration {
     type Error = ();
-    fn try_into(self) -> Result<EnumDeclaration, ()> {
-        match self {
-            Declaration::Enum(c) => Ok(c),
+    fn try_from(value: Declaration) -> Result<Self, Self::Error> {
+        match value {
+            Declaration::Enum(e) => Ok(e),
             _ => Err(()),
         }
     }
 }
-impl TryInto<ErrorDeclaration> for Declaration {
+
+impl TryFrom<Declaration> for ErrorDeclaration {
     type Error = ();
-    fn try_into(self) -> Result<ErrorDeclaration, ()> {
-        match self {
-            Declaration::Error(c) => Ok(c),
+    fn try_from(value: Declaration) -> Result<Self, Self::Error> {
+        match value {
+            Declaration::Error(e) => Ok(e),
+            _ => Err(()),
+        }
+    }
+}
+
+impl<'a> TryFrom<&'a Declaration> for &'a ErrorDeclaration {
+    type Error = ();
+    fn try_from(value: &'a Declaration) -> Result<Self, Self::Error> {
+        match value {
+            Declaration::Error(e) => Ok(e),
             _ => Err(()),
         }
     }
@@ -263,11 +254,21 @@ impl ConstructorDeclaration {
     }
 }
 impl VarDeclaration {
-    pub fn new(name: Token, value: Expression, var_type: VarType) -> Self {
+    pub fn new_const(name: Token, value: Expression, exported: bool) -> Self {
         Self {
             name,
             value: Box::new(value),
-            var_type,
+            var_type: VarType::Const,
+            exported,
+        }
+    }
+
+    pub fn new_let(name: Token, value: Expression, exported: bool) -> Self {
+        Self {
+            name,
+            value: Box::new(value),
+            var_type: VarType::Let,
+            exported,
         }
     }
 }
@@ -310,75 +311,82 @@ impl MethodDeclaration {
     }
 }
 
-impl ExportDeclaration {
-    pub fn new(exported: Declaration) -> Self {
-        Self {
-            exported: Box::new(exported),
-        }
-    }
-}
-
 impl EnumDeclaration {
-    pub fn new(name: Token, members: Vec<Token>) -> Self {
+    pub fn new(name: Token, members: Vec<Token>, exported: bool) -> Self {
         Self {
             name,
             members,
+            exported,
         }
     }
 }
 
-impl From<ErrorDeclaration> for Declaration {
-    fn from(value: ErrorDeclaration) -> Self {
-        Declaration::Error(value)
+impl Into<Declaration> for ErrorDeclaration {
+    fn into(self) -> Declaration {
+        Declaration::Error(self)
     }
 }
-impl From<ComponentDeclaration> for Declaration {
-    fn from(value: ComponentDeclaration) -> Self {
-        Declaration::Component(value)
+
+impl Into<Declaration> for ComponentDeclaration {
+    fn into(self) -> Declaration {
+        Declaration::Component(self)
     }
 }
-impl From<ConstructorDeclaration> for Declaration {
-    fn from(value: ConstructorDeclaration) -> Self {
-        Declaration::Constructor(value)
+
+impl Into<Declaration> for ConstructorDeclaration {
+    fn into(self) -> Declaration {
+        Declaration::Constructor(self)
     }
 }
-impl From<VarDeclaration> for Declaration {
-    fn from(value: VarDeclaration) -> Self {
-        Declaration::Var(value)
+
+impl<'a> TryFrom<&'a Declaration> for &'a VarDeclaration {
+    type Error = ();
+    fn try_from(value: &'a Declaration) -> Result<Self, Self::Error> {
+        match value {
+            Declaration::Var(b) => Ok(b),
+            _ => Err(()),
+        }
     }
 }
-impl From<LayoutDeclaration> for Declaration {
-    fn from(value: LayoutDeclaration) -> Self {
-        Declaration::Layout(value)
+
+impl Into<Declaration> for VarDeclaration {
+    fn into(self) -> Declaration {
+        Declaration::Var(self)
     }
 }
-impl From<SignalDeclaration> for Declaration {
-    fn from(value: SignalDeclaration) -> Self {
-        Declaration::Signal(value)
+
+impl Into<Declaration> for LayoutDeclaration {
+    fn into(self) -> Declaration {
+        Declaration::Layout(self)
     }
 }
-impl From<MethodDeclaration> for Declaration {
-    fn from(value: MethodDeclaration) -> Self {
-        Declaration::Method(value)
+
+impl Into<Declaration> for SignalDeclaration {
+    fn into(self) -> Declaration {
+        Declaration::Signal(self)
     }
 }
-impl From<RequireDeclaration> for Declaration {
-    fn from(value: RequireDeclaration) -> Self {
-        Declaration::Require(value)
+
+impl Into<Declaration> for MethodDeclaration {
+    fn into(self) -> Declaration {
+        Declaration::Method(self)
     }
 }
-impl From<UseDeclaration> for Declaration {
-    fn from(value: UseDeclaration) -> Self {
-        Declaration::Use(value)
+
+impl Into<Declaration> for RequireDeclaration {
+    fn into(self) -> Declaration {
+        Declaration::Require(self)
     }
 }
-impl From<ExportDeclaration> for Declaration {
-    fn from(value: ExportDeclaration) -> Self {
-        Declaration::Export(value)
+
+impl Into<Declaration> for UseDeclaration {
+    fn into(self) -> Declaration {
+        Declaration::Use(self)
     }
 }
-impl From<EnumDeclaration> for Declaration {
-    fn from(value: EnumDeclaration) -> Self {
-        Declaration::Enum(value)
+
+impl Into<Declaration> for EnumDeclaration {
+    fn into(self) -> Declaration {
+        Declaration::Enum(self)
     }
 }
