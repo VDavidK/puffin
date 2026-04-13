@@ -342,6 +342,7 @@ impl<'a> Compiler<'a> {
                 }
                 self.compile_expression(&call.callee)?;
                 self.chunk.push_op(OpCode::Call);
+                self.chunk.push_u8(call.arguments.len() as u8);
             }
             Expression::Accessor(accessor) => {
                 let name = self.token_to_constant(&accessor.field)?;
@@ -373,16 +374,19 @@ impl<'a> Compiler<'a> {
     fn compile_markup(&mut self, markup: &Markup) -> Result<(), CompileError> {
         match markup {
             Markup::Component(component) => {
+                let mut arg_count = 0;
                 if let Some(string) = &component.string_literal {
                     let constant = self.token_to_constant(string)?;
                     self.chunk.push_op(OpCode::Constant);
                     self.chunk.push_constant_offset(constant);
+                    arg_count += 1;
                 }
 
                 let global = self.token_to_constant(&component.name)?;
                 self.chunk.push_op(OpCode::GetGlobal);
                 self.chunk.push_constant_offset(global);
                 self.chunk.push_op(OpCode::Call);
+                self.chunk.push_u8(arg_count);
                 self.chunk.push_op(OpCode::Pop);
             }
             // Markup::Layout(_) => {}

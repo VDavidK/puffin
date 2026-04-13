@@ -213,7 +213,7 @@ impl<'a> ChunkFormatter<'a> {
                     // Branching
                     OpCode::Jump => self.push_with_instruction_offset("jmp"),
                     OpCode::JumpIf => self.push_with_instruction_offset("jmpi"),
-                    OpCode::Call => self.push("call"),
+                    OpCode::Call => self.push_with_u8("call"),
                     OpCode::Return  => self.push("return"),
 
                     // Terminal
@@ -303,6 +303,15 @@ impl<'a> ChunkFormatter<'a> {
         if let Some(offset) = self.chunk.read_instruction_offset(self.idx + 1) {
             self.push_line(format!("{name} [0x{offset:x}]"));
             self.idx += size_of::<InstructionOffset>();
+        } else {
+            self.push_line(format!("{name} [MALFORMED]"));
+        }
+    }
+
+    fn push_with_u8(&mut self, name: &'static str) {
+        if let Some(val) = self.chunk.read_u8(self.idx + 1) {
+            self.push_line(format!("{name} [{val:x}]"));
+            self.idx += size_of::<u8>();
         } else {
             self.push_line(format!("{name} [MALFORMED]"));
         }

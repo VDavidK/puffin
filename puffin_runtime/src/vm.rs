@@ -117,7 +117,7 @@ impl<'a> Vm<'a> {
 
                 if let Some(constructor) = class.borrow().get_constructor() {
                     self.runtime.push_value(instance.clone());
-                    self.runtime.call(constructor.clone().take_function()?)?;
+                    self.runtime.call_fn(constructor.clone().take_function()?)?;
                 }
 
                 self.runtime.push_value(instance);
@@ -296,32 +296,10 @@ impl<'a> Vm<'a> {
             },
 
             OpCode::Call => {
+                let num_args = self.fetch_u8()? as usize;
                 let func = self.runtime.pop_expecting()?;
-
-                match func {
-                    Value::NativeFunction(func) => {
-                        let callable = &func.fun;
-                        let local_count = self.runtime.local_count()? - func.arity;
-                        let value = callable(self.runtime)?;
-                        self.runtime.pop_until(local_count)?;
-                        self.runtime.push_value(value);
-                    },
-                    Value::Function(func) => {
-                        let ret_value = self.runtime.call(func)?;
-                        self.runtime.push_value(ret_value);
-                    },
-                    Value::Class(cls) => {
-                        let instance = new_instance(cls.clone());
-
-                        if let Some(constructor) = cls.borrow().get_constructor() {
-                            self.runtime.push_value(instance.clone());
-                            self.runtime.call(constructor.clone().take_function()?)?;
-                        }
-
-                        self.runtime.push_value(instance);
-                    },
-                    v => return Err(RuntimeError::IncorrectType { ty: v.type_name().to_owned(), expected: "function".to_owned() }),
-                }
+                let ret_value = self.runtime.call_val(func, num_args)?;
+                self.runtime.push_value(ret_value);
             },
 
             OpCode::Return => {
@@ -360,6 +338,12 @@ impl<'a> Vm<'a> {
 
         OpCode::try_from_primitive(byte)
             .map_err(|_| RuntimeError::UnrecognizedOpCode { op: byte, pc })
+    }
+
+    pub fn fetch_u8(&mut self) -> Result<u8, RuntimeError> {
+        let byte = self.read_u8()?;
+        self.runtime.move_pc(size_of::<u8>());
+        Ok(byte)
     }
 
     pub fn fetch_constant_offset(&mut self) -> Result<ConstantOffset, RuntimeError> {

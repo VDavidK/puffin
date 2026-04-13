@@ -69,7 +69,7 @@ impl Runtime {
 
         if let Some(constructor) = component.borrow().get_constructor() {
             self.push_value(instance.clone());
-            self.call(constructor.clone().take_function()?)?;
+            self.call_fn(constructor.clone().take_function()?)?;
         }
 
         loop {
@@ -87,7 +87,7 @@ impl Runtime {
                     self.push_value(value);
                 },
                 Value::Function(func) => {
-                    let ret_value = self.call(func)?;
+                    let ret_value = self.call_fn(func)?;
                     self.push_value(ret_value);
                 },
                 _ => panic!(),
@@ -98,7 +98,49 @@ impl Runtime {
         }
     }
 
-    pub fn call(&mut self, func: FunctionType) -> Result<Value, RuntimeError> {
+    pub fn call(&mut self, value: Value, args: &[Value]) -> Result<Value, RuntimeError> {
+        for arg in args {
+            self.push_value(arg.to_owned());
+        }
+
+        self.call_val(value, args.len())
+    }
+
+    pub fn call_val(&mut self, value: Value, num_args: usize) -> Result<Value, RuntimeError> {
+        match value {
+            Value::NativeFunction(func) => {
+                self.match_function_param_count(func.arity, num_args);
+                let callable = &func.fun;
+                let local_count = self.local_count()? - func.arity;
+                let value = callable(self)?;
+                self.pop_until(local_count)?;
+                Ok(value)
+            },
+            Value::Function(func) => {
+                self.match_function_param_count(func.arity, num_args);
+                let ret_value = self.call_fn(func)?;
+                Ok(ret_value)
+            },
+            Value::Class(cls) => {
+                let instance = new_instance(cls.clone());
+
+                if let Some(constructor) = cls.borrow().get_constructor() {
+                    let func = constructor.clone().take_function()?;
+                    self.match_function_param_count(func.arity, num_args);
+                    self.push_value(instance.clone());
+                    self.call_fn(func)?;
+                    self.pop_value();
+                }
+
+                Ok(Value::Instance(instance))
+            },
+            v => Err(RuntimeError::IncorrectType { ty: v.type_name().to_owned(), expected: "function".to_owned() }),
+        }
+    }
+
+
+
+    pub fn call_fn(&mut self, func: FunctionType) -> Result<Value, RuntimeError> {
         log::debug!("Executing function '{}'", func.identifier);
 
         self.push_call_frame(func.chunk.clone(), func.arity);
@@ -107,6 +149,21 @@ impl Runtime {
             .run()?;
 
         Ok(ret_value)
+    }
+
+    fn match_function_param_count(&mut self, arity: usize, passed_in: usize) {
+        let arg_diff = passed_in as i32 - arity as i32;
+
+        if arg_diff < 0 {
+            for _ in 0..-arg_diff {
+                self.push_value(Value::Null);
+            }
+        } else {
+            for _ in 0..arg_diff {
+                self.pop_value();
+            }
+        }
+
     }
 
     pub fn push_node(&mut self, node: impl Into<Node>) {
