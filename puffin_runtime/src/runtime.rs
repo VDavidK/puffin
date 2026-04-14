@@ -125,10 +125,9 @@ impl Runtime {
                 let instance = new_instance(cls.clone());
 
                 if let Some(constructor) = cls.borrow().get_constructor() {
-                    let func = constructor.clone().take_function()?;
-                    self.match_function_param_count(func.arity, num_args);
+                    let func = constructor.clone();
                     self.push_value(instance.clone());
-                    self.call_fn(func)?;
+                    self.call_val(func, 1)?;
                     self.pop_value();
                 }
 
