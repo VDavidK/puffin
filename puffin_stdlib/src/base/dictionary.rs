@@ -26,7 +26,7 @@ pub fn define_dictionary_class(runtime: &mut Runtime) {
     let mut cls = Class::new("Dictionary");
     cls.set_field("dict", NativeValue::from(NativeDictionary(HashMap::new())));
 
-    let get = NativeFunction::new(|runtime| {
+    let get = NativeFunction::new(|runtime, argc| {
         let instance = runtime.get_local(-2)?.clone().take_instance()?;
         let key = runtime.get_local(-1)?.clone();
         let dict = instance.borrow_mut()
@@ -40,9 +40,9 @@ pub fn define_dictionary_class(runtime: &mut Runtime) {
             .cloned()
             .unwrap_or(Value::Null);
         Ok(val)
-    }, 2);
+    });
 
-    let set = NativeFunction::new(|runtime| {
+    let set = NativeFunction::new(|runtime, argc| {
         let instance = runtime.get_local(-3)?.clone().take_instance()?;
         let key = runtime.get_local(-2)?.clone();
         let val = runtime.get_local(-1)?.clone();
@@ -55,9 +55,9 @@ pub fn define_dictionary_class(runtime: &mut Runtime) {
             .expect("Invalid self parameter");
         dict.0.insert(key, val);
         Ok(Value::Null)
-    }, 3);
+    });
 
-    let len = NativeFunction::new(|runtime| {
+    let len = NativeFunction::new(|runtime, argc| {
         let instance = runtime.get_local(-1)?.clone().take_instance()?;
         let arr = instance.borrow_mut()
             .get_field("arr")
@@ -70,9 +70,9 @@ pub fn define_dictionary_class(runtime: &mut Runtime) {
             .len()
             .into();
         Ok(len)
-    }, 1);
+    });
 
-    let erase = NativeFunction::new(|runtime| {
+    let erase = NativeFunction::new(|runtime, argc| {
         let instance = runtime.get_local(-2)?.clone().take_instance()?;
         let key = runtime.get_local(-1)?.clone();
         let dict = instance.borrow_mut()
@@ -84,9 +84,9 @@ pub fn define_dictionary_class(runtime: &mut Runtime) {
             .expect("Invalid self parameter");
         dict.0.remove(&key);
         Ok(Value::Null)
-    }, 2);
+    });
 
-    let has = NativeFunction::new(|runtime| {
+    let has = NativeFunction::new(|runtime, argc| {
         let instance = runtime.get_local(-2)?.clone().take_instance()?;
         let key = runtime.get_local(-1)?.clone();
         let dict = instance.borrow_mut()
@@ -97,9 +97,9 @@ pub fn define_dictionary_class(runtime: &mut Runtime) {
         let dict = dict.get_mut::<NativeDictionary>()
             .expect("Invalid self parameter");
         Ok(Value::Bool(dict.0.contains_key(&key)))
-    }, 2);
+    });
 
-    let keys = NativeFunction::new(|runtime| {
+    let keys = NativeFunction::new(|runtime, argc| {
         let instance = runtime.get_local(-1)?.clone().take_instance()?;
         let dict = instance.borrow_mut()
             .get_field("dict")
@@ -110,9 +110,9 @@ pub fn define_dictionary_class(runtime: &mut Runtime) {
             .expect("Invalid self parameter");
         let val = NativeValue::new(NativeVector(dict.0.keys().into_iter().cloned().collect::<Vec<Value>>()));
         Ok(val.into())
-    }, 1);
+    });
 
-    let values = NativeFunction::new(|runtime| {
+    let values = NativeFunction::new(|runtime, argc| {
         let instance = runtime.get_local(-1)?.clone().take_instance()?;
         let dict = instance.borrow_mut()
             .get_field("dict")
@@ -123,7 +123,7 @@ pub fn define_dictionary_class(runtime: &mut Runtime) {
             .expect("Invalid self parameter");
         let val = NativeValue::new(NativeVector(dict.0.values().into_iter().cloned().collect::<Vec<Value>>()));
         Ok(val.into())
-    }, 1);
+    });
 
     cls.set_method("get", get);
     cls.set_method("set", set);

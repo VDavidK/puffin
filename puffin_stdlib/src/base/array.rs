@@ -1,3 +1,4 @@
+use puffin_runtime::chunk::LocalOffset;
 use puffin_runtime::runtime::Runtime;
 use puffin_runtime::value::{Class, NativeFunction, NativeValue, NativeValueTrait, Value};
 
@@ -25,7 +26,23 @@ pub fn define_array_class(runtime: &mut Runtime) {
     let mut cls = Class::new("Array");
     cls.set_field("arr", NativeValue::from(NativeVector(vec![])));
 
-    let get = NativeFunction::new(|runtime| {
+    let new = NativeFunction::new(|runtime, argc| {
+        let instance = runtime.get_local(-1)?.clone().take_instance()?;
+        let arr = instance.borrow_mut()
+            .get_field("arr")
+            .expect("Called without self parameter")
+            .clone()
+            .take_native_value()?;
+        let mut arr = arr.get_mut::<NativeVector>()
+            .expect("Invalid self parameter");
+        for i in -1 - (argc as isize)..-1 {
+            let arg = runtime.get_local(i as LocalOffset)?;
+            arr.0.push(arg.clone());
+        }
+        Ok(Value::Null)
+    });
+
+    let get = NativeFunction::new(|runtime, argc| {
         let instance = runtime.get_local(-2)?.clone().take_instance()?;
         let idx = runtime.get_local(-1)?.clone().take_int()?;
         let arr = instance.borrow_mut()
@@ -39,9 +56,9 @@ pub fn define_array_class(runtime: &mut Runtime) {
             .cloned()
             .unwrap_or(Value::Null);
         Ok(val)
-    }, 2);
+    });
 
-    let push = NativeFunction::new(|runtime| {
+    let push = NativeFunction::new(|runtime, argc| {
         let instance = runtime.get_local(-2)?.clone().take_instance()?;
         let value = runtime.get_local(-1)?.clone();
         let arr = instance.borrow_mut()
@@ -53,9 +70,9 @@ pub fn define_array_class(runtime: &mut Runtime) {
             .expect("Invalid self parameter");
         arr.0.push(value);
         Ok(Value::Null)
-    }, 2);
+    });
 
-    let pop = NativeFunction::new(|runtime| {
+    let pop = NativeFunction::new(|runtime, argc| {
         let instance = runtime.get_local(-1)?.clone().take_instance()?;
         let arr = instance.borrow_mut()
             .get_field("arr")
@@ -66,8 +83,9 @@ pub fn define_array_class(runtime: &mut Runtime) {
             .expect("Invalid self parameter");
         let val = arr.0.pop().unwrap_or(Value::Null);
         Ok(val)
-    }, 1);
-    let resize = NativeFunction::new(|runtime| {
+    });
+
+    let resize = NativeFunction::new(|runtime, argc| {
         let size = runtime.get_local(-1)?.clone().take_int()?;
         let instance = runtime.get_local(-2)?.clone().take_instance()?;
         let arr = instance.borrow_mut()
@@ -79,9 +97,9 @@ pub fn define_array_class(runtime: &mut Runtime) {
             .expect("Invalid self parameter");
         arr.0.resize(size as usize, Value::Null);
         Ok(Value::Null)
-    }, 2);
+    });
 
-    let push_front = NativeFunction::new(|runtime| {
+    let push_front = NativeFunction::new(|runtime, argc| {
         let instance = runtime.get_local(-2)?.clone().take_instance()?;
         let value = runtime.get_local(-1)?.clone();
         let arr = instance.borrow_mut()
@@ -93,9 +111,9 @@ pub fn define_array_class(runtime: &mut Runtime) {
             .expect("Invalid self parameter");
         arr.0.insert(0, value);
         Ok(Value::Null)
-    }, 2);
+    });
 
-    let pop_front = NativeFunction::new(|runtime| {
+    let pop_front = NativeFunction::new(|runtime, argc| {
         let instance = runtime.get_local(-1)?.clone().take_instance()?;
         let arr = instance.borrow_mut()
             .get_field("arr")
@@ -110,10 +128,10 @@ pub fn define_array_class(runtime: &mut Runtime) {
             let value = arr.0.remove(0);
             Ok(value)
         }
-    }, 1);
+    });
     cls.set_method("pop_front", pop_front);
 
-    let len = NativeFunction::new(|runtime| {
+    let len = NativeFunction::new(|runtime, argc| {
         let instance = runtime.get_local(-1)?.clone().take_instance()?;
         let arr = instance.borrow_mut()
             .get_field("arr")
@@ -126,9 +144,9 @@ pub fn define_array_class(runtime: &mut Runtime) {
             .len()
             .into();
         Ok(len)
-    }, 1);
+    });
 
-    let size = NativeFunction::new(|runtime| {
+    let size = NativeFunction::new(|runtime, argc| {
         let instance = runtime.get_local(-1)?.clone().take_instance()?;
         let arr = instance.borrow_mut()
             .get_field("arr")
@@ -141,8 +159,9 @@ pub fn define_array_class(runtime: &mut Runtime) {
             .capacity()
             .into();
         Ok(capacity)
-    }, 1);
+    });
 
+    cls.set_constructor(new);
     cls.set_method("get", get);
     cls.set_method("push", push);
     cls.set_method("pop", pop);

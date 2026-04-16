@@ -2,7 +2,7 @@ use crate::{runtime::Runtime, value::{NativeFunction, Value}, RuntimeError};
 use crate::ui::TextNode;
 
 pub fn define_print_function(runtime: &mut Runtime) {
-    runtime.add_global("print", NativeFunction::new(|runtime| {
+    runtime.add_global("print", NativeFunction::new(|runtime, argc| {
         // Get value
         let value = runtime.get_local(-1)?;
 
@@ -15,11 +15,11 @@ pub fn define_print_function(runtime: &mut Runtime) {
 
         // Return null
         Ok(Value::Null)
-    }, 1));
+    }));
 }
 
 pub fn define_text_element(runtime: &mut Runtime) {
-    runtime.add_global("text", NativeFunction::new(|runtime| {
+    runtime.add_global("text", NativeFunction::new(|runtime, argc| {
         let text = runtime.get_local(-1)?;
 
         runtime.push_node(TextNode {
@@ -27,5 +27,5 @@ pub fn define_text_element(runtime: &mut Runtime) {
         });
 
         Ok(Value::Null)
-    }, 1));
+    }));
 }

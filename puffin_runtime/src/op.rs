@@ -147,7 +147,7 @@ pub enum OpCode {
     // Expected stack: TOP > [val: any]
     JumpIf,
 
-    // : call
+    // : call [arity:1B]
     // Pops the top function off the stack and calls it
     // Takes ownership of the arguments passed in.
     // Expected stack: TOP > [val: function]

@@ -81,9 +81,12 @@ impl Runtime {
             match main {
                 Value::NativeFunction(func) => {
                     let callable = &func.fun;
-                    let local_count = self.local_count()? - func.arity;
-                    let value = callable(self)?;
-                    self.pop_until(local_count)?;
+                    let local_count = self.local_count()?;
+                    let value = callable(self, 0)?;
+                    for _ in 0..local_count {
+                        self.pop_value();
+                    }
+                    //self.pop_until(local_count)?;
                     self.push_value(value);
                 },
                 Value::Function(func) => {
@@ -109,10 +112,10 @@ impl Runtime {
     pub fn call_val(&mut self, value: Value, num_args: usize) -> Result<Value, RuntimeError> {
         match value {
             Value::NativeFunction(func) => {
-                self.match_function_param_count(func.arity, num_args);
+                //self.match_function_param_count(func.arity, num_args);
                 let callable = &func.fun;
-                let local_count = self.local_count()? - func.arity;
-                let value = callable(self)?;
+                let local_count = self.local_count()? - num_args;
+                let value = callable(self, num_args)?;
                 self.pop_until(local_count)?;
                 Ok(value)
             },
@@ -127,7 +130,7 @@ impl Runtime {
                 if let Some(constructor) = cls.borrow().get_constructor() {
                     let func = constructor.clone();
                     self.push_value(instance.clone());
-                    self.call_val(func, 1)?;
+                    self.call_val(func, num_args)?;
                     self.pop_value();
                 }
 

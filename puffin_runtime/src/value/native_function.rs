@@ -4,25 +4,23 @@ use crate::runtime::Runtime;
 use crate::RuntimeError;
 use crate::value::{Value, NativeFunctionType};
 
-pub type NativeCallable = fn(runtime: &mut Runtime) -> Result<Value, RuntimeError>;
+pub type NativeCallable = fn(runtime: &mut Runtime, argc: usize) -> Result<Value, RuntimeError>;
 
 #[derive(Debug)]
 pub struct NativeFunction {
     pub fun: NativeCallable,
-    pub arity: usize,
 }
 
 impl Display for NativeFunction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_fmt(format_args!("<native_function({})>", self.arity))
+        f.write_fmt(format_args!("<native_function()>"))
     }
 }
 
 impl NativeFunction {
-    pub fn new(callable: NativeCallable, num_args: usize) -> Self {
+    pub fn new(callable: NativeCallable) -> Self {
         Self {
             fun: callable,
-            arity: num_args,
         }
     }
 }
