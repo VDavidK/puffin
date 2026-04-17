@@ -219,11 +219,6 @@ impl<'a> PuffinParser<'a> {
         Ok(ast)
     }
 
-    /// declaration ::= \<var_decl\><br>
-    /// declaration ::= \<signal_decl\><br>
-    /// declaration ::= \<decorated_method_decl\><br>
-    /// declaration ::= \<method_decl\><br>
-    /// declaration ::= \<constructor_decl\>
     fn declaration(&mut self) -> Result<Declaration, ParserError> {
         let decl  = match self.peek()?.ty {
             TokenType::KwLet | TokenType::KwConst => self.var_decl(false),
@@ -305,7 +300,6 @@ impl<'a> PuffinParser<'a> {
         Ok(UseDeclaration::new(expr).into())
     }
 
-    /// \<component\> ::= "component", \<identifier\>, \<parameters\>, "{", {\<declaration\>}, "}"
     fn component_decl(&mut self) -> Result<Declaration, ParserError> {
         self.expect(TokenType::KwComponent)?;
         let name = self.expect(TokenType::Identifier)?;
@@ -325,7 +319,6 @@ impl<'a> PuffinParser<'a> {
         Ok(ComponentDeclaration::new(name, decls).into())
     }
 
-    /// \<component\> ::= "component", \<identifier\>, \<parameters\>, "{", {\<declaration\>}, "}"
     fn constructor_decl(&mut self) -> Result<Declaration, ParserError> {
         self.expect(TokenType::KwNew)?;
         let params = self.parameters()?;
@@ -333,7 +326,6 @@ impl<'a> PuffinParser<'a> {
         Ok(ConstructorDeclaration::new(params, block).into())
     }
 
-    /// \<decorator\> ::= "@", \<identifier\>, \<parameters\>
     fn decorator(&mut self) -> Result<Decorator, ParserError> {
         self.expect(TokenType::At)?;
         let decorator_name = self.expect(TokenType::Identifier)?;
@@ -349,7 +341,6 @@ impl<'a> PuffinParser<'a> {
         Ok(MethodDeclaration::new(name, params, block).into())
     }
 
-    /// \<parameters\> ::= "(", {\<identifier\>}, ")"
     fn parameters(&mut self) -> Result<Vec<Token>, ParserError> {
         let params = if self.peek_is(TokenType::LeftParen)? {
             self.next_token()?;
@@ -362,7 +353,6 @@ impl<'a> PuffinParser<'a> {
         Ok(params)
     }
 
-    /// \<var_decl\> ::= "const" | "let", \<identifier\>, "=", \<expression\>, ";"
     fn var_decl(&mut self, exported: bool) -> Result<Declaration, ParserError> {
         let ty = self.var_type()?;
         let name = self
@@ -377,7 +367,6 @@ impl<'a> PuffinParser<'a> {
         Ok(decl)
     }
 
-    /// \<signal\> ::= "signal", \<identifier\>, \<parameters\>, ";"
     fn signal_decl(&mut self) -> Result<Declaration, ParserError> {
         self.expect(TokenType::KwSignal)?;
         let pos = self.pos();
@@ -388,7 +377,6 @@ impl<'a> PuffinParser<'a> {
         Ok(decl)
     }
 
-    /// <name_list> ::= \<identifier\>, {",", \<identifier\>}
     fn name_list(&mut self) -> Result<Vec<Token>, ParserError> {
         let mut names: Vec<Token> = vec![];
         while self.peek_is(TokenType::Identifier)? {
@@ -403,8 +391,6 @@ impl<'a> PuffinParser<'a> {
         Ok(names)
     }
 
-    /// \<statement\> ::= \<if_statement\><br>
-    /// \<statement\> ::= \<expr_call_or_assign_statement\>
     fn statement(&mut self) -> Result<Statement, ParserError> {
         let stat = match self.peek()?.ty {
             TokenType::KwIf => self.if_stat(),
@@ -466,12 +452,12 @@ impl<'a> PuffinParser<'a> {
         while !self.peek_is(TokenType::RightBrace)? {
             if self.peek_is(TokenType::KwDefault)? {
                 self.next_token()?;
-                self.expect(TokenType::Arrow)?;
                 let default_name = if self.peek_is(TokenType::Identifier)? {
                     Some(self.next_token()?)
                 } else {
                     None
                 };
+                self.expect(TokenType::Arrow)?;
                 let stat = self.statement()?;
                 default_case = Some((default_name, stat));
                 break;
@@ -604,7 +590,6 @@ impl<'a> PuffinParser<'a> {
         Ok(ReturnStatement::new(expr).into())
     }
 
-    /// \<if_stat\> ::= "if", \<expression\>, "{", \<block\>, "}", {"else", \<if_stat}>}, \[\"else\", \<block\>\]
     fn if_stat(&mut self) -> Result<Statement, ParserError> {
         self.expect(TokenType::KwIf)?;
         let condition = self.expression()?;
@@ -745,8 +730,6 @@ impl<'a> PuffinParser<'a> {
         }
     }
 
-    /// <primary_exp> ::= (\<literal\> | \<paren_exp\>), \[\<call_exp\>\]<br>
-    /// <paren_exp> ::= "(", \<expression\>, ")"
     fn primary_expr(&mut self) -> Result<Expression, ParserError> {
         let tok = self.peek()?;
         let mut expr = match tok.ty {
@@ -832,7 +815,6 @@ impl<'a> PuffinParser<'a> {
         Ok(AccessorExpression::new(expr, field).into())
     }
 
-    /// <expr_list> ::= \<expression\>, {",", \<expression\>}
     fn expr_list(&mut self, delimiter: TokenType, separator: TokenType) -> Result<Vec<Expression>, ParserError> {
         let mut exprs = vec![];
         exprs.push(self.expression()?);
@@ -843,7 +825,6 @@ impl<'a> PuffinParser<'a> {
         Ok(exprs)
     }
 
-    /// \<block\> ::= {\<statement\>}
     fn block_stat(&mut self) -> Result<Statement, ParserError> {
         let mut stats = vec![];
         self.expect(TokenType::LeftBrace)?;
