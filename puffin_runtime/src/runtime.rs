@@ -2,12 +2,10 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 use ratatui::DefaultTerminal;
-use crate::baselibs::{define_print_function, define_text_element};
 use crate::chunk::LocalOffset;
 use crate::vm::Vm;
 use crate::{Chunk, RuntimeError, value::Value};
 use crate::ui::{LayoutDirection, LayoutNode, Node};
-use crate::ui::Node::Layout;
 use crate::value::{new_instance, FunctionType, InstanceType, Module};
 
 #[derive(Debug, Clone)]
@@ -39,9 +37,6 @@ impl Default for Runtime {
             term,
             node_stack: vec![],
         };
-
-        define_print_function(&mut runtime);
-        define_text_element(&mut runtime);
 
         runtime
     }
