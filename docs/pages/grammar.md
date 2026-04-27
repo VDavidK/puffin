@@ -16,7 +16,7 @@ declaration ::= var_decl |
                 enum_decl |
                 error_decl;
 
-var_decl := var_type, identifier, ";";
+var_decl ::= var_type, identifier, ";";
 
 signal_decl ::= "signal", identifier, parameters, ";";
 
