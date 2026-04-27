@@ -27,6 +27,7 @@ pub type ModuleType = Rc<RefCell<Module>>;
 pub type FunctionType = Rc<Function>;
 pub type NativeFunctionType = Rc<NativeFunction>;
 pub type NativeValueType = NativeValue;
+pub type ListType = Vec<Value>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Value {
@@ -37,6 +38,7 @@ pub enum Value {
     Function(FunctionType),
     Class(ClassType),
     Module(ModuleType),
+    List(ListType),
     Null,
 
     #[serde(skip)]
@@ -57,6 +59,7 @@ impl PartialEq for Value {
             (Self::Bool(l0), Self::Bool(r0)) => l0 == r0,
             (Self::String(l0), Self::String(r0)) => l0 == r0,
             (Self::Instance(l0), Self::Instance(r0)) => l0.as_ptr() == r0.as_ptr(),
+            (Self::List(l0), Self::List(r0)) => l0.as_ptr() == r0.as_ptr(),
             (Self::Function(l0), Self::Function(r0)) => Rc::as_ptr(l0) == Rc::as_ptr(r0),
             (Self::NativeFunction(l0), Self::NativeFunction(r0)) => Rc::as_ptr(l0) == Rc::as_ptr(r0),
             (Self::Class(l0), Self::Class(r0)) => Rc::as_ptr(l0) == Rc::as_ptr(r0),
@@ -149,6 +152,23 @@ impl<'a> From<&'a str> for Value {
     }
 }
 
+impl From<ListType> for Value {
+    fn from(value: ListType) -> Self {
+        Value::List(value)
+    }
+}
+
+impl TryFrom<Value> for ListType {
+    type Error = RuntimeError;
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        match value {
+            Value::List(v) => Ok(v),
+            _ => Err(RuntimeError::IncorrectType { ty: value.type_name().to_owned(), expected: "list".to_owned() }),
+        }
+    }
+}
+
 impl From<InstanceType> for Value {
     fn from(value: InstanceType) -> Self {
         Value::Instance(value)
@@ -210,8 +230,22 @@ impl Display for Value {
             Value::Class(v) => f.write_fmt(format_args!("{}", v.borrow())),
             Value::Module(v) => f.write_fmt(format_args!("{}", v.borrow())),
             Value::NativeValue(v) => f.write_fmt(format_args!("{}", v)),
+            Value::List(v) => f.write_fmt(format_args!("{}", ListDisplay(v))),
             Value::Null => f.write_fmt(format_args!("null")),
         }
+    }
+}
+
+struct ListDisplay<'a>(&'a ListType);
+
+impl<'a> Display for ListDisplay<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let inner = self.0.iter()
+            .map(Value::to_string)
+            .collect::<Vec<String>>()
+            .join(", ");
+
+        f.write_fmt(format_args!("[{}]", inner))
     }
 }
 
@@ -312,67 +346,28 @@ impl Value {
     }
 
     pub fn is_equal(&self, rhs: &Self) -> bool {
-        match self {
-            Value::Int(lhs) => match rhs {
-                Value::Int(rhs) => *lhs == *rhs,
-                Value::Float(rhs) => *lhs as FloatType == *rhs,
-                _ => false,
-            },
-            Value::Float(lhs) => match rhs {
-                Value::Int(rhs) => *lhs == *rhs as FloatType,
-                Value::Float(rhs) => *lhs == *rhs,
-                _ => false,
-            },
+        match (self, rhs) {
+            (Value::Int(lhs), Value::Int(rhs)) => *lhs == *rhs,
+            (Value::Int(lhs), Value::Float(rhs)) => *lhs as FloatType == *rhs,
+            (Value::Float(lhs), Value::Int(rhs)) => *lhs == *rhs as FloatType,
+            (Value::Float(lhs), Value::Float(rhs)) => *lhs == *rhs,
 
-            Value::Bool(lhs) => match rhs {
-                Value::Bool(rhs) => *lhs == *rhs,
+            (Value::Bool(lhs), Value::Bool(rhs)) => *lhs == *rhs,
+            (Value::String(lhs), Value::String(rhs)) => *lhs == *rhs,
+            (Value::NativeValue(lhs), Value::NativeValue(rhs)) => *lhs == *rhs,
 
-                _ => false,
-            },
+            (Value::Instance(lhs), Value::Instance(rhs)) => lhs.as_ptr() == rhs.as_ptr(),
+            (Value::List(lhs), Value::List(rhs)) => lhs.as_ptr() == rhs.as_ptr(),
 
-            Value::String(lhs) => match rhs {
-                Value::String(rhs) => *lhs == *rhs,
+            (Value::Function(lhs), Value::Function(rhs)) => Rc::as_ptr(lhs) == Rc::as_ptr(rhs),
+            (Value::NativeFunction(lhs), Value::NativeFunction(rhs)) => Rc::as_ptr(lhs) == Rc::as_ptr(rhs),
+            (Value::Class(lhs), Value::Class(rhs)) => Rc::as_ptr(lhs) == Rc::as_ptr(rhs),
+            (Value::Module(lhs), Value::Module(rhs)) => Rc::as_ptr(lhs) == Rc::as_ptr(rhs),
 
-                _ => false,
-            },
 
-            Value::Instance(lhs) => match rhs {
-                Value::Instance(rhs) => lhs.as_ptr() == rhs.as_ptr(),
+            (Value::Null, Value::Null) => true,
 
-                _ => false,
-            }
-
-            Value::Function(lhs) => match rhs {
-                Value::Function(rhs) => Rc::as_ptr(lhs) == Rc::as_ptr(rhs),
-
-                _ => false,
-            }
-
-            Value::NativeFunction(lhs) => match rhs {
-                Value::NativeFunction(rhs) => Rc::as_ptr(lhs) == Rc::as_ptr(rhs),
-
-                _ => false,
-            }
-
-            Value::Class(lhs) => match rhs {
-                Value::Class(rhs) => Rc::as_ptr(lhs) == Rc::as_ptr(rhs),
-
-                _ => false,
-            }
-
-            Value::Module(lhs) => match rhs {
-                Value::Module(rhs) => Rc::as_ptr(lhs) == Rc::as_ptr(rhs),
-
-                _ => false,
-            }
-
-            Value::NativeValue(lhs) => match rhs {
-                Value::NativeValue(rhs) => lhs == rhs,
-
-                _ => false,
-            }
-
-            Value::Null => matches!(rhs, Value::Null),
+            _ => false,
         }
     }
 
@@ -450,6 +445,7 @@ impl Value {
             Value::Class(_) => true,
             Value::Module(_) => true,
             Value::NativeValue(_) => true,
+            Value::List(_) => true,
             Value::Null => false,
         }
     }
@@ -466,6 +462,7 @@ impl Value {
             Value::Class(_) => "class",
             Value::Module(_) => "module",
             Value::NativeValue(_) => "native_value",
+            Value::List(_) => "list",
             Value::Null => "null",
         }
     }
@@ -508,5 +505,9 @@ impl Value {
 
     pub fn take_native_value(self) -> Result<NativeValueType, RuntimeError> {
         TryInto::<NativeValueType>::try_into(self)
+    }
+
+    pub fn take_list(self) -> Result<ListType, RuntimeError> {
+        TryInto::<ListType>::try_into(self)
     }
 }
