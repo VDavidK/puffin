@@ -120,6 +120,12 @@ pub struct ComponentNode {
     pub instance: InstanceType,
 }
 
+impl From<ComponentNode> for NodeType {
+    fn from(value: ComponentNode) -> Self {
+        Rc::new(RefCell::new(Node::Component(value)))
+    }
+}
+
 impl StatefulWidget for &ComponentNode {
     type State = Runtime;
 
