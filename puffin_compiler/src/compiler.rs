@@ -93,7 +93,7 @@ impl<'a> Compiler<'a> {
                     layout_compiler.scope.define_local(&arg.lexeme);
                 }
 
-                layout_compiler.compile_markup(layout.markup)?;
+                layout_compiler.compile_markup(&layout.markup)?;
                 layout_compiler.chunk.push_op(OpCode::Return);
 
                 let func = Function {

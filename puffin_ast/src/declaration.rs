@@ -27,8 +27,8 @@ pub struct VarDeclaration {
 
 #[derive(Debug)]
 pub struct LayoutDeclaration {
-    pub markup: Vec<Markup>,
     pub name: Option<Token>,
+    pub markup: Box<Markup>,
     pub parameters: Vec<Token>,
 }
 
@@ -273,10 +273,10 @@ impl VarDeclaration {
     }
 }
 impl LayoutDeclaration {
-    pub fn new(markup: Vec<Markup>, parameters: Vec<Token>) -> Self {
+    pub fn new(markup: Markup, parameters: Vec<Token>) -> Self {
         Self {
             name: None,
-            markup,
+            markup: Box::new(markup),
             parameters,
         }
     }
