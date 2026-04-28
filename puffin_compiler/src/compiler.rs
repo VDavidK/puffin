@@ -100,7 +100,7 @@ impl<'a> Compiler<'a> {
                     layout_compiler.compile_markup(markup, list)?;
                 }
 
-                layout_compiler.ensure_return()?;
+                layout_compiler.chunk.push_op(OpCode::Return);
 
                 let func = Function {
                     chunk: Rc::new(chunk),

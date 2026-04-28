@@ -5,8 +5,7 @@ use ratatui::DefaultTerminal;
 use crate::chunk::LocalOffset;
 use crate::vm::Vm;
 use crate::{Chunk, RuntimeError, value::Value};
-use crate::ui::{LayoutDirection, LayoutNode, Node};
-use crate::value::{new_instance, FunctionType, InstanceType, Module};
+use crate::value::{new_instance, FunctionType, InstanceType, Module, LayoutDirection, LayoutNode, Node};
 
 #[derive(Debug, Clone)]
 pub struct CallFrame {
@@ -72,24 +71,8 @@ impl Runtime {
                 .get_field("<main>")
                 .ok_or(RuntimeError::GlobalNotFound { name: "<main>".to_string() })?
                 .clone();
-
-            match main {
-                Value::NativeFunction(func) => {
-                    let callable = &func.fun;
-                    let local_count = self.local_count()?;
-                    let value = callable(self, 0)?;
-                    for _ in 0..local_count {
-                        self.pop_value();
-                    }
-                    //self.pop_until(local_count)?;
-                    self.push_value(value);
-                },
-                Value::Function(func) => {
-                    let ret_value = self.call_fn(func)?;
-                    self.push_value(ret_value);
-                },
-                _ => panic!(),
-            }
+            let ret = self.call_val(main, 0)?;
+            self.push_value(ret);
 
             self.render()?;
             self.poll()?;
@@ -161,10 +144,6 @@ impl Runtime {
             }
         }
 
-    }
-
-    pub fn push_node(&mut self, node: impl Into<Node>) {
-        self.node_stack.push(node.into());
     }
 
     pub fn include_module(&mut self, module: Module) {
@@ -326,14 +305,15 @@ impl Runtime {
     }
 
     pub fn render(&mut self) -> Result<(), RuntimeError> {
-        let stack = std::mem::take(&mut self.node_stack);
+        //let stack = std::mem::take(&mut self.node_stack);
+        let node = self.pop_expecting()?.take_node()?;
         let layout = LayoutNode {
             direction: LayoutDirection::Vertical,
-            nodes: stack,
+            nodes: vec![node],
         };
 
         self.term.draw(move |frame| {
-            frame.render_widget(layout, frame.area());
+            frame.render_widget(&layout, frame.area());
         })?;
 
         Ok(())
