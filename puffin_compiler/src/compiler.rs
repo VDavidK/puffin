@@ -2,7 +2,7 @@ use crate::scope::Scope;
 use puffin_ast::Ast;
 use puffin_ast::declaration::Declaration;
 use puffin_ast::expression::Expression;
-use puffin_ast::markup::{ComponentRender, Markup};
+use puffin_ast::markup::{ComponentParameter, ComponentRender, Markup};
 use puffin_ast::statement::Statement;
 use puffin_ast::token::{Token, TokenType};
 use puffin_runtime::chunk::{ConstantOffset, LocalOffset};
@@ -99,7 +99,7 @@ impl<'a> Compiler<'a> {
                 let func = Function {
                     chunk: Rc::new(chunk),
                     identifier: name.to_owned(),
-                    arity: layout.parameters.len(),
+                    arity: layout.parameters.len() + 1, // One more for self
                 };
 
                 let constant = self.chunk.new_constant(func);
@@ -398,15 +398,17 @@ impl<'a> Compiler<'a> {
             Markup::Component(component) => {
                 let mut arg_count = 0;
 
-                if let Some(string) = &component.string_literal {
-                    let constant = self.token_to_constant(string)?;
-                    self.chunk.push_op(OpCode::Constant);
-                    self.chunk.push_constant_offset(constant);
-                    arg_count = 1;
-                } else if let Some(inner) = &component.children {
-                    self.compile_markup(inner)?;
-                    arg_count = 1;
-                }
+                let arg_count = match &component.parameter {
+                    None => 0,
+                    Some(ComponentParameter::Expression(expr)) => {
+                        self.compile_expression(expr)?;
+                        1
+                    }
+                    Some(ComponentParameter::Children(inner)) => {
+                        self.compile_markup(inner)?;
+                        1
+                    }
+                };
 
                 let global = self.token_to_constant(&component.name)?;
                 self.chunk.push_op(OpCode::GetGlobal);

@@ -71,7 +71,8 @@ impl Runtime {
                 .get_field("<main>")
                 .ok_or(RuntimeError::GlobalNotFound { name: "<main>".to_string() })?
                 .clone();
-            let ret = self.call_val(main, 0)?;
+            self.push_value(component.clone());
+            let ret = self.call_val(main, 1)?;
             self.push_value(ret);
 
             self.render()?;
