@@ -4,8 +4,9 @@ use std::rc::Rc;
 use ratatui::prelude::*;
 use serde_derive::{Deserialize, Serialize};
 use crate::runtime::Runtime;
-use crate::value::{InstanceType, Value};
+use crate::value::{FunctionType, InstanceType, Value};
 use crate::RuntimeError;
+use crate::value::ops::{ValueDef, ValueTruthy};
 
 pub type NodeType = Rc<RefCell<Node>>;
 
@@ -145,4 +146,14 @@ impl StatefulWidget for &ComponentNode {
         node.borrow()
             .render(area, buf, state);
     }
+}
+
+impl ValueTruthy for NodeType {
+    fn truthy(&self) -> bool {
+        true
+    }
+}
+
+impl ValueDef for NodeType {
+    const TYPE_NAME: &'static str = "node";
 }

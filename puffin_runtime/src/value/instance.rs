@@ -7,8 +7,8 @@ use serde_derive::{Deserialize, Serialize};
 use crate::event::Event;
 use crate::runtime::Runtime;
 use crate::RuntimeError;
-use crate::value::{Value, ClassType};
-use crate::value::ops::ValueTruthy;
+use crate::value::{Value, ClassType, IntType};
+use crate::value::ops::{ValueDef, ValueTruthy};
 
 pub type InstanceType = Rc<RefCell<Instance>>;
 
@@ -148,4 +148,8 @@ impl ValueTruthy for InstanceType {
     fn truthy(&self) -> bool {
         true
     }
+}
+
+impl ValueDef for InstanceType {
+    const TYPE_NAME: &'static str = "instance";
 }

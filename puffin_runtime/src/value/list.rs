@@ -2,8 +2,8 @@ use std::cell::RefCell;
 use std::fmt::{Display, Formatter};
 use std::rc::Rc;
 use crate::RuntimeError;
-use crate::value::ops::ValueTruthy;
-use crate::value::Value;
+use crate::value::ops::{ValueDef, ValueTruthy};
+use crate::value::{FunctionType, Value};
 
 pub type ListType = Rc<RefCell<Vec<Value>>>;
 
@@ -41,4 +41,8 @@ impl ValueTruthy for ListType {
     fn truthy(&self) -> bool {
         true
     }
+}
+
+impl ValueDef for ListType {
+    const TYPE_NAME: &'static str = "list";
 }
