@@ -386,11 +386,16 @@ impl<'a> Compiler<'a> {
 
     fn compile_markup(&mut self, markup: &'a Markup, list: LocalOffset) -> Result<(), CompileError> {
         match markup {
+            Markup::Block(block) => {
+                for elem in &block.markup {
+                    self.compile_markup(elem, list)?;
+                }
+            }
             Markup::Component(component) => {
                 let mut arg_count = 0;
                 let mut args = 0;
 
-                if !component.children.is_empty() {
+                if component.children.is_some() {
                     self.chunk.push_op(OpCode::NewList);
                     args = self.scope.define_unnamed_local();
                 }
@@ -403,14 +408,11 @@ impl<'a> Compiler<'a> {
                     self.chunk.push_op(OpCode::Constant);
                     self.chunk.push_constant_offset(constant);
                     arg_count = 1;
-                } else if !component.children.is_empty() {
+                } else if let Some(inner) = &component.children {
                     self.chunk.push_op(OpCode::GetLocal);
                     self.chunk.push_local_offset(args);
 
-                    // TOOD: Will not work with conditionals
-                    for markup in &component.children {
-                        self.compile_markup(markup, args)?;
-                    }
+                    self.compile_markup(inner, args)?;
                     arg_count = 1;
                 }
 
@@ -421,7 +423,7 @@ impl<'a> Compiler<'a> {
                 self.chunk.push_u8(arg_count);
                 self.chunk.push_op(OpCode::PushList);
 
-                if !component.children.is_empty() {
+                if component.children.is_some() {
                     self.chunk.push_op(OpCode::Pop);
                 }
             }
@@ -432,9 +434,7 @@ impl<'a> Compiler<'a> {
                 self.chunk.push_op(OpCode::Not);
                 let jmp = self.chunk.push_jump(OpCode::JumpIf);
 
-                for body in &markup.if_markup {
-                    self.compile_markup(body, list)?;
-                }
+                self.compile_markup(&markup.if_markup, list)?;
 
                 // TODO: ???
                 // let end_addr = if let Some(body) = &markup.else_markup {
