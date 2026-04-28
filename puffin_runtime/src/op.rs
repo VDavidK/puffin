@@ -38,6 +38,20 @@ pub enum OpCode {
     // Expected stack: TOP > [value: any]
     SetGlobal,
 
+    // : newarr
+    // Pushes a new list to the top of the stack
+    NewList,
+
+    // : pusharr
+    // Takes the top value form the stack and pushes it to the end of the list.
+    // Expected stack: TOP > [value: any] > [lst: list]
+    PushList,
+
+    // : poparr
+    // Pops the top value from the list at the top of the stack and pushes it to the top of the stack.
+    // Expected stack: TOP > [lst: list]
+    PopList,
+
     // ----------------------------
     // Object Manipulation Instructions
     // ----------------------------

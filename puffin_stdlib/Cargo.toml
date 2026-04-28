@@ -11,4 +11,5 @@ default = ["vendor"]
 vendor = []
 
 [dependencies]
+log = "0.4.29"
 puffin_runtime = { path = "../puffin_runtime" }

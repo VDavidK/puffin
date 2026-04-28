@@ -1207,6 +1207,7 @@ dependencies = [
 name = "puffin_stdlib"
 version = "0.1.0"
 dependencies = [
+ "log",
  "puffin_runtime",
 ]
 

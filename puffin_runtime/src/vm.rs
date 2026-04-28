@@ -194,6 +194,26 @@ impl<'a> Vm<'a> {
 
             },
 
+            OpCode::NewList => {
+                self.runtime.push_value(Vec::<Value>::new());
+            }
+
+            OpCode::PushList => {
+                let value = self.runtime.pop_expecting()?;
+                let list = self.runtime.pop_expecting()?
+                    .take_list()?;
+
+                list.borrow_mut().push(value);
+            }
+
+            OpCode::PopList => {
+                let list = self.runtime.pop_expecting()?
+                    .take_list()?;
+
+                let value = list.borrow_mut().pop().unwrap_or(Value::Null);
+                self.runtime.push_value(value);
+            }
+
             OpCode::Add => {
                 let rhs = self.runtime.pop_expecting()?;
                 let lhs = self.runtime.pop_expecting()?;

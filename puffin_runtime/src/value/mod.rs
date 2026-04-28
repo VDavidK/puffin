@@ -27,7 +27,7 @@ pub type ModuleType = Rc<RefCell<Module>>;
 pub type FunctionType = Rc<Function>;
 pub type NativeFunctionType = Rc<NativeFunction>;
 pub type NativeValueType = NativeValue;
-pub type ListType = Vec<Value>;
+pub type ListType = Rc<RefCell<Vec<Value>>>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Value {
@@ -152,12 +152,6 @@ impl<'a> From<&'a str> for Value {
     }
 }
 
-impl From<ListType> for Value {
-    fn from(value: ListType) -> Self {
-        Value::List(value)
-    }
-}
-
 impl TryFrom<Value> for ListType {
     type Error = RuntimeError;
 
@@ -168,6 +162,19 @@ impl TryFrom<Value> for ListType {
         }
     }
 }
+
+impl From<Vec<Value>> for Value {
+    fn from(value: Vec<Value>) -> Self {
+        Value::List(Rc::new(RefCell::new(value)))
+    }
+}
+
+// impl<T> FromIterator<T> for Value where T: Into<Value> {
+//     fn from_iter<I: IntoIterator<Item = T>>(mut iter: I) -> Self {
+//         iter.into_iter()
+//             .map(Into::into)
+//     }
+// }
 
 impl From<InstanceType> for Value {
     fn from(value: InstanceType) -> Self {
@@ -240,7 +247,7 @@ struct ListDisplay<'a>(&'a ListType);
 
 impl<'a> Display for ListDisplay<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let inner = self.0.iter()
+        let inner = self.0.borrow().iter()
             .map(Value::to_string)
             .collect::<Vec<String>>()
             .join(", ");

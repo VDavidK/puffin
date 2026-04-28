@@ -194,6 +194,9 @@ impl<'a> ChunkFormatter<'a> {
                     OpCode::SetConstructor => self.push("scons"),
                     OpCode::GetField => self.push_with_local_offset("getf"),
                     OpCode::SetField => self.push_with_local_offset("setf"),
+                    OpCode::NewList => self.push("newlist"),
+                    OpCode::PushList => self.push("pushlist"),
+                    OpCode::PopList => self.push("poplist"),
 
                     // Arithmetic
                     OpCode::Add => self.push("add"),

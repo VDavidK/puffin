@@ -30,7 +30,7 @@ impl Default for Runtime {
         let term = ratatui::init();
 
         #[allow(clippy::new_without_default)]
-        let mut runtime = Runtime {
+        let runtime = Runtime {
             stack: vec![],
             call_stack: vec![],
             globals: HashMap::new(),
@@ -181,7 +181,7 @@ impl Runtime {
         let frame = CallFrame {
             chunk,
             stack_offset: self.stack.len() - arity,
-            local_count: 0,
+            local_count: arity,
             pc: 0,
         };
 
@@ -251,12 +251,12 @@ impl Runtime {
 
     #[cfg(feature = "debug_tracing")]
     pub fn log_stack(&self) {
-        let mut values = self.stack.iter().map(|v| v.to_string()).collect::<Vec<_>>().join("] [");
+        let mut values = self.stack.iter().map(|v| v.to_string()).collect::<Vec<_>>().join("> <");
         if !values.is_empty() {
-            values = format!("[{values}]");
+            values = format!("<{values}>");
         }
 
-        log::debug!("stack> {values}");
+        log::debug!("stack: {values}");
     }
 
     pub(crate) fn ret(&mut self) -> Result<Value, RuntimeError> {

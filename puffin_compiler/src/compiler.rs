@@ -89,12 +89,15 @@ impl<'a> Compiler<'a> {
                 let mut chunk = Chunk::new(&name);
                 let mut layout_compiler = Compiler::new(&mut chunk);
 
+                layout_compiler.chunk.push_op(OpCode::NewList);
+                let list = layout_compiler.scope.define_unnamed_local();
+
                 for arg in &layout.parameters {
                     layout_compiler.scope.define_local(&arg.lexeme);
                 }
 
                 for markup in &layout.markup {
-                    layout_compiler.compile_markup(markup)?;
+                    layout_compiler.compile_markup(markup, list)?;
                 }
 
                 layout_compiler.ensure_return()?;
@@ -350,7 +353,17 @@ impl<'a> Compiler<'a> {
                 self.chunk.push_op(OpCode::GetField);
                 self.chunk.push_constant_offset(name);
             }
-            // Expression::Array(_) => {}
+            Expression::Array(arr) => {
+                self.chunk.push_op(OpCode::NewList);
+                let list = self.scope.define_unnamed_local();
+
+                for elem in &arr.entries {
+                    self.chunk.push_op(OpCode::GetLocal);
+                    self.chunk.push_local_offset(list);
+                    self.compile_expression(&elem)?;
+                    self.chunk.push_op(OpCode::PushList);
+                }
+            }
             Expression::Dictionary(dict) => {
                 self.chunk.push_op(OpCode::NewInstance);
                 let obj = self.scope.define_unnamed_local();
@@ -371,15 +384,28 @@ impl<'a> Compiler<'a> {
         Ok(())
     }
 
-    fn compile_markup(&mut self, markup: &Markup) -> Result<(), CompileError> {
+    fn compile_markup(&mut self, markup: &'a Markup, list: LocalOffset) -> Result<(), CompileError> {
         match markup {
             Markup::Component(component) => {
                 let mut arg_count = 0;
+
+                self.chunk.push_op(OpCode::GetLocal);
+                self.chunk.push_local_offset(list);
+
                 if let Some(string) = &component.string_literal {
                     let constant = self.token_to_constant(string)?;
                     self.chunk.push_op(OpCode::Constant);
                     self.chunk.push_constant_offset(constant);
-                    arg_count += 1;
+                    arg_count = 1;
+                } else if !component.children.is_empty() {
+                    self.chunk.push_op(OpCode::NewList);
+                    let args = self.scope.define_unnamed_local();
+
+                    // TOOD: Will not work with conditionals
+                    for markup in &component.children {
+                        self.compile_markup(markup, args)?;
+                    }
+                    arg_count = 1;
                 }
 
                 let global = self.token_to_constant(&component.name)?;
@@ -387,11 +413,36 @@ impl<'a> Compiler<'a> {
                 self.chunk.push_constant_offset(global);
                 self.chunk.push_op(OpCode::Call);
                 self.chunk.push_u8(arg_count);
-                self.chunk.push_op(OpCode::Pop);
+                self.chunk.push_op(OpCode::PushList);
             }
             // Markup::Layout(_) => {}
             // Markup::Match(_) => {}
-            // Markup::If(_) => {}
+            Markup::If(markup) => {
+                self.compile_expression(&markup.condition)?;
+                self.chunk.push_op(OpCode::Not);
+                let jmp = self.chunk.push_jump(OpCode::JumpIf);
+
+                for body in &markup.if_markup {
+                    self.compile_markup(body, list)?;
+                }
+
+                // TODO: ???
+                // let end_addr = if let Some(body) = &markup.else_markup {
+                //     let if_to_end_jump = self.chunk.push_jump(OpCode::Jump);
+                //     let else_addr = self.chunk.addr();
+                //     self.compile_statement(else_stmt)?;
+                //     self.chunk.patch_jump(if_to_end_jump, self.chunk.addr());
+                //     else_addr
+                // } else {
+                //     self.chunk.addr()
+                // };
+                let end_addr = self.chunk.addr();
+
+                self.chunk.patch_jump(jmp, end_addr);
+
+                // TODO: Should not exist
+                // if_markup.elseif_markup
+            }
             // Markup::Iterative(_) => {}
             // Markup::Style(_) => {}
             _ => (),
