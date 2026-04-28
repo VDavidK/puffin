@@ -24,35 +24,42 @@ fn construct_flow(runtime: &mut Runtime, direction: LayoutDirection) -> Result<L
 
 pub fn define_flow_elements(runtime: &mut Runtime) {
     let hbox_class = new_class("HBox");
+    let vbox_class = new_class("VBox");
 
-    hbox_class.borrow_mut().set_constructor(NativeFunction::new(|runtime, argc, this| {
+    hbox_class.borrow_mut().set_constructor(NativeFunction::new(|runtime, _, this| {
+        let this = this.expect(format!("Constructor called for {} without this", "hbox").as_str());
         let children = construct_flow(runtime, LayoutDirection::Horizontal)?;
-
-        this.expect("How did you do this?")
-            .borrow_mut()
-            .set_field("children", Node::Layout(children));
-
+        this.borrow_mut().set_field("<children>", Node::Layout(children));
         Ok(Value::Null)
     }));
 
-    hbox_class.borrow_mut().set_method("<layout>", NativeFunction::new(|runtime, argc, this| {
-        let this = this.expect("How did you do this?");
+    hbox_class.borrow_mut().set_method("<layout>", NativeFunction::new(|_, _, this| {
+        let this = this.expect(format!("Constructor called for {} without this", "hbox").as_str());
 
         Ok(this.borrow()
-            .get_field("children")
-            .expect("How did you do this?")
+            .get_field("<children>")
+            .expect("Hbox initialized without <children> property")
+            .to_owned()
+        )
+    }));
+
+    vbox_class.borrow_mut().set_constructor(NativeFunction::new(|runtime, _, this| {
+        let this = this.expect(format!("Constructor called for {} without this", "vbox").as_str());
+        let children = construct_flow(runtime, LayoutDirection::Vertical)?;
+        this.borrow_mut().set_field("<children>", Node::Layout(children));
+        Ok(Value::Null)
+    }));
+
+    vbox_class.borrow_mut().set_method("<layout>", NativeFunction::new(|_, _, this| {
+        let this = this.expect(format!("Constructor called for {} without this", "vbox").as_str());
+
+        Ok(this.borrow()
+            .get_field("<children>")
+            .expect("Vbox initialized without <children> property")
             .to_owned()
         )
     }));
 
     runtime.add_global("hbox", hbox_class);
-
-    // runtime.add_global("hbox", NativeFunction::new(|runtime, _argc| {
-    //     let node = construct_flow(runtime, LayoutDirection::Horizontal)?;
-    //     Ok(Node::Layout(node).into())
-    // }));
-    // runtime.add_global("vbox", NativeFunction::new(|runtime, _argc| {
-    //     let node = construct_flow(runtime, LayoutDirection::Vertical)?;
-    //     Ok(Node::Layout(node).into())
-    // }));
+    runtime.add_global("vbox", vbox_class);
 }

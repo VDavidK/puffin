@@ -20,7 +20,7 @@ pub use native_function::{NativeFunction, NativeFunctionType};
 pub use class::{new_class, Class, ClassType};
 pub use module::{new_module, Module, ModuleType};
 pub use native_value::{NativeValue, NativeValueTrait, NativeValueType};
-pub use node::{Node, LayoutNode, LayoutDirection, TextNode, ComponentNode, NodeType};
+pub use node::{Node, LayoutNode, LayoutDirection, TextNode, ComponentNode, NodeType, FrameNode};
 pub use reactive::{Reactive, ReactiveType};
 pub use crate::value::list::{ListDisplay, ListType};
 pub use crate::value::float::FloatType;

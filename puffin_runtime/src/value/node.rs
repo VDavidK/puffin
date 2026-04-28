@@ -2,6 +2,7 @@ use std::cell::RefCell;
 use std::fmt::{Display, Formatter};
 use std::rc::Rc;
 use ratatui::prelude::*;
+use ratatui::widgets::{Block, BorderType, Borders, Paragraph};
 use serde_derive::{Deserialize, Serialize};
 use crate::runtime::Runtime;
 use crate::value::{FunctionType, InstanceType, Value};
@@ -14,6 +15,7 @@ pub type NodeType = Rc<RefCell<Node>>;
 pub enum Node {
     Text(TextNode),
     Layout(LayoutNode),
+    Frame(FrameNode),
     Component(ComponentNode),
 }
 
@@ -37,6 +39,8 @@ impl StatefulWidget for &Node {
             => layout.render(area, buf, state),
             Node::Component(component)
             => component.render(area, buf, state),
+            Node::Frame(item)
+            => item.render(area, buf, state),
         }
     }
 }
@@ -46,9 +50,34 @@ pub struct TextNode {
     pub content: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FrameNode {
+    pub nodes: Vec<NodeType>,
+}
+
+impl StatefulWidget for &FrameNode {
+    type State = Runtime;
+
+    fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) where Self: Sized {
+        let len = self.nodes.len();
+        let frame = Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Plain);
+
+        let layout = Layout::new(Direction::Vertical, std::iter::repeat_n(Constraint::Fill(1), len))
+            .split(frame.inner(area));
+        frame.render(area, buf);
+
+        for (node, area) in self.nodes.iter().zip(layout.iter()) {
+            let node = node.borrow();
+            node.render(*area, buf, state);
+        }
+    }
+}
+
 impl Widget for &TextNode {
     fn render(self, area: Rect, buf: &mut Buffer) where Self: Sized {
-        Span::from(&self.content)
+        Paragraph::new(self.content.as_str())
             .render(area, buf);
     }
 }
