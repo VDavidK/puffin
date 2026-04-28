@@ -6,9 +6,10 @@ pub fn define_hbox_element(runtime: &mut Runtime) {
         let child_elements = runtime
             .get_local(-1)?
             .to_owned()
-            .take_list()?
-            .into_iter()
-            .map(|x| x.take_node())
+            .take_list()?;
+        let child_elements = child_elements.borrow()
+            .iter()
+            .map(|x| x.to_owned().take_node())
             .collect::<Result<Vec<_>, _>>()?;
 
         let layout = LayoutNode {

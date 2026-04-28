@@ -89,12 +89,12 @@ impl<'a> Compiler<'a> {
                 let mut chunk = Chunk::new(&name);
                 let mut layout_compiler = Compiler::new(&mut chunk);
 
-                layout_compiler.chunk.push_op(OpCode::NewList);
-                let list = layout_compiler.scope.define_unnamed_local();
-
                 for arg in &layout.parameters {
                     layout_compiler.scope.define_local(&arg.lexeme);
                 }
+
+                layout_compiler.chunk.push_op(OpCode::NewList);
+                let list = layout_compiler.scope.define_unnamed_local();
 
                 for markup in &layout.markup {
                     layout_compiler.compile_markup(markup, list)?;
@@ -388,6 +388,12 @@ impl<'a> Compiler<'a> {
         match markup {
             Markup::Component(component) => {
                 let mut arg_count = 0;
+                let mut args = 0;
+
+                if !component.children.is_empty() {
+                    self.chunk.push_op(OpCode::NewList);
+                    args = self.scope.define_unnamed_local();
+                }
 
                 self.chunk.push_op(OpCode::GetLocal);
                 self.chunk.push_local_offset(list);
@@ -398,8 +404,8 @@ impl<'a> Compiler<'a> {
                     self.chunk.push_constant_offset(constant);
                     arg_count = 1;
                 } else if !component.children.is_empty() {
-                    self.chunk.push_op(OpCode::NewList);
-                    let args = self.scope.define_unnamed_local();
+                    self.chunk.push_op(OpCode::GetLocal);
+                    self.chunk.push_local_offset(args);
 
                     // TOOD: Will not work with conditionals
                     for markup in &component.children {
@@ -414,6 +420,10 @@ impl<'a> Compiler<'a> {
                 self.chunk.push_op(OpCode::Call);
                 self.chunk.push_u8(arg_count);
                 self.chunk.push_op(OpCode::PushList);
+
+                if !component.children.is_empty() {
+                    self.chunk.push_op(OpCode::Pop);
+                }
             }
             // Markup::Layout(_) => {}
             // Markup::Match(_) => {}

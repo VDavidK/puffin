@@ -73,7 +73,7 @@ impl Widget for &LayoutNode {
             LayoutDirection::Horizontal => Direction::Horizontal,
         };
 
-        let layout = Layout::new(direction, std::iter::repeat_n(Constraint::Length(1), len))
+        let layout = Layout::new(direction, std::iter::repeat_n(Constraint::Fill(1), len))
             .split(area);
 
         for (node, area) in self.nodes.iter().zip(layout.iter()) {

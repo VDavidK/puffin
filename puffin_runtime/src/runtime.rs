@@ -306,10 +306,17 @@ impl Runtime {
 
     pub fn render(&mut self) -> Result<(), RuntimeError> {
         //let stack = std::mem::take(&mut self.node_stack);
-        let node = self.pop_expecting()?.take_node()?;
+        let node = self.pop_expecting()?
+            .take_list()?
+            .borrow()
+            .iter()
+            .cloned()
+            .map(|v| v.take_node())
+            .collect::<Result<Vec<_>, _>>()?;
+
         let layout = LayoutNode {
             direction: LayoutDirection::Vertical,
-            nodes: vec![node],
+            nodes: node,
         };
 
         self.term.draw(move |frame| {
