@@ -20,16 +20,16 @@ pub struct Runtime {
     stack: Vec<Value>,
     call_stack: Vec<CallFrame>,
     globals: HashMap<String, Value>,
+    running: bool,
 }
 
 impl Default for Runtime {
     fn default() -> Self {
-
-        #[allow(clippy::new_without_default)]
         let runtime = Runtime {
             stack: vec![],
             call_stack: vec![],
             globals: HashMap::new(),
+            running: true,
         };
 
         runtime
@@ -291,6 +291,14 @@ impl Runtime {
 
     pub fn get_global(&self, name: impl AsRef<str>) -> Option<&Value> {
         self.globals.get(name.as_ref())
+    }
+
+    pub fn exit(&mut self) {
+        self.running = false;
+    }
+
+    pub fn exit_requested(&self) -> bool {
+        !self.running
     }
 }
 
