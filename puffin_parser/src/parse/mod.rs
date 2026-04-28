@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use puffin_ast::{Ast, VarType};
 use puffin_ast::snippet::{IntoSnippet, Snippet};
 use puffin_ast::span::Span;
@@ -84,20 +85,20 @@ mod tests;
 #[derive(Debug)]
 pub(crate) struct PuffinParser<'a> {
     lexer: PuffinLexer<'a>,
-    current_token: Option<Token>,
+    token_queue: VecDeque<Token>,
 }
 
 impl<'a> PuffinParser<'a> {
     pub(crate) fn new(src: &'a str, src_name: &'a str) -> Self {
         PuffinParser {
             lexer: PuffinLexer::new(src, src_name),
-            current_token: None,
+            token_queue: VecDeque::new(),
         }
     }
 
     /// Returns the position of the parser's current token if it is assigned, or a default position if it is ```None```.
     fn pos(&self) -> Span {
-        self.current_token.as_ref().map(|t| t.span).unwrap_or_default()
+        self.token_queue.front().map(|t| t.span).unwrap_or_default()
     }
 
     /// Returns an indicator of whether the lexer's tokens have been exhausted.
@@ -107,17 +108,15 @@ impl<'a> PuffinParser<'a> {
 
     /// Peeks the next token and returns it if it exists. Does not consume the currently active token.
     fn safe_peek(&mut self) -> Result<Option<&Token>, ParserError> {
-        match self.current_token.as_ref() {
-            Some(token) => Ok(self.current_token.as_ref()),
-            None => {
-                match self.lexer.next() {
-                    Some(t) => {
-                        self.current_token = Some(t?);
-                        Ok(self.current_token.as_ref())
-                    },
-                    None => Ok(None),
-                }
-            }
+        if self.token_queue.front().is_some() {
+            return Ok(self.token_queue.front());
+        }
+        match self.lexer.next() {
+            Some(t) => {
+                self.token_queue.push_back(t?);
+                Ok(self.token_queue.front())
+            },
+            None => Ok(None),
         }
     }
 
@@ -130,26 +129,57 @@ impl<'a> PuffinParser<'a> {
         }
     }
 
+    fn peek_n(&mut self, n: usize) -> Result<Option<&Token>, ParserError> {
+        if self.token_queue.len() < n {
+            return Ok(self.token_queue.get(n));
+        }
+        let mut extra_tokens = self.lexer.by_ref().take(1 + n - self.token_queue.len()).collect::<Result<VecDeque<_>, _>>()?;
+        self.token_queue.append(&mut extra_tokens);
+        Ok(self.token_queue.get(n))
+    }
+
     /// Peeks the next token and returns an indicator of whether its type matches ```expected```.
     fn peek_is(&mut self, expected: TokenType) -> Result<bool, ParserError> {
-        Ok(self.safe_peek()?.is_some_and(|f| f.ty == expected))
+        self.peek_n_is(expected, 0)
+    }
+
+    /// Peeks the token at the designated offset and returns an indicator of whether its type matches ```expected```.
+    /// NOTE: Offset is zero-indexed, with 0 returning the immediate token.
+    fn peek_n_is(&mut self, expected: TokenType, n: usize) -> Result<bool, ParserError> {
+        Ok(self.peek_n(n)?.is_some_and(|f| f.ty == expected))
     }
 
     fn next_token(&mut self) -> Result<Token, ParserError> {
-        self.next_token_or_none()?.ok_or(ParserError::UnexpectedEof())
+        self.advance()?.ok_or(ParserError::UnexpectedEof())
     }
 
-    fn next_token_or_none(&mut self) -> Result<Option<Token>, ParserError> {
-        match self.safe_peek()? {
-            Some(token) => {
-                let tok = self.current_token.take().ok_or(ParserError::UnexpectedEof())?;
-                self.current_token = None;
-                Ok(Some(tok))
-            },
-            None => Ok(None),
+    fn get_current_token(&self) -> Option<&Token> {
+        self.token_queue.front()
+    }
+
+    /// Advances the iterator to the next token if it exists.
+    /// Does not throw an error if there are no tokens remaining.
+    fn advance(&mut self) -> Result<Option<Token>, ParserError> {
+        if !self.token_queue.is_empty() {
+            Ok(self.token_queue.pop_front())
+        } else {
+            match self.safe_peek()? {
+                Some(token) => {
+                    let tok = self.take_current_token()?;
+                    Ok(Some(tok))
+                },
+                None => Ok(None),
+            }
         }
     }
 
+    /// Removes the first token in the peek queue if it exists and returns its.
+    /// Throws an error if the token queue is empty.
+    fn take_current_token(&mut self) -> Result<Token, ParserError> {
+        self.token_queue.pop_front().ok_or(ParserError::UnexpectedEof())
+    }
+
+    /// Returns the next token if it matches ```ty```, throwing an error if it does not.
     pub fn expect(&mut self, ty: TokenType) -> Result<Token, ParserError> {
         let res = self.next_token()?;
         if res.ty == ty {
@@ -179,7 +209,7 @@ impl<'a> PuffinParser<'a> {
     }
 
     fn get_lex_snippet(&self) -> Box<Snippet> {
-        let span = match &self.current_token {
+        let span = match &self.get_current_token() {
             Some(tok) => tok.span,
             None => self.lexer
                 .get_span()
@@ -343,7 +373,7 @@ impl<'a> PuffinParser<'a> {
 
     fn parameters(&mut self) -> Result<Vec<Token>, ParserError> {
         let params = if self.peek_is(TokenType::LeftParen)? {
-            self.next_token()?;
+            self.advance();
             let params = self.name_list()?;
             self.expect(TokenType::RightParen)?;
             params
@@ -385,7 +415,7 @@ impl<'a> PuffinParser<'a> {
             if !self.peek_is(TokenType::Comma)? {
                 break;
             } else {
-                self.next_token_or_none()?;
+                self.advance()?;
             }
         }
         Ok(names)
@@ -596,7 +626,7 @@ impl<'a> PuffinParser<'a> {
         let if_block = self.block_stat()?;
         let else_block: Option<Statement> = match self.peek()?.ty {
             TokenType::KwElse => {
-                self.next_token_or_none()?;
+                self.advance()?;
                 match self.peek()?.ty {
                     TokenType::KwIf => Some(self.if_stat()?),
                     _ => {
@@ -777,7 +807,7 @@ impl<'a> PuffinParser<'a> {
                 self.expect(TokenType::RightBrace)?;
                 return Ok(expr);
             },
-            _ => Err(ParserError::ExpectedLiteral(self.get_lex_snippet(), self.current_token.as_ref().map(|t| t.ty)))
+            _ => Err(ParserError::ExpectedLiteral(self.get_lex_snippet(), self.get_current_token().map(|t| t.ty)))
         }?;
         loop {
             match self.peek()?.ty {
@@ -973,82 +1003,64 @@ impl<'a> PuffinParser<'a> {
 
     fn markup_item(&mut self) -> Result<Markup, ParserError> {
         let name = self.next_token()?;
-        if self.peek_is(TokenType::LeftParen)? {
-            self.next_token()?;
-            let mut exprs = vec![];
-            while !self.peek_is(TokenType::RightParen)? {
-                exprs.push(self.expression()?);
-                if self.peek_is(TokenType::Comma)? {
-                    self.next_token()?;
-                } else {
-                    break;
+        let mut bindings = vec![];
+        while self.peek_is(TokenType::Identifier)? && self.peek_n_is(TokenType::Assign, 1)? {
+            let name = self.next_token()?;
+            self.advance();
+            let mut is_lambda = false;
+            let parameters = if self.peek_is(TokenType::LeftParen)? {
+                self.advance();
+                is_lambda = true;
+                let mut parameters = vec![];
+                while !self.peek_is(TokenType::RightParen)? {
+                    parameters.push(self.expect(TokenType::Identifier)?);
+                    if self.peek_is(TokenType::Comma)? {
+                        self.advance();
+                    } else {
+                        self.expect(TokenType::RightParen)?;
+                        break;
+                    }
                 }
+                parameters
+            } else {
+                vec![]
+            };
+            self.expect(TokenType::Assign)?;
+            if self.peek_is(TokenType::LeftBrace)? {
+                is_lambda = true;
             }
-            self.expect(TokenType::RightParen)?;
-            self.expect(TokenType::Semicolon)?;
-            return Ok(LayoutRender::new(name, exprs).into())
-        }
-        let bindings = if self.peek_is(TokenType::Identifier)? {
-            let mut bindings = vec![];
-            while self.peek_is(TokenType::Identifier)? {
-                let name = self.next_token()?;
-                let mut is_lambda = false;
-                let parameters = if self.peek_is(TokenType::LeftParen)? {
-                    is_lambda = true;
-                    self.expect(TokenType::LeftParen)?;
-                    let mut parameters = vec![];
-                    while !self.peek_is(TokenType::RightParen)? {
-                        parameters.push(self.expect(TokenType::Identifier)?);
+            let binding = if is_lambda {
+                self.expect(TokenType::LeftBrace)?;
+                let exprs = self.expr_list(TokenType::RightBrace, TokenType::Semicolon)?;
+                self.expect(TokenType::RightBrace)?;
+                LambdaFunctionBinding::new(parameters, exprs).into()
+            } else {
+                let tokens = if self.peek_is(TokenType::LeftBracket)? {
+                    let mut tokens = vec![];
+                    self.next_token()?;
+                    while !self.peek_is(TokenType::RightBracket)? {
+                        tokens.push(self.expect(TokenType::Identifier)?);
                         if self.peek_is(TokenType::Comma)? {
-                            self.expect(TokenType::Comma)?;
+                            self.next_token()?;
                         } else {
-                            self.expect(TokenType::RightParen)?;
                             break;
                         }
                     }
-                    parameters
+                    self.expect(TokenType::RightBracket)?;
+                    tokens
                 } else {
-                    vec![]
+                    vec![self.expect(TokenType::Identifier)?]
                 };
-                self.expect(TokenType::Assign)?;
-                if self.peek_is(TokenType::LeftBrace)? {
-                    is_lambda = true;
-                }
-                let binding = if is_lambda {
-                    self.expect(TokenType::LeftBrace)?;
-                    let exprs = self.expr_list(TokenType::RightBrace, TokenType::Semicolon)?;
-                    self.expect(TokenType::RightBrace)?;
-                    LambdaFunctionBinding::new(parameters, exprs).into()
-                } else {
-                    let tokens = if self.peek_is(TokenType::LeftBracket)? {
-                        let mut tokens = vec![];
-                        self.next_token()?;
-                        while !self.peek_is(TokenType::RightBracket)? {
-                            tokens.push(self.expect(TokenType::Identifier)?);
-                            if self.peek_is(TokenType::Comma)? {
-                                self.next_token()?;
-                            } else {
-                                break;
-                            }
-                        }
-                        self.expect(TokenType::RightBracket)?;
-                        tokens
-                    } else {
-                        vec![self.expect(TokenType::Identifier)?]
-                    };
-                    DirectBindings::new(tokens).into()
-                };
-                bindings.push(MarkupBinding::new(name, binding))
-            }
-            bindings
-        } else {
-            vec![]
-        };
+                DirectBindings::new(tokens).into()
+            };
+            bindings.push(MarkupBinding::new(name, binding))
+        }
         if self.peek_is(TokenType::LeftBrace)? {
             let children = self.markup_block()?;
             Ok(ComponentRender::new_with_children(name, bindings, children).into())
         } else if !self.peek_is(TokenType::Semicolon)? {
             let expr = self.expression()?;
+            self.expect(TokenType::Semicolon)?;
             Ok(ComponentRender::new_with_expression(name, bindings, expr).into())
         } else {
             Ok(ComponentRender::new(name, bindings).into())
