@@ -1,13 +1,22 @@
+use std::fmt::{Display, Formatter};
 use ratatui::prelude::*;
+use serde_derive::{Deserialize, Serialize};
+use crate::value::NodeType;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Node {
     Text(TextNode),
     Layout(LayoutNode),
     Component(ComponentNode),
 }
 
-impl Widget for Node {
+impl Display for Node {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Node")
+    }
+}
+
+impl Widget for &Node {
     fn render(self, area: Rect, buf: &mut Buffer)
     where
         Self: Sized
@@ -23,12 +32,12 @@ impl Widget for Node {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TextNode {
     pub content: String,
 }
 
-impl Widget for TextNode {
+impl Widget for &TextNode {
     fn render(self, area: Rect, buf: &mut Buffer) where Self: Sized {
         Span::from(&self.content)
             .render(area, buf);
@@ -42,20 +51,20 @@ impl From<TextNode> for Node {
 }
 
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Default)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Default, Serialize, Deserialize)]
 pub enum LayoutDirection {
     #[default]
     Vertical,
     Horizontal,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct LayoutNode {
     pub direction: LayoutDirection,
-    pub nodes: Vec<Node>,
+    pub nodes: Vec<NodeType>,
 }
 
-impl Widget for LayoutNode {
+impl Widget for &LayoutNode {
     fn render(self, area: Rect, buf: &mut Buffer) where Self: Sized {
         let len = self.nodes.len();
 
@@ -67,18 +76,18 @@ impl Widget for LayoutNode {
         let layout = Layout::new(direction, std::iter::repeat_n(Constraint::Length(1), len))
             .split(area);
 
-        for (node, area) in self.nodes.into_iter().zip(layout.iter()) {
-            node.render(*area, buf);
+        for (node, area) in self.nodes.iter().zip(layout.iter()) {
+            node.borrow().render(*area, buf);
         }
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ComponentNode {
     pub root: Box<Node>,
 }
 
-impl Widget for ComponentNode {
+impl Widget for &ComponentNode {
     fn render(self, area: Rect, buf: &mut Buffer) where Self: Sized {
         self.root.render(area, buf);
     }

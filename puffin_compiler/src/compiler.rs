@@ -97,7 +97,7 @@ impl<'a> Compiler<'a> {
                     layout_compiler.compile_markup(markup)?;
                 }
 
-                layout_compiler.ensure_return()?;
+                layout_compiler.chunk.push_op(OpCode::Return);
 
                 let func = Function {
                     chunk: Rc::new(chunk),
@@ -387,7 +387,7 @@ impl<'a> Compiler<'a> {
                 self.chunk.push_constant_offset(global);
                 self.chunk.push_op(OpCode::Call);
                 self.chunk.push_u8(arg_count);
-                self.chunk.push_op(OpCode::Pop);
+                //self.chunk.push_op(OpCode::Pop);
             }
             // Markup::Layout(_) => {}
             // Markup::Match(_) => {}
