@@ -5,6 +5,7 @@ mod class;
 mod module;
 mod native_value;
 mod node;
+mod reactive;
 
 use std::{cell::RefCell, fmt::Display, hash::Hash, rc::Rc};
 pub use instance::{new_instance, Instance};
@@ -14,6 +15,7 @@ pub use class::{new_class, Class};
 pub use module::{new_module, Module};
 pub use native_value::{NativeValue, NativeValueTrait};
 pub use node::{Node, LayoutNode, LayoutDirection, TextNode, ComponentNode};
+pub use reactive::{Reactive};
 
 use serde_derive::{Deserialize, Serialize};
 use crate::RuntimeError;
@@ -30,6 +32,7 @@ pub type NativeFunctionType = Rc<NativeFunction>;
 pub type NativeValueType = NativeValue;
 pub type ListType = Rc<RefCell<Vec<Value>>>;
 pub type NodeType = Rc<RefCell<Node>>;
+pub type ReactiveType = Rc<RefCell<Reactive>>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Value {
@@ -41,6 +44,7 @@ pub enum Value {
     Class(ClassType),
     Module(ModuleType),
     List(ListType),
+    Reactive(ReactiveType),
     Null,
 
     #[serde(skip)]
@@ -69,6 +73,7 @@ impl PartialEq for Value {
             (Self::Class(l0), Self::Class(r0)) => Rc::as_ptr(l0) == Rc::as_ptr(r0),
             (Self::Module(l0), Self::Module(r0)) => Rc::as_ptr(l0) == Rc::as_ptr(r0),
             (Self::Node(l0), Self::Node(r0)) => Rc::as_ptr(l0) == Rc::as_ptr(r0),
+            (Self::Reactive(l0), Self::Reactive(r0)) => Rc::as_ptr(l0) == Rc::as_ptr(r0),
             (Self::NativeValue(l0), Self::NativeValue(r0)) => l0 == r0,
             _ => false,
         }
@@ -174,6 +179,23 @@ impl From<Vec<Value>> for Value {
     }
 }
 
+impl TryFrom<Value> for ReactiveType {
+    type Error = RuntimeError;
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        match value {
+            Value::Reactive(v) => Ok(v),
+            _ => Err(RuntimeError::IncorrectType { ty: value.type_name().to_owned(), expected: "reactive".to_owned() }),
+        }
+    }
+}
+
+impl From<Reactive> for Value {
+    fn from(value: Reactive) -> Self {
+        Value::Reactive(Rc::new(RefCell::new(value)))
+    }
+}
+
 // impl<T> FromIterator<T> for Value where T: Into<Value> {
 //     fn from_iter<I: IntoIterator<Item = T>>(mut iter: I) -> Self {
 //         iter.into_iter()
@@ -267,6 +289,7 @@ impl Display for Value {
             Value::NativeValue(v) => f.write_fmt(format_args!("{}", v)),
             Value::List(v) => f.write_fmt(format_args!("{}", ListDisplay(v))),
             Value::Node(v) => f.write_fmt(format_args!("{}", v.borrow())),
+            Value::Reactive(v) => f.write_fmt(format_args!("{}", v.borrow())),
             Value::Null => f.write_fmt(format_args!("null")),
         }
     }
@@ -287,6 +310,10 @@ impl<'a> Display for ListDisplay<'a> {
 
 impl Value {
     pub fn try_add(&self, rhs: &Self) -> Result<Value, RuntimeError> {
+        if let Value::Reactive(rhs) = rhs {
+            return self.try_add(rhs.borrow().get());
+        }
+
         match self {
             Value::Int(lhs) => match rhs {
                 Value::Int(rhs) => Ok(Value::Int(lhs + rhs)),
@@ -299,6 +326,9 @@ impl Value {
                 _ => Err(RuntimeError::InvalidBinaryOperation { op: "add".to_owned(), lhs_type: self.type_name().to_owned(), rhs_type: rhs.type_name().to_owned() }),
             },
 
+            Value::Reactive(inner) => inner.borrow().get().try_add(rhs),
+            // TODO: Derived
+
             Value::String(lhs) => Ok(Value::String(format!("{lhs}{}", rhs.to_owned()))),
 
             _ => Err(RuntimeError::InvalidBinaryOperation { op: "add".to_owned(), lhs_type: self.type_name().to_owned(), rhs_type: rhs.type_name().to_owned() }),
@@ -306,6 +336,10 @@ impl Value {
     }
 
     pub fn try_sub(&self, rhs: &Self) -> Result<Value, RuntimeError> {
+        if let Value::Reactive(rhs) = rhs {
+            return self.try_sub(rhs.borrow().get());
+        }
+
         match self {
             Value::Int(lhs) => match rhs {
                 Value::Int(rhs) => Ok(Value::Int(lhs - rhs)),
@@ -318,11 +352,17 @@ impl Value {
                 _ => Err(RuntimeError::InvalidBinaryOperation { op: "subtract".to_owned(), lhs_type: self.type_name().to_owned(), rhs_type: rhs.type_name().to_owned() }),
             },
 
+            Value::Reactive(inner) => inner.borrow().get().try_sub(rhs),
+
             _ => Err(RuntimeError::InvalidBinaryOperation { op: "subtract".to_owned(), lhs_type: self.type_name().to_owned(), rhs_type: rhs.type_name().to_owned() }),
         }
     }
 
     pub fn try_div(&self, rhs: &Self) -> Result<Value, RuntimeError> {
+        if let Value::Reactive(rhs) = rhs {
+            return self.try_div(rhs.borrow().get());
+        }
+
         match self {
             Value::Int(lhs) => match rhs {
                 Value::Int(0) => Err(RuntimeError::DivideByZero),
@@ -343,11 +383,17 @@ impl Value {
                 _ => Err(RuntimeError::InvalidBinaryOperation { op: "divide".to_owned(), lhs_type: self.type_name().to_owned(), rhs_type: rhs.type_name().to_owned() }),
             },
 
+            Value::Reactive(inner) => inner.borrow().get().try_div(rhs),
+
             _ => Err(RuntimeError::InvalidBinaryOperation { op: "divide".to_owned(), lhs_type: self.type_name().to_owned(), rhs_type: rhs.type_name().to_owned() }),
         }
     }
 
     pub fn try_mul(&self, rhs: &Self) -> Result<Value, RuntimeError> {
+        if let Value::Reactive(rhs) = rhs {
+            return self.try_mul(rhs.borrow().get());
+        }
+
         match self {
             Value::Int(lhs) => match rhs {
                 Value::Int(rhs) => Ok(Value::Int(lhs * rhs)),
@@ -360,11 +406,17 @@ impl Value {
                 _ => Err(RuntimeError::InvalidBinaryOperation { op: "multiply".to_owned(), lhs_type: self.type_name().to_owned(), rhs_type: rhs.type_name().to_owned() }),
             },
 
+            Value::Reactive(inner) => inner.borrow().get().try_mul(rhs),
+
             _ => Err(RuntimeError::InvalidBinaryOperation { op: "multiply".to_owned(), lhs_type: self.type_name().to_owned(), rhs_type: rhs.type_name().to_owned() }),
         }
     }
 
     pub fn try_mod(&self, rhs: &Self) -> Result<Value, RuntimeError> {
+        if let Value::Reactive(rhs) = rhs {
+            return self.try_mod(rhs.borrow().get());
+        }
+
         match self {
             Value::Int(lhs) => match rhs {
                 Value::Int(rhs) => Ok(Value::Int(lhs % rhs)),
@@ -376,6 +428,8 @@ impl Value {
                 Value::Float(rhs) => Ok(Value::Float(lhs % rhs)),
                 _ => Err(RuntimeError::InvalidBinaryOperation { op: "modulo".to_owned(), lhs_type: self.type_name().to_owned(), rhs_type: rhs.type_name().to_owned() }),
             },
+
+            Value::Reactive(inner) => inner.borrow().get().try_mod(rhs),
 
             _ => Err(RuntimeError::InvalidBinaryOperation { op: "modulo".to_owned(), lhs_type: self.type_name().to_owned(), rhs_type: rhs.type_name().to_owned() }),
         }
@@ -401,6 +455,8 @@ impl Value {
             (Value::Module(lhs), Value::Module(rhs)) => Rc::as_ptr(lhs) == Rc::as_ptr(rhs),
             (Value::Node(lhs), Value::Node(rhs)) => Rc::as_ptr(lhs) == Rc::as_ptr(rhs),
 
+            (lhs, Value::Reactive(inner)) => lhs.is_equal(inner.borrow().get()),
+            (Value::Reactive(inner), rhs) => inner.borrow().get().is_equal(rhs),
 
             (Value::Null, Value::Null) => true,
 
@@ -413,6 +469,10 @@ impl Value {
     }
 
     pub fn greater(&self, rhs: &Self) -> bool {
+        if let Value::Reactive(rhs) = rhs {
+            return self.greater(rhs.borrow().get());
+        }
+
         match self {
             Value::Int(lhs) => match rhs {
                 Value::Int(rhs) => *lhs > *rhs,
@@ -427,11 +487,17 @@ impl Value {
                 _ => false,
             },
 
+            Value::Reactive(lhs) => lhs.borrow().get().greater(rhs),
+
             _ => false,
         }
     }
 
     pub fn lesser(&self, rhs: &Self) -> bool {
+        if let Value::Reactive(rhs) = rhs {
+            return self.lesser(rhs.borrow().get());
+        }
+
         match self {
             Value::Int(lhs) => match rhs {
                 Value::Int(rhs) => *lhs < *rhs,
@@ -462,6 +528,7 @@ impl Value {
         match self {
             Value::Int(lhs) => Ok(Value::Int(-lhs)),
             Value::Float(lhs) => Ok(Value::Float(-lhs)),
+            Value::Reactive(inner) => inner.borrow().get().try_negate(),
             _ => Err(RuntimeError::InvalidUnaryOperation { op: "negate".to_owned(), rhs_type: self.type_name().to_owned() }),
         }
     }
@@ -484,6 +551,7 @@ impl Value {
             Value::NativeValue(_) => true,
             Value::List(_) => true,
             Value::Node(_) => true,
+            Value::Reactive(value) => value.borrow().get().truthy(),
             Value::Null => false,
         }
     }
@@ -503,6 +571,9 @@ impl Value {
             Value::List(_) => "list",
             Value::Node(_) => "node",
             Value::Null => "null",
+
+            // TODO: Possibly show reactive outer. For example: reactive<inner>
+            Value::Reactive(inner) => inner.borrow().get().type_name(),
         }
     }
 
@@ -552,5 +623,9 @@ impl Value {
 
     pub fn take_node(self) -> Result<NodeType, RuntimeError> {
         TryInto::<NodeType>::try_into(self)
+    }
+
+    pub fn take_reactive(self) -> Result<ReactiveType, RuntimeError> {
+        TryInto::<ReactiveType>::try_into(self)
     }
 }
