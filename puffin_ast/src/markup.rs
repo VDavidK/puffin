@@ -19,6 +19,12 @@ pub enum Markup {
 }
 
 #[derive(Debug)]
+pub enum ComponentParameter {
+    Expression(Box<Expression>),
+    Children(Box<Markup>),
+}
+
+#[derive(Debug)]
 pub enum MarkupProp {
     DirectBindings(DirectBindings),
     Lambda(LambdaFunctionBinding),
@@ -50,8 +56,7 @@ pub struct MarkupBlock {
 pub struct ComponentRender {
     pub name: Token,
     pub bindings: Vec<MarkupBinding>,
-    pub string_literal: Option<Token>,
-    pub children: Option<Box<Markup>>,
+    pub parameter: Option<ComponentParameter>,
 }
 
 #[derive(Debug)]
@@ -134,18 +139,24 @@ impl MarkupBinding {
 }
 
 impl ComponentRender {
-    pub fn new(name: Token, bindings: Vec<MarkupBinding>, string_literal: Option<Token>, children: Option<Markup>) -> Self {
+    pub fn new(name: Token, bindings: Vec<MarkupBinding>) -> Self {
         Self {
             name,
             bindings,
-            string_literal,
-            children: children.map(Box::new),
+            parameter: None,
         }
     }
-
-    pub fn with_string_literal(&mut self, string_literal: Token) -> &Self {
-        self.string_literal = Some(string_literal);
-        self
+    pub fn new_with_expression(name: Token, bindings: Vec<MarkupBinding>, expression: Expression) -> Self {
+        Self {
+            parameter: Some(expression.into()),
+            ..Self::new(name, bindings)
+        }
+    }
+    pub fn new_with_children(name: Token, bindings: Vec<MarkupBinding>, children: Markup) -> Self {
+        Self {
+            parameter: Some(children.into()),
+            ..Self::new(name, bindings)
+        }
     }
 }
 
@@ -242,5 +253,17 @@ impl From<LayoutRender> for Markup {
 impl From<MarkupBlock> for Markup {
     fn from(m: MarkupBlock) -> Self {
         Markup::Block(m)
+    }
+}
+
+impl From<Expression> for ComponentParameter {
+    fn from(e: Expression) -> Self {
+        ComponentParameter::Expression(Box::new(e))
+    }
+}
+
+impl From<Markup> for ComponentParameter {
+    fn from(m: Markup) -> Self {
+        ComponentParameter::Children(Box::new(m))
     }
 }

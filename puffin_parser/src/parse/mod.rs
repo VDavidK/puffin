@@ -6,7 +6,7 @@ use puffin_ast::statement::{Statement, AssignStatement, ExpressionStatement, Bre
 use puffin_ast::declaration::{Declaration, VarDeclaration, Decorator, ComponentDeclaration, MethodDeclaration, SignalDeclaration, LayoutDeclaration, RequireDeclaration, UseDeclaration, EnumDeclaration, ErrorDeclaration, ConstructorDeclaration};
 use puffin_ast::expression::{AccessorExpression, BinaryExpression, Expression, FunctionCallExpression, LiteralExpression, UnaryExpression, ArrayExpression, DictionaryExpression, MatchExpression, IndexExpression};
 use puffin_ast::expression::Expression::FunctionCall;
-use puffin_ast::markup::{Markup, LambdaFunctionBinding, MarkupBinding, DirectBindings, ComponentRender, IterativeRender, IfConditionalRender, MatchConditionalRender, LayoutRender, StyleRender, MarkupBlock};
+use puffin_ast::markup::{Markup, LambdaFunctionBinding, MarkupBinding, DirectBindings, ComponentRender, IterativeRender, IfConditionalRender, MatchConditionalRender, LayoutRender, StyleRender, MarkupBlock, ComponentParameter};
 use crate::lex::{PuffinLexer, LexerError};
 use crate::parse::ParserError::{DuplicateConstructor, InvalidExport, MissingComponentFileName};
 
@@ -1044,20 +1044,15 @@ impl<'a> PuffinParser<'a> {
         } else {
             vec![]
         };
-        let string_literal = if self.peek_is(TokenType::String)? {
-            Some(self.next_token()?)
+        if self.peek_is(TokenType::LeftBrace)? {
+            let children = self.markup_block()?;
+            Ok(ComponentRender::new_with_children(name, bindings, children).into())
+        } else if !self.peek_is(TokenType::Semicolon)? {
+            let expr = self.expression()?;
+            Ok(ComponentRender::new_with_expression(name, bindings, expr).into())
         } else {
-            None
-        };
-        let children = if string_literal.is_some() {
-            self.expect(TokenType::Semicolon)?;
-            None
-        } else if self.peek_is(TokenType::LeftBrace)? {
-            Some(self.markup_block()?)
-        } else {
-            None
-        };
-        Ok(ComponentRender::new(name, bindings, string_literal, children).into())
+            Ok(ComponentRender::new(name, bindings).into())
+        }
     }
 
     fn markup_block(&mut self) -> Result<Markup, ParserError> {
