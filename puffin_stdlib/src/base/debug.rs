@@ -12,3 +12,12 @@ pub fn define_print_function(runtime: &mut Runtime) {
         Ok(Value::Null)
     }));
 }
+
+pub fn define_exit_function(runtime: &mut Runtime) {
+    runtime.add_global("exit", NativeFunction::new(|runtime, argc, _| {
+        runtime.exit();
+
+        // Return null
+        Ok(Value::Null)
+    }));
+}

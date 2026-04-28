@@ -61,7 +61,13 @@ impl Dom {
         loop {
             self.render(runtime)?;
             self.poll(instance.to_owned(), runtime)?;
+
+            if runtime.exit_requested() {
+                break;
+            }
         }
+
+        Ok(())
     }
 
     pub fn render(&mut self, runtime: &mut Runtime) -> Result<(), RuntimeError> {
