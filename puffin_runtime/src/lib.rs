@@ -5,6 +5,7 @@ pub mod runtime;
 pub mod value;
 pub mod vm;
 pub mod dom;
+mod event;
 
 pub use chunk::Chunk;
 

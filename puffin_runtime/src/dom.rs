@@ -1,4 +1,5 @@
 use ratatui::DefaultTerminal;
+use crate::event::Event;
 use crate::runtime::Runtime;
 use crate::RuntimeError;
 use crate::value::{new_instance, ClassType, InstanceType, LayoutDirection, LayoutNode, Node, NodeType, Value};
@@ -59,7 +60,7 @@ impl Dom {
 
         loop {
             self.render(runtime)?;
-            self.poll()?;
+            self.poll(instance.to_owned(), runtime)?;
         }
     }
 
@@ -87,8 +88,32 @@ impl Dom {
         Ok(())
     }
 
-    pub fn poll(&self) -> Result<(), RuntimeError> {
-        ratatui::crossterm::event::read()?;
+    pub fn dispatch_event(&self, main: InstanceType, runtime: &mut Runtime, event: Event) -> Result<(), RuntimeError> {
+        event.dispatch(runtime, main)?;
+
+        for elem in &self.tree {
+            event.dispatch(runtime, elem.to_owned())?;
+        }
+
+        Ok(())
+    }
+
+    pub fn poll(&self, main: InstanceType, runtime: &mut Runtime) -> Result<(), RuntimeError> {
+        use ratatui::crossterm::event::{
+            Event as CrosstermEvent,
+            KeyEvent,
+            KeyCode,
+        };
+
+        let event = ratatui::crossterm::event::read()?;
+
+        match event {
+            CrosstermEvent::Key(KeyEvent { code: KeyCode::Char(c), .. }) => {
+                self.dispatch_event(main, runtime, Event::KeyPress(c))?;
+            }
+            _ => (),
+        }
+
         Ok(())
     }
 }

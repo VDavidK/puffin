@@ -195,6 +195,7 @@ impl<'a> ChunkFormatter<'a> {
                     OpCode::GetField => self.push_with_local_offset("getf"),
                     OpCode::SetField => self.push_with_local_offset("setf"),
                     OpCode::SetClassMethod => self.push_with_constant("setmet"),
+                    OpCode::SetHandler => self.push_with_constant("sethand"),
                     OpCode::NewList => self.push("newlist"),
                     OpCode::PushList => self.push("pushlist"),
                     OpCode::PopList => self.push("poplist"),

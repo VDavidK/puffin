@@ -368,7 +368,13 @@ impl<'a> PuffinParser<'a> {
         let name = self.expect(TokenType::Identifier)?;
         let params = self.parameters()?;
         let block = self.block_stat()?;
-        Ok(MethodDeclaration::new(name, params, block).into())
+        let decl = match decorator {
+            Some(decorator) => MethodDeclaration::new(name, params, block)
+                .with_decorator(decorator),
+            None => MethodDeclaration::new(name, params, block),
+        };
+
+        Ok(decl.into())
     }
 
     fn parameters(&mut self) -> Result<Vec<Token>, ParserError> {

@@ -16,6 +16,7 @@ pub struct Class {
     pub constructor: Option<Value>,
     pub fields: HashMap<String, Value>,
     pub methods: HashMap<String, Value>,
+    pub handlers: HashMap<String, Value>,
 }
 
 impl Class {
@@ -25,6 +26,7 @@ impl Class {
             constructor: None,
             fields: HashMap::new(),
             methods: HashMap::new(),
+            handlers: HashMap::new(),
         }
     }
 
@@ -50,6 +52,10 @@ impl Class {
 
     pub fn set_method(&mut self, name: impl Into<String>, value: impl Into<Value>) {
         self.methods.insert(name.into(), value.into());
+    }
+
+    pub fn set_handler(&mut self, name: impl Into<String>, value: impl Into<Value>) {
+        self.handlers.insert(name.into(), value.into());
     }
 
     pub fn get_fields(&self) -> &HashMap<String, Value> {

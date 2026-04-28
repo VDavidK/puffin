@@ -139,9 +139,15 @@ impl<'a> Compiler<'a> {
                 let constant = self.chunk.new_constant(func);
                 self.chunk.push_op(OpCode::Constant);
                 self.chunk.push_constant_offset(constant);
-                self.chunk.push_op(OpCode::SetClassMethod);
-                let name = self.token_to_constant(&method.name)?;
-                self.chunk.push_constant_offset(name);
+                if let Some(decorator) = &method.decorator {
+                    self.chunk.push_op(OpCode::SetHandler);
+                    let name = self.token_to_constant(&decorator.name)?;
+                    self.chunk.push_constant_offset(name);
+                } else {
+                    self.chunk.push_op(OpCode::SetClassMethod);
+                    let name = self.token_to_constant(&method.name)?;
+                    self.chunk.push_constant_offset(name);
+                }
             }
             Declaration::Constructor(constructor) => {
                 self.chunk.push_op(OpCode::GetLocal);

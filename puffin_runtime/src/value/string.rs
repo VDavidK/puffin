@@ -10,6 +10,12 @@ impl From<StringType> for Value {
     }
 }
 
+impl From<char> for Value {
+    fn from(value: char) -> Self {
+        Value::String(value.to_string())
+    }
+}
+
 impl TryFrom<Value> for StringType {
     type Error = RuntimeError;
 

@@ -83,6 +83,11 @@ pub enum OpCode {
     // Expected stack: TOP > [method: callable] > [cls: class]
     SetClassMethod,
 
+    // : sethand [offset:4B]
+    // Pops the top function off the stack and assigns it as an event handler to a class with the name of the constant at the provided offset.
+    // Expected stack: TOP > [handler: callable] > [cls: class]
+    SetHandler,
+
     // : reactive
     // Pops the top value of the stack and wraps it as a reactive value. Pushing the result back onto the stack.
     MakeReactive,

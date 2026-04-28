@@ -305,7 +305,7 @@ impl MethodDeclaration {
         }
     }
 
-    pub fn with_decorator(&mut self, decorator: Decorator) -> &Self {
+    pub fn with_decorator(mut self, decorator: Decorator) -> Self {
         self.decorator = Some(decorator);
         self
     }
