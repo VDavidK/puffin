@@ -4,9 +4,9 @@ use std::fmt::Display;
 use std::rc::Rc;
 use serde_derive::{Deserialize, Serialize};
 use crate::{RuntimeError};
-use crate::value::{Value};
+use crate::value::{FunctionType, Value};
 use crate::value::instance::InstanceType;
-use crate::value::ops::ValueTruthy;
+use crate::value::ops::{ValueDef, ValueTruthy};
 
 pub type ModuleType = Rc<RefCell<Module>>;
 
@@ -68,4 +68,8 @@ impl ValueTruthy for ModuleType {
     fn truthy(&self) -> bool {
         true
     }
+}
+
+impl ValueDef for ModuleType {
+    const TYPE_NAME: &'static str = "module";
 }

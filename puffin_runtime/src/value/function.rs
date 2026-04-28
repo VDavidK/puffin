@@ -4,7 +4,7 @@ use std::rc::Rc;
 use serde_derive::{Deserialize, Serialize};
 use crate::{Chunk, RuntimeError};
 use crate::value::{InstanceType, Value};
-use crate::value::ops::ValueTruthy;
+use crate::value::ops::{ValueDef, ValueTruthy};
 
 pub type FunctionType = Rc<RefCell<Function>>;
 
@@ -60,4 +60,8 @@ impl ValueTruthy for FunctionType {
     fn truthy(&self) -> bool {
         true
     }
+}
+
+impl ValueDef for FunctionType {
+    const TYPE_NAME: &'static str = "function";
 }

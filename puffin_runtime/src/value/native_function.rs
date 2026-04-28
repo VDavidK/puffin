@@ -4,7 +4,7 @@ use std::rc::Rc;
 use crate::runtime::Runtime;
 use crate::RuntimeError;
 use crate::value::{InstanceType, Value};
-use crate::value::ops::ValueTruthy;
+use crate::value::ops::{ValueDef, ValueTruthy};
 
 pub type NativeFunctionType = Rc<RefCell<NativeFunction>>;
 
@@ -68,4 +68,8 @@ impl ValueTruthy for NativeFunctionType {
     fn truthy(&self) -> bool {
         true
     }
+}
+
+impl ValueDef for NativeFunctionType {
+    const TYPE_NAME: &'static str = "native_function";
 }
