@@ -1025,7 +1025,7 @@ impl<'a> PuffinParser<'a> {
             } else {
                 vec![]
             };
-            self.expect(TokenType::Assign)?;
+            //self.expect(TokenType::Assign)?;
             if self.peek_is(TokenType::LeftBrace)? {
                 is_lambda = true;
             }
