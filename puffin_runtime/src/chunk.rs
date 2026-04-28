@@ -197,6 +197,7 @@ impl<'a> ChunkFormatter<'a> {
                     OpCode::NewList => self.push("newlist"),
                     OpCode::PushList => self.push("pushlist"),
                     OpCode::PopList => self.push("poplist"),
+                    OpCode::MakeReactive => self.push("reactive"),
 
                     // Arithmetic
                     OpCode::Add => self.push("add"),
@@ -218,14 +219,6 @@ impl<'a> ChunkFormatter<'a> {
                     OpCode::JumpIf => self.push_with_instruction_offset("jmpi"),
                     OpCode::Call => self.push_with_u8("call"),
                     OpCode::Return  => self.push("return"),
-
-                    // Terminal
-                    OpCode::Exit => self.push("exit"),
-                    OpCode::Poll => self.push("poll"),
-                    OpCode::Render => self.push("render"),
-
-                    // Layout
-                    OpCode::SetRoot => self.push("setroot"),
                 },
                 Err(_) => self.inst.push(format!("{:<4x}| unknown [0x{:x}]", byte, self.idx)),
             }

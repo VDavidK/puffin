@@ -78,6 +78,10 @@ pub enum OpCode {
     // Expected stack: TOP > [obj: assignable]
     GetField,
 
+    // : reactive
+    // Pops the top value of the stack and wraps it as a reactive value. Pushing the result back onto the stack.
+    MakeReactive,
+
     // ----------------------------
     // Arithmetic Instructions
     // ----------------------------
@@ -172,31 +176,5 @@ pub enum OpCode {
     // Pops all other local variables defined in the current scope
     // Expected stack: TOP > [return_val: any] > ...
     Return,
-
-    
-    // ----------------------------
-    // Terminal Instructions
-    // ----------------------------
-
-    // : exit
-    // Exits the application
-    Exit,
-
-    // : poll
-    // Waits for user input and runs the corresponding event handlers
-    Poll,
-
-    // : render
-    // Renders the current layout buffer to the terminal
-    Render,
-
-    // ----------------------------
-    // Layout Instructions
-    // ----------------------------
-
-    // :setroot
-    // Pops the top element off the stack and sets it as the root element for the render loop
-    // Expected stack: TOP > [value: renderable]
-    SetRoot,
 
 }

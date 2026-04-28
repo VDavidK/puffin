@@ -4,11 +4,12 @@ use crate::runtime::Runtime;
 use crate::RuntimeError;
 use crate::value::{Value, NativeFunctionType};
 
-pub type NativeCallable = fn(runtime: &mut Runtime, argc: usize) -> Result<Value, RuntimeError>;
+pub type NativeCallable = fn(runtime: &mut Runtime, argc: usize, this: Value) -> Result<Value, RuntimeError>;
 
 #[derive(Debug)]
 pub struct NativeFunction {
     pub fun: NativeCallable,
+    pub bound_value: Value,
 }
 
 impl Display for NativeFunction {
@@ -21,7 +22,17 @@ impl NativeFunction {
     pub fn new(callable: NativeCallable) -> Self {
         Self {
             fun: callable,
+            bound_value: Value::Null,
         }
+    }
+
+    pub fn bound_to(mut self, value: Value) -> Self {
+        self.bind(value);
+        self
+    }
+
+    pub fn bind(&mut self, value: Value) {
+        self.bound_value = value;
     }
 }
 

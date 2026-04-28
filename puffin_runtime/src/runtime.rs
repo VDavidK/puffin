@@ -19,22 +19,17 @@ pub struct CallFrame {
 pub struct Runtime {
     stack: Vec<Value>,
     call_stack: Vec<CallFrame>,
-    term: DefaultTerminal,
     globals: HashMap<String, Value>,
-    node_stack: Vec<Node>,
 }
 
 impl Default for Runtime {
     fn default() -> Self {
-        let term = ratatui::init();
 
         #[allow(clippy::new_without_default)]
         let runtime = Runtime {
             stack: vec![],
             call_stack: vec![],
             globals: HashMap::new(),
-            term,
-            node_stack: vec![],
         };
 
         runtime
@@ -53,32 +48,6 @@ impl Runtime {
         Ok(ret_value)
     }
 
-    pub fn run_component(&mut self, name: impl AsRef<str>) -> Result<(), RuntimeError> {
-        let name = name.as_ref();
-        let component = self.get_global(name)
-            .ok_or(RuntimeError::GlobalNotFound { name: name.to_owned() })?;
-
-        let component = component.clone().take_class()?;
-        let instance = new_instance(component.clone());
-
-        if let Some(constructor) = component.borrow().get_constructor() {
-            self.push_value(instance.clone());
-            self.call_fn(constructor.clone().take_function()?)?;
-        }
-
-        loop {
-            let main = instance.borrow()
-                .get_field("<main>")
-                .ok_or(RuntimeError::GlobalNotFound { name: "<main>".to_string() })?
-                .clone();
-            self.push_value(component.clone());
-            let ret = self.call_val(main, 1)?;
-            self.push_value(ret);
-
-            self.render()?;
-            self.poll()?;
-        }
-    }
 
     pub fn call(&mut self, value: Value, args: &[Value]) -> Result<Value, RuntimeError> {
         for arg in args {
@@ -91,15 +60,15 @@ impl Runtime {
     pub fn call_val(&mut self, value: Value, num_args: usize) -> Result<Value, RuntimeError> {
         match value {
             Value::NativeFunction(func) => {
-                //self.match_function_param_count(func.arity, num_args);
                 let callable = &func.fun;
                 let local_count = self.local_count()? - num_args;
-                let value = callable(self, num_args)?;
+                let value = callable(self, num_args, func.bound_value.to_owned())?;
                 self.pop_until(local_count)?;
                 Ok(value)
             },
             Value::Function(func) => {
                 self.match_function_param_count(func.arity, num_args);
+                self.push_value(func.bound_value.to_owned());
                 let ret_value = self.call_fn(func)?;
                 Ok(ret_value)
             },
@@ -108,7 +77,7 @@ impl Runtime {
 
                 if let Some(constructor) = cls.borrow().get_constructor() {
                     let func = constructor.clone();
-                    self.push_value(instance.clone());
+                    Self::bind_func(func.to_owned(), instance.to_owned());
                     self.call_val(func, num_args)?;
                     self.pop_value();
                 }
@@ -119,7 +88,11 @@ impl Runtime {
         }
     }
 
-
+    fn bind_func(func: Value, value: Value) -> {
+        match func {
+            Value::NativeFunction(func) => func.bind(value)
+        }
+    }
 
     pub fn call_fn(&mut self, func: FunctionType) -> Result<Value, RuntimeError> {
         log::debug!("Executing function '{}'", func.identifier);
@@ -303,33 +276,6 @@ impl Runtime {
         if let Some(frame) = self.call_stack.last_mut() {
             frame.pc = pc
         }
-    }
-
-    pub fn render(&mut self) -> Result<(), RuntimeError> {
-        //let stack = std::mem::take(&mut self.node_stack);
-        let node = self.pop_expecting()?
-            .take_list()?
-            .borrow()
-            .iter()
-            .cloned()
-            .map(|v| v.take_node())
-            .collect::<Result<Vec<_>, _>>()?;
-
-        let layout = LayoutNode {
-            direction: LayoutDirection::Vertical,
-            nodes: node,
-        };
-
-        self.term.draw(move |frame| {
-            frame.render_widget(&layout, frame.area());
-        })?;
-
-        Ok(())
-    }
-
-    pub fn poll(&self) -> Result<(), RuntimeError> {
-        ratatui::crossterm::event::read()?;
-        Ok(())
     }
 
     pub fn add_global(&mut self, name: impl Into<String>, value: impl Into<Value>) {

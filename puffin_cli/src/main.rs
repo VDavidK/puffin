@@ -8,6 +8,7 @@ use std::{fs::File, path::PathBuf};
 use puffin_runtime::runtime::Runtime;
 #[cfg(feature = "logging")]
 use simplelog::{Config, LevelFilter, WriteLogger};
+use puffin_runtime::dom::Dom;
 
 #[derive(Subcommand, Debug)]
 enum Operation {
@@ -91,7 +92,13 @@ fn main() -> color_eyre::Result<()> {
                 .to_owned();
 
             runtime.execute(Rc::new(chunk))?;
-            runtime.run_component(main_component_name)?;
+
+            let main_component = runtime.get_global(main_component_name)
+                .ok_or_eyre("Main component missing")?
+                .to_owned();
+
+            let mut dom = Dom::new();
+            dom.run_component(&mut runtime, main_component)?;
         }
     }
 

@@ -3,7 +3,7 @@ use num_enum::TryFromPrimitive;
 use crate::{RuntimeError, op::OpCode, value::{Value, new_instance}};
 use crate::chunk::{InstructionOffset, ConstantOffset, LocalOffset};
 use crate::runtime::Runtime;
-use crate::value::new_class;
+use crate::value::{new_class, Reactive};
 
 #[derive(Debug)]
 pub(crate) struct Vm<'a> {
@@ -64,7 +64,7 @@ impl<'a> Vm<'a> {
             self.runtime.log_stack();
             log::debug!("exec [{}] 0x{:X} | {op:?}", self.runtime.chunk_name()?, self.runtime.pc()? - 1);
         }
-        
+
         match op {
             OpCode::Invalid => return Err(RuntimeError::InvalidOpCode { pc: self.runtime.pc()? - 1 }),
 
@@ -214,6 +214,19 @@ impl<'a> Vm<'a> {
                 self.runtime.push_value(value);
             }
 
+            OpCode::MakeReactive => {
+                let value = self.runtime.pop_expecting()?;
+
+                let reactive_value = match value {
+                    Value::Reactive(inner) => Value::Reactive(inner),
+                    // TODO: Support derived
+
+                    val => Reactive::new(val).into(),
+                };
+
+                self.runtime.push_value(reactive_value);
+            }
+
             OpCode::Add => {
                 let rhs = self.runtime.pop_expecting()?;
                 let lhs = self.runtime.pop_expecting()?;
@@ -324,26 +337,6 @@ impl<'a> Vm<'a> {
 
             OpCode::Return => {
                 return Ok(Some(self.runtime.ret()?));
-            },
-
-            OpCode::Exit => {
-                self.running = false;
-            },
-
-            OpCode::Poll => {
-                self.runtime.poll()?;
-            },
-            
-            OpCode::Render => {
-                self.runtime.render()?;
-            },
-
-            OpCode::SetRoot => {
-                // let element = self.runtime
-                //     .pop_expecting()?
-                //     .take_instance()?;
-
-                // self.root = Some(element);
             },
         }
 

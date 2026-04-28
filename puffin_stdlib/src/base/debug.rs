@@ -8,9 +8,6 @@ pub fn define_print_function(runtime: &mut Runtime) {
 
         log::info!("{}", value);
 
-        // Wait for user input
-        runtime.poll()?;
-
         // Return null
         Ok(Value::Null)
     }));

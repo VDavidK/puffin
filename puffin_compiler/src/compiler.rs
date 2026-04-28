@@ -72,6 +72,7 @@ impl<'a> Compiler<'a> {
 
                 let name = self.chunk.new_constant(var.name.lexeme.clone());
                 self.compile_expression(&var.value)?;
+                self.chunk.push_op(OpCode::MakeReactive);
 
                 self.chunk.push_op(OpCode::SetField);
                 self.chunk.push_constant_offset(name);
@@ -83,7 +84,7 @@ impl<'a> Compiler<'a> {
                 let name = layout.name
                     .as_ref()
                     .map(|name| name.lexeme.as_str())
-                    .unwrap_or("<main>")
+                    .unwrap_or("<layout>")
                     .to_owned();
 
                 let mut chunk = Chunk::new(&name);

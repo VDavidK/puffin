@@ -9,6 +9,7 @@ pub struct Function {
     pub chunk: Rc<Chunk>,
     pub identifier: String,
     pub arity: usize,
+    pub bound_value: Value,
 }
 
 impl Display for Function {

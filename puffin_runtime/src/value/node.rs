@@ -1,7 +1,9 @@
+use std::cell::Ref;
 use std::fmt::{Display, Formatter};
 use ratatui::prelude::*;
 use serde_derive::{Deserialize, Serialize};
-use crate::value::NodeType;
+use crate::runtime::Runtime;
+use crate::value::{InstanceType, NodeType};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Node {
@@ -16,8 +18,10 @@ impl Display for Node {
     }
 }
 
-impl Widget for &Node {
-    fn render(self, area: Rect, buf: &mut Buffer)
+impl StatefulWidget for &Node {
+    type State = Runtime;
+
+    fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State)
     where
         Self: Sized
     {
@@ -25,9 +29,9 @@ impl Widget for &Node {
             Node::Text(text)
             => text.render(area, buf),
             Node::Layout(layout)
-            => layout.render(area, buf),
+            => layout.render(area, buf, state),
             Node::Component(component)
-            => component.render(area, buf),
+            => component.render(area, buf, state),
         }
     }
 }
@@ -64,8 +68,10 @@ pub struct LayoutNode {
     pub nodes: Vec<NodeType>,
 }
 
-impl Widget for &LayoutNode {
-    fn render(self, area: Rect, buf: &mut Buffer) where Self: Sized {
+impl StatefulWidget for &LayoutNode {
+    type State = Runtime;
+
+    fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) where Self: Sized {
         let len = self.nodes.len();
 
         let direction = match self.direction {
@@ -77,18 +83,34 @@ impl Widget for &LayoutNode {
             .split(area);
 
         for (node, area) in self.nodes.iter().zip(layout.iter()) {
-            node.borrow().render(*area, buf);
+            let node = node.borrow();
+            node.render(*area, buf, state);
         }
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ComponentNode {
-    pub root: Box<Node>,
+    pub instance: InstanceType,
 }
 
-impl Widget for &ComponentNode {
-    fn render(self, area: Rect, buf: &mut Buffer) where Self: Sized {
-        self.root.render(area, buf);
+impl StatefulWidget for &ComponentNode {
+    type State = Runtime;
+
+    fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
+        // TODO: Fix error handling
+
+        let instance = self.instance.borrow();
+        let layout = instance
+            .get_field("<layout>")
+            .unwrap();
+
+        let node = state.call(layout.to_owned(), &[instance.to_owned().into()])
+            .unwrap()
+            .take_node()
+            .unwrap();
+
+        node.borrow()
+            .render(area, buf, state);
     }
 }
