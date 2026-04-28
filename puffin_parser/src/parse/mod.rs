@@ -6,7 +6,7 @@ use puffin_ast::statement::{Statement, AssignStatement, ExpressionStatement, Bre
 use puffin_ast::declaration::{Declaration, VarDeclaration, Decorator, ComponentDeclaration, MethodDeclaration, SignalDeclaration, LayoutDeclaration, RequireDeclaration, UseDeclaration, EnumDeclaration, ErrorDeclaration, ConstructorDeclaration};
 use puffin_ast::expression::{AccessorExpression, BinaryExpression, Expression, FunctionCallExpression, LiteralExpression, UnaryExpression, ArrayExpression, DictionaryExpression, MatchExpression, IndexExpression};
 use puffin_ast::expression::Expression::FunctionCall;
-use puffin_ast::markup::{Markup, LambdaFunctionBinding, MarkupBinding, DirectBindings, ComponentRender, IterativeRender, IfConditionalRender, MatchConditionalRender, LayoutRender, StyleRender};
+use puffin_ast::markup::{Markup, LambdaFunctionBinding, MarkupBinding, DirectBindings, ComponentRender, IterativeRender, IfConditionalRender, MatchConditionalRender, LayoutRender, StyleRender, MarkupBlock};
 use crate::lex::{PuffinLexer, LexerError};
 use crate::parse::ParserError::{DuplicateConstructor, InvalidExport, MissingComponentFileName};
 
@@ -945,17 +945,17 @@ impl<'a> PuffinParser<'a> {
         self.expect(TokenType::KwIf)?;
         let condition = self.expression()?;
         let if_markup = self.markup_block()?;
-        let mut elseif_markup = None;
-        let mut else_markup = vec![];
-        if self.peek_is(TokenType::KwElse)? {
+        let else_markup = if self.peek_is(TokenType::KwElse)? {
         self.next_token()?;
             if self.peek_is(TokenType::KwIf)? {
-                elseif_markup = Some(self.if_markup()?);
+                Some(self.if_markup()?)
             } else {
-                else_markup = self.markup_block()?
+                Some(self.markup_block()?)
             }
-        }
-        Ok(IfConditionalRender::new(condition, if_markup, elseif_markup, else_markup).into())
+        } else {
+            None
+        };
+        Ok(IfConditionalRender::new(condition, if_markup, else_markup).into())
     }
 
     fn for_markup(&mut self) -> Result<Markup, ParserError> {
@@ -969,7 +969,7 @@ impl<'a> PuffinParser<'a> {
         } else {
             None
         };
-        let block = self.markup_block()?;
+        let block = Some(self.markup_block()?);
         Ok(IterativeRender::new(name, iterable, end_range, block).into())
     }
 
@@ -1053,19 +1053,19 @@ impl<'a> PuffinParser<'a> {
         };
         let children = if string_literal.is_some() {
             self.expect(TokenType::Semicolon)?;
-            vec![]
+            None
         } else if self.peek_is(TokenType::LeftBrace)? {
-            self.markup_block()?
+            Some(self.markup_block()?)
         } else {
-            vec![]
+            None
         };
         Ok(ComponentRender::new(name, bindings, string_literal, children).into())
     }
 
-    fn markup_block(&mut self) -> Result<Vec<Markup>, ParserError> {
+    fn markup_block(&mut self) -> Result<Markup, ParserError> {
         self.expect(TokenType::LeftBrace)?;
         let mut markup = self.markup()?;
         self.expect(TokenType::RightBrace)?;
-        Ok(markup)
+        Ok(MarkupBlock::new(markup).into())
     }
 }

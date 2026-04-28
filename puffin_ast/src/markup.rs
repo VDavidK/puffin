@@ -14,6 +14,8 @@ pub enum Markup {
     Iterative(IterativeRender),
     /// Modifying the appearance of a component
     Style(StyleRender),
+    /// A collection of multiple markup elements
+    Block(MarkupBlock),
 }
 
 #[derive(Debug)]
@@ -40,11 +42,16 @@ pub struct MarkupBinding {
 }
 
 #[derive(Debug)]
+pub struct MarkupBlock {
+    pub markup: Vec<Markup>,
+}
+
+#[derive(Debug)]
 pub struct ComponentRender {
     pub name: Token,
     pub bindings: Vec<MarkupBinding>,
     pub string_literal: Option<Token>,
-    pub children: Vec<Markup>,
+    pub children: Option<Box<Markup>>,
 }
 
 #[derive(Debug)]
@@ -63,9 +70,8 @@ pub struct MatchConditionalRender {
 #[derive(Debug)]
 pub struct IfConditionalRender {
     pub condition: Box<Expression>,
-    pub if_markup: Vec<Markup>,
-    pub elseif_markup: Option<Box<Markup>>,
-    pub else_markup: Vec<Markup>,
+    pub if_markup: Box<Markup>,
+    pub else_markup: Option<Box<Markup>>,
 }
 
 #[derive(Debug)]
@@ -73,7 +79,7 @@ pub struct IterativeRender {
     pub var_name: Token,
     pub iterable: Box<Expression>,
     pub end_range: Option<Box<Expression>>,
-    pub block: Vec<Markup>
+    pub block: Option<Box<Markup>>
 }
 
 #[derive(Debug)]
@@ -128,12 +134,12 @@ impl MarkupBinding {
 }
 
 impl ComponentRender {
-    pub fn new(name: Token, bindings: Vec<MarkupBinding>, string_literal: Option<Token>, children: Vec<Markup>,) -> Self {
+    pub fn new(name: Token, bindings: Vec<MarkupBinding>, string_literal: Option<Token>, children: Option<Markup>) -> Self {
         Self {
             name,
             bindings,
             string_literal,
-            children,
+            children: children.map(Box::new),
         }
     }
 
@@ -161,24 +167,31 @@ impl IterativeRender {
     pub fn new(var_name: Token,
        iterable: Expression,
        end_range: Option<Expression>,
-       block: Vec<Markup>
+       block: Option<Markup>
     ) -> Self {
         Self {
             var_name,
             iterable: Box::new(iterable),
             end_range: end_range.map(Box::new),
-            block,
+            block: block.map(Box::new),
         }
     }
 }
 
 impl IfConditionalRender {
-    pub fn new(condition: Expression, if_markup: Vec<Markup>, elseif_markup: Option<Markup>, else_markup: Vec<Markup>) -> Self {
+    pub fn new(condition: Expression, if_markup: Markup, else_markup: Option<Markup>) -> Self {
         Self {
             condition: Box::new(condition),
-            if_markup,
-            elseif_markup: elseif_markup.map(Box::new),
-            else_markup,
+            if_markup: Box::new(if_markup),
+            else_markup: else_markup.map(Box::new),
+        }
+    }
+}
+
+impl MarkupBlock {
+    pub fn new(markup: Vec<Markup>) -> Self {
+        Self {
+            markup,
         }
     }
 }
@@ -223,5 +236,11 @@ impl From<LambdaFunctionBinding> for MarkupProp {
 impl From<LayoutRender> for Markup {
     fn from(m: LayoutRender) -> Self {
         Markup::Layout(m)
+    }
+}
+
+impl From<MarkupBlock> for Markup {
+    fn from(m: MarkupBlock) -> Self {
+        Markup::Block(m)
     }
 }
