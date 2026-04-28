@@ -99,7 +99,7 @@ impl<'a> Compiler<'a> {
                 let func = Function {
                     chunk: Rc::new(chunk),
                     identifier: name.to_owned(),
-                    arity: layout.parameters.len() + 1, // One more for self
+                    arity: layout.parameters.len(),
                 };
 
                 let constant = self.chunk.new_constant(func);
@@ -387,9 +387,11 @@ impl<'a> Compiler<'a> {
                 for elem in &block.markup {
                     self.chunk.push_op(OpCode::GetLocal);
                     self.chunk.push_local_offset(children);
+                    self.scope.define_unnamed_local();
 
                     self.compile_markup(elem)?;
 
+                    self.scope.remove_top_local();
                     self.chunk.push_op(OpCode::PushList);
                 }
             }
@@ -410,6 +412,7 @@ impl<'a> Compiler<'a> {
                 self.chunk.push_op(OpCode::GetGlobal);
                 self.chunk.push_constant_offset(global);
                 self.chunk.push_op(OpCode::Call);
+                self.chunk.push_u8(arg_count);
             }
             // Markup::Layout(_) => {}
             // Markup::Match(_) => {}
