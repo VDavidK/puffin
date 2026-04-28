@@ -93,19 +93,13 @@ impl<'a> Compiler<'a> {
                     layout_compiler.scope.define_local(&arg.lexeme);
                 }
 
-                layout_compiler.chunk.push_op(OpCode::NewList);
-                let list = layout_compiler.scope.define_unnamed_local();
-
-                for markup in &layout.markup {
-                    layout_compiler.compile_markup(markup, list)?;
-                }
-
+                layout_compiler.compile_markup(layout.markup)?;
                 layout_compiler.chunk.push_op(OpCode::Return);
 
                 let func = Function {
                     chunk: Rc::new(chunk),
                     identifier: name.to_owned(),
-                    arity: layout.parameters.len(),
+                    arity: layout.parameters.len() + 1, // One more for self
                 };
 
                 let constant = self.chunk.new_constant(func);
@@ -384,24 +378,23 @@ impl<'a> Compiler<'a> {
         Ok(())
     }
 
-    fn compile_markup(&mut self, markup: &'a Markup, list: LocalOffset) -> Result<(), CompileError> {
+    fn compile_markup(&mut self, markup: &'a Markup) -> Result<(), CompileError> {
         match markup {
             Markup::Block(block) => {
+                self.chunk.push_op(OpCode::NewList);
+                let children = self.scope.define_unnamed_local();
+
                 for elem in &block.markup {
-                    self.compile_markup(elem, list)?;
+                    self.chunk.push_op(OpCode::GetLocal);
+                    self.chunk.push_local_offset(children);
+
+                    self.compile_markup(elem)?;
+
+                    self.chunk.push_op(OpCode::PushList);
                 }
             }
             Markup::Component(component) => {
                 let mut arg_count = 0;
-                let mut args = 0;
-
-                if component.children.is_some() {
-                    self.chunk.push_op(OpCode::NewList);
-                    args = self.scope.define_unnamed_local();
-                }
-
-                self.chunk.push_op(OpCode::GetLocal);
-                self.chunk.push_local_offset(list);
 
                 if let Some(string) = &component.string_literal {
                     let constant = self.token_to_constant(string)?;
@@ -409,10 +402,7 @@ impl<'a> Compiler<'a> {
                     self.chunk.push_constant_offset(constant);
                     arg_count = 1;
                 } else if let Some(inner) = &component.children {
-                    self.chunk.push_op(OpCode::GetLocal);
-                    self.chunk.push_local_offset(args);
-
-                    self.compile_markup(inner, args)?;
+                    self.compile_markup(inner)?;
                     arg_count = 1;
                 }
 
@@ -420,12 +410,6 @@ impl<'a> Compiler<'a> {
                 self.chunk.push_op(OpCode::GetGlobal);
                 self.chunk.push_constant_offset(global);
                 self.chunk.push_op(OpCode::Call);
-                self.chunk.push_u8(arg_count);
-                self.chunk.push_op(OpCode::PushList);
-
-                if component.children.is_some() {
-                    self.chunk.push_op(OpCode::Pop);
-                }
             }
             // Markup::Layout(_) => {}
             // Markup::Match(_) => {}
@@ -434,7 +418,7 @@ impl<'a> Compiler<'a> {
                 self.chunk.push_op(OpCode::Not);
                 let jmp = self.chunk.push_jump(OpCode::JumpIf);
 
-                self.compile_markup(&markup.if_markup, list)?;
+                self.compile_markup(&markup.if_markup)?;
 
                 // TODO: ???
                 // let end_addr = if let Some(body) = &markup.else_markup {
