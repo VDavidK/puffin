@@ -4,7 +4,11 @@ use std::fmt::Display;
 use std::rc::Rc;
 use serde_derive::{Deserialize, Serialize};
 use crate::RuntimeError;
-use crate::value::{Value, ClassType, InstanceType};
+use crate::value::{Value, ClassType};
+use crate::value::bool::BoolType;
+use crate::value::ops::ValueTruthy;
+
+pub type InstanceType = Rc<RefCell<Instance>>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Instance {
@@ -49,6 +53,17 @@ impl TryFrom<Value> for InstanceType {
         }
     }
 }
+impl From<InstanceType> for Value {
+    fn from(value: InstanceType) -> Self {
+        Value::Instance(value)
+    }
+}
+
+impl From<Instance> for Value {
+    fn from(value: Instance) -> Self {
+        Value::Instance(Rc::new(RefCell::new(value)))
+    }
+}
 
 pub fn new_instance(class: ClassType) -> InstanceType {
     let mut instance = Instance::new(class.clone());
@@ -61,4 +76,10 @@ pub fn new_instance(class: ClassType) -> InstanceType {
     }
 
     Rc::new(RefCell::new(instance))
+}
+
+impl ValueTruthy for InstanceType {
+    fn truthy(&self) -> bool {
+        true
+    }
 }

@@ -1,7 +1,12 @@
+use std::cell::RefCell;
 use std::fmt::{Display, Formatter};
+use std::rc::Rc;
 use ratatui::prelude::*;
 use serde_derive::{Deserialize, Serialize};
-use crate::value::NodeType;
+use crate::RuntimeError;
+use crate::value::Value;
+
+pub type NodeType = Rc<RefCell<Node>>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Node {
@@ -50,6 +55,28 @@ impl From<TextNode> for Node {
     }
 }
 
+impl From<NodeType> for Value {
+    fn from(value: NodeType) -> Self {
+        Value::Node(value)
+    }
+}
+
+impl From<Node> for Value {
+    fn from(value: Node) -> Self {
+        Rc::new(RefCell::new(value)).into()
+    }
+}
+
+impl TryFrom<Value> for NodeType {
+    type Error = RuntimeError;
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        match value {
+            Value::Node(v) => Ok(v),
+            _ => Err(RuntimeError::IncorrectType { ty: value.type_name().to_owned(), expected: "node".to_owned() }),
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Default, Serialize, Deserialize)]
 pub enum LayoutDirection {

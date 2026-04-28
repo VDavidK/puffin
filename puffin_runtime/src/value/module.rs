@@ -4,7 +4,11 @@ use std::fmt::Display;
 use std::rc::Rc;
 use serde_derive::{Deserialize, Serialize};
 use crate::{RuntimeError};
-use crate::value::{Value, ModuleType};
+use crate::value::{Value};
+use crate::value::instance::InstanceType;
+use crate::value::ops::ValueTruthy;
+
+pub type ModuleType = Rc<RefCell<Module>>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Module {
@@ -58,4 +62,10 @@ impl TryFrom<Value> for ModuleType {
 
 pub fn new_module(name: impl Into<String>) -> ModuleType {
     Rc::new(RefCell::new(Module::new(name)))
+}
+
+impl ValueTruthy for ModuleType {
+    fn truthy(&self) -> bool {
+        true
+    }
 }

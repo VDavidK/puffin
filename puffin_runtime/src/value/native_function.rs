@@ -2,7 +2,11 @@ use std::fmt::Display;
 use std::rc::Rc;
 use crate::runtime::Runtime;
 use crate::RuntimeError;
-use crate::value::{Value, NativeFunctionType};
+use crate::value::{Value};
+use crate::value::instance::InstanceType;
+use crate::value::ops::ValueTruthy;
+
+pub type NativeFunctionType = Rc<NativeFunction>;
 
 pub type NativeCallable = fn(runtime: &mut Runtime, argc: usize) -> Result<Value, RuntimeError>;
 
@@ -39,5 +43,11 @@ impl TryFrom<Value> for NativeFunctionType {
             Value::NativeFunction(s) => Ok(s),
             _ => Err(RuntimeError::IncorrectType { ty: value.type_name().to_owned(), expected: "native_function".to_owned() }),
         }
+    }
+}
+
+impl ValueTruthy for NativeFunctionType {
+    fn truthy(&self) -> bool {
+        true
     }
 }

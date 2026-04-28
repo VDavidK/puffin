@@ -5,7 +5,7 @@ use ratatui::DefaultTerminal;
 use crate::chunk::LocalOffset;
 use crate::vm::Vm;
 use crate::{Chunk, RuntimeError, value::Value};
-use crate::value::{new_instance, FunctionType, InstanceType, Module, LayoutDirection, LayoutNode, Node};
+use crate::value::{new_instance, Module, LayoutDirection, LayoutNode, Node, FunctionType};
 
 #[derive(Debug, Clone)]
 pub struct CallFrame {
