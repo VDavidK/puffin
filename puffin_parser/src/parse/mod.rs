@@ -857,9 +857,7 @@ impl<'a> PuffinParser<'a> {
         } else {
             None
         };
-        self.expect(TokenType::LeftBrace)?;
         let markup = self.markup_block()?;
-        self.expect(TokenType::RightBrace)?;
         Ok(LayoutDeclaration::new(markup, parameters).with_name(name).into())
     }
 
