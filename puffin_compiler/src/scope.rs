@@ -38,6 +38,10 @@ impl<'a> Scope<'a> {
         local_count
     }
 
+    pub fn remove_top_local(&mut self) {
+        self.local_count -= 1;
+    }
+
     pub fn local_count(&self) -> usize {
         self.local_count
     }
