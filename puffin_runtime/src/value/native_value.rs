@@ -3,7 +3,11 @@ use std::cell::{Ref, RefCell, RefMut};
 use std::fmt::Display;
 use std::sync::Arc;
 use crate::RuntimeError;
-use crate::value::{NativeValueType, Value};
+use crate::value::{Value};
+use crate::value::instance::InstanceType;
+use crate::value::ops::ValueTruthy;
+
+pub type NativeValueType = NativeValue;
 
 pub trait NativeValueTrait: Any + Display + std::fmt::Debug + 'static { }
 
@@ -53,6 +57,11 @@ impl TryFrom<Value> for NativeValueType {
         }
     }
 }
+impl From<NativeValue> for Value {
+    fn from(value: NativeValue) -> Self {
+        Value::NativeValue(value)
+    }
+}
 
 impl PartialEq for NativeValue {
     fn eq(&self, other: &Self) -> bool {
@@ -63,5 +72,11 @@ impl PartialEq for NativeValue {
 impl Display for NativeValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_fmt(format_args!("{}", self.0.borrow()))
+    }
+}
+
+impl ValueTruthy for NativeValueType {
+    fn truthy(&self) -> bool {
+        true
     }
 }

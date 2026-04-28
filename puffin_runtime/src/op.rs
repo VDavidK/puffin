@@ -78,6 +78,11 @@ pub enum OpCode {
     // Expected stack: TOP > [obj: assignable]
     GetField,
 
+    // : setmet [offset:4B]
+    // Pops the top function off the stack and assigns it as a method to a class with the name of the constant at the provided offset.
+    // Expected stack: TOP > [method: callable] > [cls: class]
+    SetClassMethod,
+
     // : reactive
     // Pops the top value of the stack and wraps it as a reactive value. Pushing the result back onto the stack.
     MakeReactive,

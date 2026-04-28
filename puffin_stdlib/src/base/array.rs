@@ -13,162 +13,162 @@ impl std::fmt::Display for NativeVector {
 
 impl NativeValueTrait for NativeVector {}
 
-/// Array defines the following methods:
-/// - get(idx) > Returns an element at the provided index of the Array. Returns `null` if out of bounds
-/// - push > Pushes an element to the back of the Array
-/// - pop > Removes the last element of the Array and returns it
-/// - resize > Modifies the capacity of the Array, removing excess elements or adding default values
-/// - push_front > Pushes an element to the front of the Array
-/// - pop_front > Removes the first element of the Array and returns it
-/// - len > Returns the number of elements in the Array
-/// - size > Returns the total capacity of the Array
-pub fn define_array_class(runtime: &mut Runtime) {
-    let mut cls = Class::new("Array");
-    cls.set_field("arr", NativeValue::from(NativeVector(vec![])));
-
-    let new = NativeFunction::new(|runtime, argc| {
-        let instance = runtime.get_local(-1)?.clone().take_instance()?;
-        let arr = instance.borrow_mut()
-            .get_field("arr")
-            .expect("Called without self parameter")
-            .clone()
-            .take_native_value()?;
-        let mut arr = arr.get_mut::<NativeVector>()
-            .expect("Invalid self parameter");
-        for i in -1 - (argc as isize)..-1 {
-            let arg = runtime.get_local(i as LocalOffset)?;
-            arr.0.push(arg.clone());
-        }
-        Ok(Value::Null)
-    });
-
-    let get = NativeFunction::new(|runtime, argc| {
-        let instance = runtime.get_local(-2)?.clone().take_instance()?;
-        let idx = runtime.get_local(-1)?.clone().take_int()?;
-        let arr = instance.borrow_mut()
-            .get_field("arr")
-            .expect("Called without self parameter")
-            .clone()
-            .take_native_value()?;
-        let arr = arr.get_mut::<NativeVector>()
-            .expect("Invalid self parameter");
-        let val = arr.0.get(idx as usize)
-            .cloned()
-            .unwrap_or(Value::Null);
-        Ok(val)
-    });
-
-    let push = NativeFunction::new(|runtime, argc| {
-        let instance = runtime.get_local(-2)?.clone().take_instance()?;
-        let value = runtime.get_local(-1)?.clone();
-        let arr = instance.borrow_mut()
-            .get_field("arr")
-            .expect("Called without self parameter")
-            .clone()
-            .take_native_value()?;
-        let mut arr = arr.get_mut::<NativeVector>()
-            .expect("Invalid self parameter");
-        arr.0.push(value);
-        Ok(Value::Null)
-    });
-
-    let pop = NativeFunction::new(|runtime, argc| {
-        let instance = runtime.get_local(-1)?.clone().take_instance()?;
-        let arr = instance.borrow_mut()
-            .get_field("arr")
-            .expect("Called without self parameter")
-            .clone()
-            .take_native_value()?;
-        let mut arr = arr.get_mut::<NativeVector>()
-            .expect("Invalid self parameter");
-        let val = arr.0.pop().unwrap_or(Value::Null);
-        Ok(val)
-    });
-
-    let resize = NativeFunction::new(|runtime, argc| {
-        let size = runtime.get_local(-1)?.clone().take_int()?;
-        let instance = runtime.get_local(-2)?.clone().take_instance()?;
-        let arr = instance.borrow_mut()
-            .get_field("arr")
-            .expect("Called without self parameter")
-            .clone()
-            .take_native_value()?;
-        let mut arr = arr.get_mut::<NativeVector>()
-            .expect("Invalid self parameter");
-        arr.0.resize(size as usize, Value::Null);
-        Ok(Value::Null)
-    });
-
-    let push_front = NativeFunction::new(|runtime, argc| {
-        let instance = runtime.get_local(-2)?.clone().take_instance()?;
-        let value = runtime.get_local(-1)?.clone();
-        let arr = instance.borrow_mut()
-            .get_field("arr")
-            .expect("Called without self parameter")
-            .clone()
-            .take_native_value()?;
-        let mut arr = arr.get_mut::<NativeVector>()
-            .expect("Invalid self parameter");
-        arr.0.insert(0, value);
-        Ok(Value::Null)
-    });
-
-    let pop_front = NativeFunction::new(|runtime, argc| {
-        let instance = runtime.get_local(-1)?.clone().take_instance()?;
-        let arr = instance.borrow_mut()
-            .get_field("arr")
-            .expect("Called without self parameter")
-            .clone()
-            .take_native_value()?;
-        let mut arr = arr.get_mut::<NativeVector>()
-            .expect("Invalid self parameter");
-        if arr.0.len() == 0 {
-           Ok(Value::Null)
-        } else {
-            let value = arr.0.remove(0);
-            Ok(value)
-        }
-    });
-    cls.set_method("pop_front", pop_front);
-
-    let len = NativeFunction::new(|runtime, argc| {
-        let instance = runtime.get_local(-1)?.clone().take_instance()?;
-        let arr = instance.borrow_mut()
-            .get_field("arr")
-            .expect("Called without self parameter")
-            .clone()
-            .take_native_value()?;
-        let len = arr.get_mut::<NativeVector>()
-            .expect("Invalid self parameter")
-            .0
-            .len()
-            .into();
-        Ok(len)
-    });
-
-    let size = NativeFunction::new(|runtime, argc| {
-        let instance = runtime.get_local(-1)?.clone().take_instance()?;
-        let arr = instance.borrow_mut()
-            .get_field("arr")
-            .expect("Called without self parameter")
-            .clone()
-            .take_native_value()?;
-        let capacity = arr.get_mut::<NativeVector>()
-            .expect("Invalid self parameter")
-            .0
-            .capacity()
-            .into();
-        Ok(capacity)
-    });
-
-    cls.set_constructor(new);
-    cls.set_method("get", get);
-    cls.set_method("push", push);
-    cls.set_method("pop", pop);
-    cls.set_method("resize", resize);
-    cls.set_method("push_front", push_front);
-    cls.set_method("len", len);
-    cls.set_method("size", size);
-
-    runtime.add_global("Array", cls);
-}
+// /// Array defines the following methods:
+// /// - get(idx) > Returns an element at the provided index of the Array. Returns `null` if out of bounds
+// /// - push > Pushes an element to the back of the Array
+// /// - pop > Removes the last element of the Array and returns it
+// /// - resize > Modifies the capacity of the Array, removing excess elements or adding default values
+// /// - push_front > Pushes an element to the front of the Array
+// /// - pop_front > Removes the first element of the Array and returns it
+// /// - len > Returns the number of elements in the Array
+// /// - size > Returns the total capacity of the Array
+// pub fn define_array_class(runtime: &mut Runtime) {
+//     let mut cls = Class::new("Array");
+//     cls.set_field("arr", NativeValue::from(NativeVector(vec![])));
+//
+//     let new = NativeFunction::new(|runtime, argc, this| {
+//         let instance = runtime.get_local(-1)?.clone().take_instance()?;
+//         let arr = instance.borrow_mut()
+//             .get_field("arr")
+//             .expect("Called without self parameter")
+//             .clone()
+//             .take_native_value()?;
+//         let mut arr = arr.get_mut::<NativeVector>()
+//             .expect("Invalid self parameter");
+//         for i in -1 - (argc as isize)..-1 {
+//             let arg = runtime.get_local(i as LocalOffset)?;
+//             arr.0.push(arg.clone());
+//         }
+//         Ok(Value::Null)
+//     });
+//
+//     let get = NativeFunction::new(|runtime, argc| {
+//         let instance = runtime.get_local(-2)?.clone().take_instance()?;
+//         let idx = runtime.get_local(-1)?.clone().take_int()?;
+//         let arr = instance.borrow_mut()
+//             .get_field("arr")
+//             .expect("Called without self parameter")
+//             .clone()
+//             .take_native_value()?;
+//         let arr = arr.get_mut::<NativeVector>()
+//             .expect("Invalid self parameter");
+//         let val = arr.0.get(idx as usize)
+//             .cloned()
+//             .unwrap_or(Value::Null);
+//         Ok(val)
+//     });
+//
+//     let push = NativeFunction::new(|runtime, argc| {
+//         let instance = runtime.get_local(-2)?.clone().take_instance()?;
+//         let value = runtime.get_local(-1)?.clone();
+//         let arr = instance.borrow_mut()
+//             .get_field("arr")
+//             .expect("Called without self parameter")
+//             .clone()
+//             .take_native_value()?;
+//         let mut arr = arr.get_mut::<NativeVector>()
+//             .expect("Invalid self parameter");
+//         arr.0.push(value);
+//         Ok(Value::Null)
+//     });
+//
+//     let pop = NativeFunction::new(|runtime, argc| {
+//         let instance = runtime.get_local(-1)?.clone().take_instance()?;
+//         let arr = instance.borrow_mut()
+//             .get_field("arr")
+//             .expect("Called without self parameter")
+//             .clone()
+//             .take_native_value()?;
+//         let mut arr = arr.get_mut::<NativeVector>()
+//             .expect("Invalid self parameter");
+//         let val = arr.0.pop().unwrap_or(Value::Null);
+//         Ok(val)
+//     });
+//
+//     let resize = NativeFunction::new(|runtime, argc| {
+//         let size = runtime.get_local(-1)?.clone().take_int()?;
+//         let instance = runtime.get_local(-2)?.clone().take_instance()?;
+//         let arr = instance.borrow_mut()
+//             .get_field("arr")
+//             .expect("Called without self parameter")
+//             .clone()
+//             .take_native_value()?;
+//         let mut arr = arr.get_mut::<NativeVector>()
+//             .expect("Invalid self parameter");
+//         arr.0.resize(size as usize, Value::Null);
+//         Ok(Value::Null)
+//     });
+//
+//     let push_front = NativeFunction::new(|runtime, argc| {
+//         let instance = runtime.get_local(-2)?.clone().take_instance()?;
+//         let value = runtime.get_local(-1)?.clone();
+//         let arr = instance.borrow_mut()
+//             .get_field("arr")
+//             .expect("Called without self parameter")
+//             .clone()
+//             .take_native_value()?;
+//         let mut arr = arr.get_mut::<NativeVector>()
+//             .expect("Invalid self parameter");
+//         arr.0.insert(0, value);
+//         Ok(Value::Null)
+//     });
+//
+//     let pop_front = NativeFunction::new(|runtime, argc| {
+//         let instance = runtime.get_local(-1)?.clone().take_instance()?;
+//         let arr = instance.borrow_mut()
+//             .get_field("arr")
+//             .expect("Called without self parameter")
+//             .clone()
+//             .take_native_value()?;
+//         let mut arr = arr.get_mut::<NativeVector>()
+//             .expect("Invalid self parameter");
+//         if arr.0.len() == 0 {
+//            Ok(Value::Null)
+//         } else {
+//             let value = arr.0.remove(0);
+//             Ok(value)
+//         }
+//     });
+//     cls.set_method("pop_front", pop_front);
+//
+//     let len = NativeFunction::new(|runtime, argc| {
+//         let instance = runtime.get_local(-1)?.clone().take_instance()?;
+//         let arr = instance.borrow_mut()
+//             .get_field("arr")
+//             .expect("Called without self parameter")
+//             .clone()
+//             .take_native_value()?;
+//         let len = arr.get_mut::<NativeVector>()
+//             .expect("Invalid self parameter")
+//             .0
+//             .len()
+//             .into();
+//         Ok(len)
+//     });
+//
+//     let size = NativeFunction::new(|runtime, argc| {
+//         let instance = runtime.get_local(-1)?.clone().take_instance()?;
+//         let arr = instance.borrow_mut()
+//             .get_field("arr")
+//             .expect("Called without self parameter")
+//             .clone()
+//             .take_native_value()?;
+//         let capacity = arr.get_mut::<NativeVector>()
+//             .expect("Invalid self parameter")
+//             .0
+//             .capacity()
+//             .into();
+//         Ok(capacity)
+//     });
+//
+//     cls.set_constructor(new);
+//     cls.set_method("get", get);
+//     cls.set_method("push", push);
+//     cls.set_method("pop", pop);
+//     cls.set_method("resize", resize);
+//     cls.set_method("push_front", push_front);
+//     cls.set_method("len", len);
+//     cls.set_method("size", size);
+//
+//     runtime.add_global("Array", cls);
+// }

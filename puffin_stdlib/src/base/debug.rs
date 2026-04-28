@@ -2,7 +2,7 @@ use puffin_runtime::runtime::Runtime;
 use puffin_runtime::value::{NativeFunction, Value};
 
 pub fn define_print_function(runtime: &mut Runtime) {
-    runtime.add_global("print", NativeFunction::new(|runtime, argc| {
+    runtime.add_global("print", NativeFunction::new(|runtime, argc, _| {
         // Get value
         let value = runtime.get_local(-1)?;
 

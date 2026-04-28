@@ -4,7 +4,10 @@ use std::fmt::Display;
 use std::rc::Rc;
 use serde_derive::{Deserialize, Serialize};
 use crate::RuntimeError;
-use crate::value::{Value, ClassType, InstanceType};
+use crate::value::{Value, ClassType};
+use crate::value::ops::ValueTruthy;
+
+pub type InstanceType = Rc<RefCell<Instance>>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Instance {
@@ -49,6 +52,17 @@ impl TryFrom<Value> for InstanceType {
         }
     }
 }
+impl From<InstanceType> for Value {
+    fn from(value: InstanceType) -> Self {
+        Value::Instance(value)
+    }
+}
+
+impl From<Instance> for Value {
+    fn from(value: Instance) -> Self {
+        Value::Instance(Rc::new(RefCell::new(value)))
+    }
+}
 
 pub fn new_instance(class: ClassType) -> InstanceType {
     let mut instance = Instance::new(class.clone());
@@ -60,5 +74,27 @@ pub fn new_instance(class: ClassType) -> InstanceType {
         instance.set_field(k, v.clone());
     }
 
-    Rc::new(RefCell::new(instance))
+    let instance = Rc::new(RefCell::new(instance));
+
+    for (k, v) in &class.methods {
+        match v {
+            Value::Function(func) => {
+                let method = func.borrow().bound_copy(instance.to_owned());
+                instance.borrow_mut().set_field(k, method);
+            }
+            Value::NativeFunction(func) => {
+                let method = func.borrow().bound_copy(instance.to_owned());
+                instance.borrow_mut().set_field(k, method);
+            }
+            _ => unreachable!("Class method needs to be of type function"),
+        }
+    }
+
+    instance
+}
+
+impl ValueTruthy for InstanceType {
+    fn truthy(&self) -> bool {
+        true
+    }
 }

@@ -94,19 +94,22 @@ impl<'a> Compiler<'a> {
                     layout_compiler.scope.define_local(&arg.lexeme);
                 }
 
+                layout_compiler.scope.define_local("self");
+
                 layout_compiler.compile_markup(&layout.markup)?;
                 layout_compiler.chunk.push_op(OpCode::Return);
 
                 let func = Function {
                     chunk: Rc::new(chunk),
                     identifier: name.to_owned(),
-                    arity: layout.parameters.len() + 1, // One more for self
+                    arity: layout.parameters.len(),
+                    bound_value: None,
                 };
 
                 let constant = self.chunk.new_constant(func);
                 self.chunk.push_op(OpCode::Constant);
                 self.chunk.push_constant_offset(constant);
-                self.chunk.push_op(OpCode::SetField);
+                self.chunk.push_op(OpCode::SetClassMethod);
                 let name = self.add_to_constants(name)?;
                 self.chunk.push_constant_offset(name);
             }
@@ -122,6 +125,8 @@ impl<'a> Compiler<'a> {
                     method_compiler.scope.define_local(&arg.lexeme);
                 }
 
+                method_compiler.scope.define_local("self");
+
                 method_compiler.compile_statement(&method.block)?;
                 method_compiler.ensure_return()?;
 
@@ -129,11 +134,12 @@ impl<'a> Compiler<'a> {
                     chunk: Rc::new(chunk),
                     identifier: method.name.lexeme.clone(),
                     arity: method.parameters.len(),
+                    bound_value: None,
                 };
                 let constant = self.chunk.new_constant(func);
                 self.chunk.push_op(OpCode::Constant);
                 self.chunk.push_constant_offset(constant);
-                self.chunk.push_op(OpCode::SetField);
+                self.chunk.push_op(OpCode::SetClassMethod);
                 let name = self.token_to_constant(&method.name)?;
                 self.chunk.push_constant_offset(name);
             }
@@ -148,6 +154,8 @@ impl<'a> Compiler<'a> {
                     method_compiler.scope.define_local(&arg.lexeme);
                 }
 
+                method_compiler.scope.define_local("self");
+
                 method_compiler.compile_statement(&constructor.block)?;
                 method_compiler.ensure_return()?;
 
@@ -155,6 +163,7 @@ impl<'a> Compiler<'a> {
                     chunk: Rc::new(chunk),
                     identifier: "constructor".to_owned(),
                     arity: constructor.parameters.len(),
+                    bound_value: None,
                 };
                 let constant = self.chunk.new_constant(func);
                 self.chunk.push_op(OpCode::Constant);
@@ -182,8 +191,9 @@ impl<'a> Compiler<'a> {
                 self.pop_scope()?;
             }
             Statement::Assign(assign) => {
+                let target = self.fetch_target(&assign.lhs)?;
                 self.compile_expression(&assign.rhs)?;
-                match self.fetch_target(&assign.lhs)? {
+                match target {
                     VariableTarget::Local(local) => {
                         self.chunk.push_op(OpCode::SetLocal);
                         self.chunk.push_local_offset(local);
@@ -397,8 +407,6 @@ impl<'a> Compiler<'a> {
                 }
             }
             Markup::Component(component) => {
-                let mut arg_count = 0;
-
                 let arg_count = match &component.parameter {
                     None => 0,
                     Some(ComponentParameter::Expression(expr)) => {
@@ -468,7 +476,7 @@ impl<'a> Compiler<'a> {
     fn fetch_target(&mut self, expr: &'a Expression) -> Result<VariableTarget, CompileError> {
         match expr {
             Expression::Accessor(accessor) => {
-                match self.fetch_target(expr)? {
+                match self.fetch_target(&accessor.expression)? {
                     VariableTarget::Local(local) => {
                         self.chunk.push_op(OpCode::GetLocal);
                         self.chunk.push_local_offset(local);

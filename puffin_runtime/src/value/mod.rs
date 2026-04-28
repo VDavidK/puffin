@@ -6,33 +6,30 @@ mod module;
 mod native_value;
 mod node;
 mod reactive;
+mod ops;
+mod int;
+mod float;
+mod bool;
+mod string;
+mod list;
 
 use std::{cell::RefCell, fmt::Display, hash::Hash, rc::Rc};
-pub use instance::{new_instance, Instance};
-pub use function::Function;
-pub use native_function::NativeFunction;
-pub use class::{new_class, Class};
-pub use module::{new_module, Module};
-pub use native_value::{NativeValue, NativeValueTrait};
-pub use node::{Node, LayoutNode, LayoutDirection, TextNode, ComponentNode};
-pub use reactive::{Reactive};
+pub use instance::{new_instance, Instance, InstanceType};
+pub use function::{Function, FunctionType};
+pub use native_function::{NativeFunction, NativeFunctionType};
+pub use class::{new_class, Class, ClassType};
+pub use module::{new_module, Module, ModuleType};
+pub use native_value::{NativeValue, NativeValueTrait, NativeValueType};
+pub use node::{Node, LayoutNode, LayoutDirection, TextNode, ComponentNode, NodeType};
+pub use reactive::{Reactive, ReactiveType};
+pub use crate::value::list::{ListDisplay, ListType};
+pub use crate::value::float::FloatType;
+pub use crate::value::int::IntType;
+pub use crate::value::bool::BoolType;
+pub use crate::value::string::StringType;
 
 use serde_derive::{Deserialize, Serialize};
 use crate::RuntimeError;
-
-pub type IntType = i64;
-pub type FloatType = f64;
-pub type BoolType = bool;
-pub type StringType = String;
-pub type InstanceType = Rc<RefCell<Instance>>;
-pub type ClassType = Rc<RefCell<Class>>;
-pub type ModuleType = Rc<RefCell<Module>>;
-pub type FunctionType = Rc<Function>;
-pub type NativeFunctionType = Rc<NativeFunction>;
-pub type NativeValueType = NativeValue;
-pub type ListType = Rc<RefCell<Vec<Value>>>;
-pub type NodeType = Rc<RefCell<Node>>;
-pub type ReactiveType = Rc<RefCell<Reactive>>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Value {
@@ -88,191 +85,12 @@ impl Hash for Value {
     }
 }
 
-impl From<IntType> for Value {
-    fn from(value: IntType) -> Self {
-        Value::Int(value)
-    }
-}
-
-impl TryFrom<Value> for IntType {
-    type Error = RuntimeError;
-
-    fn try_from(value: Value) -> Result<Self, Self::Error> {
-        match value {
-            Value::Int(v) => Ok(v),
-            _ => Err(RuntimeError::IncorrectType { ty: value.type_name().to_owned(), expected: "int".to_owned() }),
-        }
-    }
-}
-
-impl From<FloatType> for Value {
-    fn from(value: FloatType) -> Self {
-        Value::Float(value)
-    }
-}
-
-impl TryFrom<Value> for FloatType {
-    type Error = RuntimeError;
-
-    fn try_from(value: Value) -> Result<Self, Self::Error> {
-        match value {
-            Value::Float(v) => Ok(v),
-            _ => Err(RuntimeError::IncorrectType { ty: value.type_name().to_owned(), expected: "float".to_owned() }),
-        }
-    }
-}
-
-impl From<BoolType> for Value {
-    fn from(value: BoolType) -> Self {
-        Value::Bool(value)
-    }
-}
-
-impl TryFrom<Value> for BoolType {
-    type Error = RuntimeError;
-
-    fn try_from(value: Value) -> Result<Self, Self::Error> {
-        match value {
-            Value::Bool(v) => Ok(v),
-            _ => Err(RuntimeError::IncorrectType { ty: value.type_name().to_owned(), expected: "bool".to_owned() }),
-        }
-    }
-}
-
-impl From<StringType> for Value {
-    fn from(value: StringType) -> Self {
-        Value::String(value)
-    }
-}
-
-impl TryFrom<Value> for StringType {
-    type Error = RuntimeError;
-
-    fn try_from(value: Value) -> Result<Self, Self::Error> {
-        match value {
-            Value::String(s) => Ok(s),
-            _ => Err(RuntimeError::IncorrectType { ty: value.type_name().to_owned(), expected: "string".to_owned() }),
-        }
-    }
-}
-
-impl<'a> From<&'a str> for Value {
-    fn from(value: &'a str) -> Self {
-        Value::String(value.to_owned())
-    }
-}
-
-impl TryFrom<Value> for ListType {
-    type Error = RuntimeError;
-
-    fn try_from(value: Value) -> Result<Self, Self::Error> {
-        match value {
-            Value::List(v) => Ok(v),
-            _ => Err(RuntimeError::IncorrectType { ty: value.type_name().to_owned(), expected: "list".to_owned() }),
-        }
-    }
-}
-
-impl From<Vec<Value>> for Value {
-    fn from(value: Vec<Value>) -> Self {
-        Value::List(Rc::new(RefCell::new(value)))
-    }
-}
-
-impl TryFrom<Value> for ReactiveType {
-    type Error = RuntimeError;
-
-    fn try_from(value: Value) -> Result<Self, Self::Error> {
-        match value {
-            Value::Reactive(v) => Ok(v),
-            _ => Err(RuntimeError::IncorrectType { ty: value.type_name().to_owned(), expected: "reactive".to_owned() }),
-        }
-    }
-}
-
-impl From<Reactive> for Value {
-    fn from(value: Reactive) -> Self {
-        Value::Reactive(Rc::new(RefCell::new(value)))
-    }
-}
-
 // impl<T> FromIterator<T> for Value where T: Into<Value> {
 //     fn from_iter<I: IntoIterator<Item = T>>(mut iter: I) -> Self {
 //         iter.into_iter()
 //             .map(Into::into)
 //     }
 // }
-
-impl From<InstanceType> for Value {
-    fn from(value: InstanceType) -> Self {
-        Value::Instance(value)
-    }
-}
-
-impl From<Instance> for Value {
-    fn from(value: Instance) -> Self {
-        Value::Instance(Rc::new(RefCell::new(value)))
-    }
-}
-
-impl From<NativeValue> for Value {
-    fn from(value: NativeValue) -> Self {
-        Value::NativeValue(value)
-    }
-}
-
-impl From<ClassType> for Value {
-    fn from(value: ClassType) -> Self {
-        Value::Class(value)
-    }
-}
-
-impl From<Class> for Value {
-    fn from(value: Class) -> Self {
-        Value::Class(Rc::new(RefCell::new(value)))
-    }
-}
-
-impl From<FunctionType> for Value {
-    fn from(value: FunctionType) -> Self {
-        Value::Function(value)
-    }
-}
-
-impl From<usize> for Value {
-    fn from(value: usize) -> Self {
-        Value::Int(value as IntType)
-    }
-}
-
-impl From<i32> for Value {
-    fn from(value: i32) -> Self {
-        Value::Int(value as IntType)
-    }
-}
-
-impl From<NodeType> for Value {
-    fn from(value: NodeType) -> Self {
-        Value::Node(value)
-    }
-}
-
-impl From<Node> for Value {
-    fn from(value: Node) -> Self {
-        Rc::new(RefCell::new(value)).into()
-    }
-}
-
-impl TryFrom<Value> for NodeType {
-    type Error = RuntimeError;
-
-    fn try_from(value: Value) -> Result<Self, Self::Error> {
-        match value {
-            Value::Node(v) => Ok(v),
-            _ => Err(RuntimeError::IncorrectType { ty: value.type_name().to_owned(), expected: "node".to_owned() }),
-        }
-    }
-}
 
 impl Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -282,8 +100,8 @@ impl Display for Value {
             Value::Bool(v) => f.write_fmt(format_args!("{v}")),
             Value::String(v) => f.write_fmt(format_args!("{v}")),
             Value::Instance(v) => f.write_fmt(format_args!("{}", v.borrow())),
-            Value::Function(v) => f.write_fmt(format_args!("{}", v)),
-            Value::NativeFunction(v) => f.write_fmt(format_args!("{}", v)),
+            Value::Function(v) => f.write_fmt(format_args!("{}", v.borrow())),
+            Value::NativeFunction(v) => f.write_fmt(format_args!("{}", v.borrow())),
             Value::Class(v) => f.write_fmt(format_args!("{}", v.borrow())),
             Value::Module(v) => f.write_fmt(format_args!("{}", v.borrow())),
             Value::NativeValue(v) => f.write_fmt(format_args!("{}", v)),
@@ -292,19 +110,6 @@ impl Display for Value {
             Value::Reactive(v) => f.write_fmt(format_args!("{}", v.borrow())),
             Value::Null => f.write_fmt(format_args!("null")),
         }
-    }
-}
-
-struct ListDisplay<'a>(&'a ListType);
-
-impl<'a> Display for ListDisplay<'a> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let inner = self.0.borrow().iter()
-            .map(Value::to_string)
-            .collect::<Vec<String>>()
-            .join(", ");
-
-        f.write_fmt(format_args!("[{}]", inner))
     }
 }
 

@@ -130,7 +130,7 @@ impl<'a> PuffinParser<'a> {
     }
 
     fn peek_n(&mut self, n: usize) -> Result<Option<&Token>, ParserError> {
-        if self.token_queue.len() < n {
+        if self.token_queue.len() > n {
             return Ok(self.token_queue.get(n));
         }
         let mut extra_tokens = self.lexer.by_ref().take(1 + n - self.token_queue.len()).collect::<Result<VecDeque<_>, _>>()?;

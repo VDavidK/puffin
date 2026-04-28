@@ -194,6 +194,7 @@ impl<'a> ChunkFormatter<'a> {
                     OpCode::SetConstructor => self.push("scons"),
                     OpCode::GetField => self.push_with_local_offset("getf"),
                     OpCode::SetField => self.push_with_local_offset("setf"),
+                    OpCode::SetClassMethod => self.push_with_constant("setmet"),
                     OpCode::NewList => self.push("newlist"),
                     OpCode::PushList => self.push("pushlist"),
                     OpCode::PopList => self.push("poplist"),
@@ -257,7 +258,7 @@ impl<'a> ChunkFormatter<'a> {
 
             for func in inner_functions {
                 let formatter = ChunkFormatter {
-                    chunk: &func.chunk,
+                    chunk: &func.borrow().chunk,
                     inst: vec![],
                     idx: 0,
                     indent: self.indent + 1,

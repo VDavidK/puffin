@@ -10,7 +10,7 @@ impl Declaration for FileSystem {
     const NAME: &'static str = "fs";
 
     fn declare(module: &mut Module) {
-        module.set_item("write", NativeFunction::new(|runtime, argc| {
+        module.set_item("write", NativeFunction::new(|runtime, argc, _| {
             let path = runtime.get_local(-3)?
                 .to_owned()
                 .take_string()?;

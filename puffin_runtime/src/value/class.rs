@@ -4,7 +4,11 @@ use std::fmt::Display;
 use std::rc::Rc;
 use serde_derive::{Serialize, Deserialize};
 use crate::{RuntimeError};
-use crate::value::{Value, ClassType};
+use crate::value::{Value};
+use crate::value::instance::InstanceType;
+use crate::value::ops::ValueTruthy;
+
+pub type ClassType = Rc<RefCell<Class>>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Class {
@@ -70,6 +74,24 @@ impl TryFrom<Value> for ClassType {
     }
 }
 
+impl From<ClassType> for Value {
+    fn from(value: ClassType) -> Self {
+        Value::Class(value)
+    }
+}
+
+impl From<Class> for Value {
+    fn from(value: Class) -> Self {
+        Value::Class(Rc::new(RefCell::new(value)))
+    }
+}
+
 pub fn new_class(name: impl Into<String>) -> ClassType {
     Rc::new(RefCell::new(Class::new(name)))
+}
+
+impl ValueTruthy for ClassType {
+    fn truthy(&self) -> bool {
+        true
+    }
 }

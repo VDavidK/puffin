@@ -194,6 +194,17 @@ impl<'a> Vm<'a> {
 
             },
 
+            OpCode::SetClassMethod => {
+                let name = self.fetch_constant()?
+                    .to_owned()
+                    .take_string()?;
+                let method = self.runtime.pop_expecting()?;
+                let class = self.runtime.pop_expecting()?
+                    .take_class()?;
+
+                class.borrow_mut().set_method(name, method);
+            }
+
             OpCode::NewList => {
                 self.runtime.push_value(Vec::<Value>::new());
             }

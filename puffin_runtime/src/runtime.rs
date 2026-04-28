@@ -5,7 +5,7 @@ use ratatui::DefaultTerminal;
 use crate::chunk::LocalOffset;
 use crate::vm::Vm;
 use crate::{Chunk, RuntimeError, value::Value};
-use crate::value::{new_instance, FunctionType, InstanceType, Module, LayoutDirection, LayoutNode, Node};
+use crate::value::{new_instance, Module, LayoutDirection, LayoutNode, Node, FunctionType, InstanceType};
 
 #[derive(Debug, Clone)]
 pub struct CallFrame {
@@ -60,15 +60,18 @@ impl Runtime {
     pub fn call_val(&mut self, value: Value, num_args: usize) -> Result<Value, RuntimeError> {
         match value {
             Value::NativeFunction(func) => {
-                let callable = &func.fun;
+                let callable = &func.borrow().fun;
                 let local_count = self.local_count()? - num_args;
-                let value = callable(self, num_args, func.bound_value.to_owned())?;
+                let value = callable(self, num_args, func.borrow().bound_value.to_owned())?;
                 self.pop_until(local_count)?;
                 Ok(value)
-            },
+            }
             Value::Function(func) => {
-                self.match_function_param_count(func.arity, num_args);
-                self.push_value(func.bound_value.to_owned());
+                self.match_function_param_count(func.borrow().arity, num_args);
+                self.push_value(match func.borrow().bound_value.to_owned() {
+                    Some(value) => Value::Instance(value),
+                    None => Value::Null,
+                });
                 let ret_value = self.call_fn(func)?;
                 Ok(ret_value)
             },
@@ -79,7 +82,6 @@ impl Runtime {
                     let func = constructor.clone();
                     Self::bind_func(func.to_owned(), instance.to_owned());
                     self.call_val(func, num_args)?;
-                    self.pop_value();
                 }
 
                 Ok(Value::Instance(instance))
@@ -88,16 +90,17 @@ impl Runtime {
         }
     }
 
-    fn bind_func(func: Value, value: Value) -> {
+    fn bind_func(func: Value, value: InstanceType) {
         match func {
-            Value::NativeFunction(func) => func.bind(value)
+            Value::NativeFunction(func) => func.borrow_mut().bind(value),
+            _ => (),
         }
     }
 
     pub fn call_fn(&mut self, func: FunctionType) -> Result<Value, RuntimeError> {
-        log::debug!("Executing function '{}'", func.identifier);
+        log::debug!("Executing function '{}'", func.borrow().identifier);
 
-        self.push_call_frame(func.chunk.clone(), func.arity);
+        self.push_call_frame(func.borrow().chunk.clone(), func.borrow().arity + 1);
 
         let ret_value = Vm::new(self)
             .run()?;

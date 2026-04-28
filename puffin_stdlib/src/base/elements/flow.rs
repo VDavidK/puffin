@@ -20,12 +20,12 @@ fn construct_flow(runtime: &mut Runtime, direction: LayoutDirection) -> Result<L
 }
 
 pub fn define_flow_elements(runtime: &mut Runtime) {
-    runtime.add_global("hbox", NativeFunction::new(|runtime, _argc| {
-        let node = construct_flow(runtime, LayoutDirection::Horizontal)?;
-        Ok(Node::Layout(node).into())
-    }));
-    runtime.add_global("vbox", NativeFunction::new(|runtime, _argc| {
-        let node = construct_flow(runtime, LayoutDirection::Vertical)?;
-        Ok(Node::Layout(node).into())
-    }));
+    // runtime.add_global("hbox", NativeFunction::new(|runtime, _argc| {
+    //     let node = construct_flow(runtime, LayoutDirection::Horizontal)?;
+    //     Ok(Node::Layout(node).into())
+    // }));
+    // runtime.add_global("vbox", NativeFunction::new(|runtime, _argc| {
+    //     let node = construct_flow(runtime, LayoutDirection::Vertical)?;
+    //     Ok(Node::Layout(node).into())
+    // }));
 }
