@@ -38,9 +38,13 @@ pub enum OpCode {
     // Expected stack: TOP > [value: any]
     SetGlobal,
 
-    // : newarr
+    // : newlist
     // Pushes a new list to the top of the stack
     NewList,
+
+    // : newdict
+    // Pushes a new dictionary to the top of the stack
+    NewDictionary,
 
     // : pusharr
     // Takes the top value form the stack and pushes it to the end of the list.

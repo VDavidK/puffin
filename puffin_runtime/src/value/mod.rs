@@ -12,8 +12,9 @@ mod float;
 mod bool;
 mod string;
 mod list;
+mod dict;
 
-use std::{cell::RefCell, fmt::Display, hash::Hash, rc::Rc};
+use std::{fmt::Display, hash::Hash, rc::Rc};
 pub use instance::{new_instance, Instance, InstanceType};
 pub use function::{Function, FunctionType};
 pub use native_function::{NativeFunction, NativeFunctionType};
@@ -27,6 +28,7 @@ pub use crate::value::float::FloatType;
 pub use crate::value::int::IntType;
 pub use crate::value::bool::BoolType;
 pub use crate::value::string::StringType;
+pub use crate::value::dict::{DictionaryDisplay, DictionaryType};
 
 use serde_derive::{Deserialize, Serialize};
 use crate::RuntimeError;
@@ -42,6 +44,7 @@ pub enum Value {
     Class(ClassType),
     Module(ModuleType),
     List(ListType),
+    Dictionary(DictionaryType),
     Reactive(ReactiveType),
     Null,
 
@@ -107,6 +110,7 @@ impl Display for Value {
             Value::Module(v) => f.write_fmt(format_args!("{}", v.borrow())),
             Value::NativeValue(v) => f.write_fmt(format_args!("{}", v)),
             Value::List(v) => f.write_fmt(format_args!("{}", ListDisplay(v))),
+            Value::Dictionary(v) => f.write_fmt(format_args!("{}", DictionaryDisplay(v))),
             Value::Node(v) => f.write_fmt(format_args!("{}", v.borrow())),
             Value::Reactive(v) => f.write_fmt(format_args!("{}", v.borrow())),
             Value::Null => f.write_fmt(format_args!("null")),
@@ -302,6 +306,7 @@ impl Value {
             Value::Module(v) => v.truthy(),
             Value::NativeValue(v) => v.truthy(),
             Value::List(v) => v.truthy(),
+            Value::Dictionary(v) => v.truthy(),
             Value::Node(v) => v.truthy(),
             Value::Reactive(v) => v.borrow().get().truthy(),
             Value::Null => false,
@@ -321,6 +326,7 @@ impl Value {
             Value::Module(_) => ModuleType::type_name(),
             Value::NativeValue(_) => NativeValueType::type_name(),
             Value::List(_) => ListType::type_name(),
+            Value::Dictionary(_) => DictionaryType::type_name(),
             Value::Node(_) => NodeType::type_name(),
             Value::Null => "null",
 

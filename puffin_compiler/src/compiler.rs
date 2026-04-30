@@ -376,7 +376,7 @@ impl<'a> Compiler<'a> {
                 }
             }
             Expression::Dictionary(dict) => {
-                self.chunk.push_op(OpCode::NewInstance);
+                self.chunk.push_op(OpCode::NewDictionary);
                 let obj = self.scope.define_unnamed_local();
 
                 for (key, value) in &dict.entries {

@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use num_enum::TryFromPrimitive;
 
 use crate::{RuntimeError, op::OpCode, value::{Value, new_instance}};
@@ -207,6 +208,10 @@ impl<'a> Vm<'a> {
 
             OpCode::NewList => {
                 self.runtime.push_value(Vec::<Value>::new());
+            }
+
+            OpCode::NewDictionary => {
+                self.runtime.push_value(HashMap::<Value, Value>::new());
             }
 
             OpCode::PushList => {
