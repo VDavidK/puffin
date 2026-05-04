@@ -198,7 +198,7 @@ impl<'a> Vm<'a> {
             OpCode::GetIndex => {
                 let idx = self.runtime.pop_expecting()?;
 
-                let value = match self.runtime.pop_expecting()? {
+                let value = match self.runtime.pop_expecting()?.eval()? {
                     Value::List(li) => {
                         let idx = idx.take_int()?;
                         li.borrow().get(idx as usize).cloned().unwrap_or(Value::Null)

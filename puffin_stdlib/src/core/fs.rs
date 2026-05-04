@@ -31,10 +31,10 @@ impl Declaration for FileSystem {
                 .open(path)
                 .expect("Could not create file");
 
-            //if let Err(e) = writeln!(file, "{}", content) {
-            //
-            //}
-            // std::fs::write(path, content)?;
+            if let Err(e) = writeln!(file, "{}", content) {
+                // TODO: Error handling
+                _ = e
+            }
 
             Ok(Value::Null)
         }));
