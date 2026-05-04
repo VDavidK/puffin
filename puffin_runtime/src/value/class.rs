@@ -4,7 +4,7 @@ use std::fmt::Display;
 use std::rc::Rc;
 use serde_derive::{Serialize, Deserialize};
 use crate::{RuntimeError};
-use crate::value::{FunctionType, Value};
+use crate::value::{FunctionType, Reactive, Value};
 use crate::value::instance::InstanceType;
 use crate::value::ops::{ValueDef, ValueTruthy};
 
@@ -38,8 +38,16 @@ impl Class {
         self.constructor.as_ref()
     }
 
-    pub fn set_field(&mut self, name: impl Into<String>, value: impl Into<Value>) {
+    pub fn set_field(&mut self, name: impl Into<String>, value: impl Into<Value>) -> Result<(), RuntimeError> {
+        let name = name.into();
+
+        if let Some(Value::Reactive(reactive)) = self.fields.get(&name) {
+            Reactive::set(reactive.clone(), value.into())?;
+            return Ok(());
+        }
+
         self.fields.insert(name.into(), value.into());
+        Ok(())
     }
 
     pub fn get_field(&self, name: impl AsRef<str>) -> Option<&Value> {
