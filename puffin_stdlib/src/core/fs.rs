@@ -31,10 +31,7 @@ impl Declaration for FileSystem {
                 .open(path)
                 .expect("Could not create file");
 
-            if let Err(e) = writeln!(file, "{}", content) {
-                // TODO: Error handling
-                _ = e
-            }
+            writeln!(file, "{}", content)?;
 
             Ok(Value::Null)
         }));
