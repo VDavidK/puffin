@@ -837,7 +837,7 @@ impl<'a> PuffinParser<'a> {
                     self.next_token()?;
                     let indexer = self.expression()?;
                     self.expect(TokenType::RightBracket)?;
-                    expr = IndexExpression::new(indexer, expr).into();
+                    expr = IndexExpression::new(expr, indexer).into();
                 },
                 _ => break
             }

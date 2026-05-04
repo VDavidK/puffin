@@ -195,6 +195,25 @@ impl<'a> Vm<'a> {
 
             },
 
+            OpCode::GetIndex => {
+                let idx = self.runtime.pop_expecting()?;
+
+                let value = match self.runtime.pop_expecting()? {
+                    Value::List(li) => {
+                        let idx = idx.take_int()?;
+                        li.borrow().get(idx as usize).cloned().unwrap_or(Value::Null)
+                    }
+                    Value::Dictionary(dict) => {
+                        dict.borrow().get(&idx).cloned().unwrap_or(Value::Null)
+                    }
+                    v => {
+                        return Err(RuntimeError::IncorrectType { ty: v.type_name().into(), expected: "list or dictionary".into() })
+                    }
+                };
+
+                self.runtime.push_value(value);
+            }
+
             OpCode::SetClassMethod => {
                 let name = self.fetch_constant()?
                     .to_owned()

@@ -38,7 +38,7 @@ impl Chunk {
     }
 
     pub fn push_constant(&mut self, constant: impl Into<Value>) -> ConstantOffset {
-        let offset = self.new_constant(constant.into()) as ConstantOffset;
+        let offset = self.new_constant(constant.into());
         self.push_op(OpCode::Constant);
         self.push_constant_offset(offset);
         offset
@@ -194,6 +194,7 @@ impl<'a> ChunkFormatter<'a> {
                     OpCode::SetConstructor => self.push("scons"),
                     OpCode::GetField => self.push_with_local_offset("getf"),
                     OpCode::SetField => self.push_with_local_offset("setf"),
+                    OpCode::GetIndex => self.push("gidx"),
                     OpCode::SetClassMethod => self.push_with_constant("setmet"),
                     OpCode::SetHandler => self.push_with_constant("sethand"),
                     OpCode::NewList => self.push("newlist"),

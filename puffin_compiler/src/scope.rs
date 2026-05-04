@@ -32,6 +32,12 @@ impl<'a> Scope<'a> {
         local_count
     }
 
+    pub fn replace_local(&mut self, name: &'a str) -> LocalOffset {
+        let local_count = self.total_local_count() as LocalOffset;
+        self.local_table.insert(name, local_count - 1);
+        local_count
+    }
+
     pub fn define_unnamed_local(&mut self) -> LocalOffset {
         let local_count = self.total_local_count() as LocalOffset;
         self.local_count += 1;
@@ -40,6 +46,10 @@ impl<'a> Scope<'a> {
 
     pub fn remove_top_local(&mut self) {
         self.local_count -= 1;
+    }
+
+    pub fn remove_top_n_locals(&mut self, n: usize) {
+        self.local_count -= n;
     }
 
     pub fn local_count(&self) -> usize {

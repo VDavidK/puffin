@@ -4,7 +4,7 @@ use puffin_runtime::value::{new_class, ComponentNode, FrameNode, LayoutDirection
 pub fn define_frame_element(runtime: &mut Runtime) {
     let frame_class = new_class("Frame");
 
-    frame_class.borrow_mut().set_constructor(NativeFunction::new(|runtime, argc, this| {
+    frame_class.borrow_mut().set_constructor(NativeFunction::new(|runtime, _argc, this| {
         let this = this.expect(format!("Constructor called for {} without this", "vbox").as_str());
 
         let child_elements = runtime

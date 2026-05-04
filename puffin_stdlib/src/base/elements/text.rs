@@ -4,7 +4,7 @@ use puffin_runtime::value::{new_class, NativeFunction, Node, TextNode, Value};
 pub fn define_text_element(runtime: &mut Runtime) {
     let text_class = new_class("Text");
 
-    text_class.borrow_mut().set_constructor(NativeFunction::new(|runtime, argc, this| {
+    text_class.borrow_mut().set_constructor(NativeFunction::new(|runtime, _argc, this| {
         let text = runtime.get_local(-1)?
             .to_owned();
 
@@ -15,7 +15,7 @@ pub fn define_text_element(runtime: &mut Runtime) {
         Ok(Value::Null)
     }));
 
-    text_class.borrow_mut().set_method("<layout>", NativeFunction::new(|runtime, argc, this| {
+    text_class.borrow_mut().set_method("<layout>", NativeFunction::new(|_runtime, _argc, this| {
         let this = this.expect("How did you do this?");
 
         let text = this.borrow();

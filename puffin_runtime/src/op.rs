@@ -82,6 +82,11 @@ pub enum OpCode {
     // Expected stack: TOP > [obj: assignable]
     GetField,
 
+    // : gidx []
+    // Pops the top value of the stack, indexes the new top of the stack if it is indexable with the prior top value
+    // Expected stack: TOP > [value: any] > [obj: indexable
+    GetIndex,
+
     // : setmet [offset:4B]
     // Pops the top function off the stack and assigns it as a method to a class with the name of the constant at the provided offset.
     // Expected stack: TOP > [method: callable] > [cls: class]

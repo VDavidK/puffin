@@ -10,7 +10,7 @@ impl Declaration for FileSystem {
     const NAME: &'static str = "fs";
 
     fn declare(module: &mut Module) {
-        module.set_item("write", NativeFunction::new(|runtime, argc, _| {
+        module.set_item("write", NativeFunction::new(|runtime, _, _| {
             let path = runtime.get_local(-3)?
                 .to_owned()
                 .take_string()?;
@@ -31,9 +31,9 @@ impl Declaration for FileSystem {
                 .open(path)
                 .expect("Could not create file");
 
-            if let Err(e) = writeln!(file, "{}", content) {
-
-            }
+            //if let Err(e) = writeln!(file, "{}", content) {
+            //
+            //}
             // std::fs::write(path, content)?;
 
             Ok(Value::Null)
