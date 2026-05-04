@@ -1,6 +1,4 @@
-use puffin_runtime::chunk::LocalOffset;
-use puffin_runtime::runtime::Runtime;
-use puffin_runtime::value::{Class, NativeFunction, NativeValue, NativeValueTrait, Value};
+use puffin_runtime::value::{NativeValueTrait, Value};
 
 #[derive(Debug)]
 pub(crate) struct NativeVector(pub Vec<Value>);

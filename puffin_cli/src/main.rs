@@ -81,9 +81,9 @@ fn main() -> color_eyre::Result<()> {
             log::debug!("-- Running chunk --\n{chunk}");
 
             let mut runtime = Runtime::default();
-            runtime.include_module(puffin_stdlib::core::fs::module());
+            runtime.include_module(puffin_stdlib::core::fs::module())?;
 
-            puffin_stdlib::base::define(&mut runtime);
+            puffin_stdlib::base::define(&mut runtime)?;
 
             let main_component_name = input.file_stem()
                 .ok_or_eyre("File path must have a valid stem")?

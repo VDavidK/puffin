@@ -114,7 +114,7 @@ impl<'a> Vm<'a> {
                 let class = self.runtime.pop_expecting()?
                     .take_class()?;
 
-                let instance = new_instance(class.clone());
+                let instance = new_instance(class.clone())?;
 
                 if let Some(constructor) = class.borrow().get_constructor() {
                     self.runtime.push_value(instance.clone());
@@ -195,7 +195,7 @@ impl<'a> Vm<'a> {
                             .borrow_mut()
                             .insert(Value::String(name), value.to_owned());
                     }
-                    _ => panic!("Invalid assignment target"),
+                    obj => Err(RuntimeError::InvalidAssignmentTarget{ ty: obj.type_name().to_owned() })?,
                 }
 
             },

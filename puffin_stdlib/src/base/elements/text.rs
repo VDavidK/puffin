@@ -1,7 +1,8 @@
 use puffin_runtime::runtime::Runtime;
+use puffin_runtime::RuntimeError;
 use puffin_runtime::value::{new_class, NativeFunction, Node, TextNode, Value};
 
-pub fn define_text_element(runtime: &mut Runtime) {
+pub fn define_text_element(runtime: &mut Runtime) -> Result<(), RuntimeError>  {
     let text_class = new_class("Text");
 
     text_class.borrow_mut().set_constructor(NativeFunction::new(|runtime, _argc, this| {
@@ -10,7 +11,7 @@ pub fn define_text_element(runtime: &mut Runtime) {
 
         this.expect("Constructor called without instance")
             .borrow_mut()
-            .set_field("text", text);
+            .set_field("text", text)?;
 
         Ok(Value::Null)
     }));
@@ -30,5 +31,6 @@ pub fn define_text_element(runtime: &mut Runtime) {
         Ok(Node::Text(node).into())
     }));
 
-    runtime.add_global("text", text_class);
+    runtime.add_global("text", text_class)?;
+    Ok(())
 }

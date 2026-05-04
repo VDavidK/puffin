@@ -1,9 +1,9 @@
 use std::cell::RefCell;
-use std::fmt::{Display, Formatter};
+use std::fmt::Display;
 use std::rc::Rc;
 use crate::RuntimeError;
 use crate::value::ops::{ValueDef, ValueTruthy};
-use crate::value::{FunctionType, Value};
+use crate::value::Value;
 
 pub type ListType = Rc<RefCell<Vec<Value>>>;
 

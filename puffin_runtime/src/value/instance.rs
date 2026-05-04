@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::rc::Rc;
@@ -7,7 +6,7 @@ use serde_derive::{Deserialize, Serialize};
 use crate::event::Event;
 use crate::runtime::Runtime;
 use crate::RuntimeError;
-use crate::value::{Value, ClassType, IntType, Reactive};
+use crate::value::{Value, ClassType, Reactive};
 use crate::value::ops::{ValueDef, ValueTruthy};
 
 pub type InstanceType = Rc<RefCell<Instance>>;
@@ -31,14 +30,9 @@ impl Instance {
     pub fn set_field(&mut self, name: impl Into<String>, value: impl Into<Value>) -> Result<(), RuntimeError> {
         let name = name.into();
 
-        if let Some(inner) = self.fields.get(&name) {
-            match inner {
-                Value::Reactive(inner) => {
-                    Reactive::set(inner.clone(), value.into())?;
-                    return Ok(());
-                }
-                _ => (),
-            }
+        if let Some(Value::Reactive(inner)) = self.fields.get(&name) {
+            Reactive::set(inner.clone(), value.into())?;
+            return Ok(());
         }
 
         self.fields.insert(name, value.into());
@@ -102,14 +96,14 @@ impl From<Instance> for Value {
     }
 }
 
-pub fn new_instance(class: ClassType) -> InstanceType {
+pub fn new_instance(class: ClassType) -> Result<InstanceType, RuntimeError> {
     let mut instance = Instance::new(class.clone());
 
     let class = class.borrow();
     let fields = class.get_fields();
 
     for (k, v) in fields.iter() {
-        instance.set_field(k, v.clone());
+        instance.set_field(k, v.clone())?;
     }
 
     let instance = Rc::new(RefCell::new(instance));
@@ -118,11 +112,11 @@ pub fn new_instance(class: ClassType) -> InstanceType {
         match v {
             Value::Function(func) => {
                 let method = func.borrow().bound_copy(instance.to_owned());
-                instance.borrow_mut().set_field(k, method);
+                instance.borrow_mut().set_field(k, method)?;
             }
             Value::NativeFunction(func) => {
                 let method = func.borrow().bound_copy(instance.to_owned());
-                instance.borrow_mut().set_field(k, method);
+                instance.borrow_mut().set_field(k, method)?;
             }
             _ => unreachable!("Class method needs to be of type function"),
         }
@@ -142,7 +136,7 @@ pub fn new_instance(class: ClassType) -> InstanceType {
         }
     }
 
-    instance
+    Ok(instance)
 }
 
 impl ValueTruthy for InstanceType {

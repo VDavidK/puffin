@@ -4,8 +4,7 @@ use std::fmt::Display;
 use std::rc::Rc;
 use serde_derive::{Deserialize, Serialize};
 use crate::{RuntimeError};
-use crate::value::{FunctionType, Value};
-use crate::value::instance::InstanceType;
+use crate::value::Value;
 use crate::value::ops::{ValueDef, ValueTruthy};
 
 pub type ModuleType = Rc<RefCell<Module>>;

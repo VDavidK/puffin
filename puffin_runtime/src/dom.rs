@@ -2,11 +2,17 @@ use ratatui::DefaultTerminal;
 use crate::event::Event;
 use crate::runtime::Runtime;
 use crate::RuntimeError;
-use crate::value::{new_instance, ClassType, InstanceType, LayoutDirection, LayoutNode, Node, NodeType, Value};
+use crate::value::{new_instance, InstanceType, LayoutDirection, LayoutNode, NodeType, Value};
 
 pub struct Dom {
     tree: Vec<InstanceType>,
     term: DefaultTerminal,
+}
+
+impl Default for Dom {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Dom {
@@ -34,7 +40,7 @@ impl Dom {
 
     pub fn run_component(&mut self, runtime: &mut Runtime, component: Value) -> Result<(), RuntimeError> {
         let component = component.clone().take_class()?;
-        let instance = new_instance(component.clone());
+        let instance = new_instance(component.clone())?;
 
         if let Some(constructor) = component.borrow().get_constructor() {
             let constructor = constructor
@@ -50,7 +56,7 @@ impl Dom {
 
         let main = instance.borrow()
             .get_field("<layout>")
-            .ok_or(RuntimeError::GlobalNotFound { name: "<layout>".to_string() })?
+            .ok_or(RuntimeError::GlobalNotFound { name: "<layout>".to_owned() })?
             .clone();
 
         runtime.push_value(component.clone());
@@ -113,11 +119,8 @@ impl Dom {
 
         let event = ratatui::crossterm::event::read()?;
 
-        match event {
-            CrosstermEvent::Key(KeyEvent { code: KeyCode::Char(c), .. }) => {
-                self.dispatch_event(main, runtime, Event::KeyPress(c))?;
-            }
-            _ => (),
+        if let CrosstermEvent::Key(KeyEvent { code: KeyCode::Char(c), .. }) = event {
+            self.dispatch_event(main, runtime, Event::KeyPress(c))?;
         }
 
         Ok(())

@@ -2,7 +2,7 @@ use crate::scope::Scope;
 use puffin_ast::Ast;
 use puffin_ast::declaration::Declaration;
 use puffin_ast::expression::Expression;
-use puffin_ast::markup::{ComponentParameter, ComponentRender, Markup};
+use puffin_ast::markup::{ComponentParameter, Markup};
 use puffin_ast::statement::Statement;
 use puffin_ast::token::{Token, TokenType};
 use puffin_runtime::chunk::{ConstantOffset, LocalOffset};
@@ -394,7 +394,7 @@ impl<'a> Compiler<'a> {
                 for elem in &arr.entries {
                     self.chunk.push_op(OpCode::GetLocal);
                     self.chunk.push_local_offset(list);
-                    self.compile_expression(&elem)?;
+                    self.compile_expression(elem)?;
                     self.chunk.push_op(OpCode::PushList);
                     self.scope.remove_top_local();
                 }

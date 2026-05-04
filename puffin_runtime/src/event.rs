@@ -1,6 +1,6 @@
 use crate::runtime::Runtime;
 use crate::RuntimeError;
-use crate::value::{InstanceType, Value};
+use crate::value::InstanceType;
 
 pub enum Event {
     KeyPress(char),
@@ -9,16 +9,13 @@ pub enum Event {
 impl Event {
     pub fn dispatch(&self, runtime: &mut Runtime, instance: InstanceType) -> Result<(), RuntimeError> {
         let handler = match self {
-            Event::KeyPress(c) => instance.borrow().get_handler("onkey"),
+            Event::KeyPress(_c) => instance.borrow().get_handler("onkey"),
         };
-
-        if handler.is_none() {
-            return Ok(())
-        }
-
-        match self {
-            Event::KeyPress(c) => {
-                runtime.call(handler.unwrap(), &[(*c).into()])?;
+        if let Some(h) = handler {
+            match self {
+                Event::KeyPress(c) => {
+                    runtime.call(h, &[(*c).into()])?;
+                }
             }
         }
 

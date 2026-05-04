@@ -1,10 +1,10 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
+use std::fmt::Display;
 use std::rc::Rc;
 use crate::RuntimeError;
 use crate::value::ops::{ValueDef, ValueTruthy};
-use crate::value::{FunctionType, Value};
+use crate::value::Value;
 
 pub type DictionaryType = Rc<RefCell<HashMap<Value, Value>>>;
 

@@ -4,8 +4,7 @@ use std::fmt::Display;
 use std::rc::Rc;
 use serde_derive::{Serialize, Deserialize};
 use crate::{RuntimeError};
-use crate::value::{FunctionType, Reactive, Value};
-use crate::value::instance::InstanceType;
+use crate::value::{Reactive, Value};
 use crate::value::ops::{ValueDef, ValueTruthy};
 
 pub type ClassType = Rc<RefCell<Class>>;
@@ -46,7 +45,7 @@ impl Class {
             return Ok(());
         }
 
-        self.fields.insert(name.into(), value.into());
+        self.fields.insert(name, value.into());
         Ok(())
     }
 

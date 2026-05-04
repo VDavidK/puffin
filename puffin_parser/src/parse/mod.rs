@@ -300,7 +300,7 @@ impl<'a> PuffinParser<'a> {
             TokenType::KwEnum => self.enum_decl(true)?,
             t => return Err(InvalidExport(self.get_lex_snippet(), t)),
         };
-        Ok(decl.into())
+        Ok(decl)
     }
 
     fn enum_decl(&mut self, exported: bool) -> Result<Declaration, ParserError> {

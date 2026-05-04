@@ -5,7 +5,7 @@ use ratatui::prelude::*;
 use ratatui::widgets::{Block, BorderType, Borders, Paragraph};
 use serde_derive::{Deserialize, Serialize};
 use crate::runtime::Runtime;
-use crate::value::{FunctionType, InstanceType, Value};
+use crate::value::{InstanceType, Value};
 use crate::RuntimeError;
 use crate::value::ops::{ValueDef, ValueTruthy};
 
@@ -159,6 +159,7 @@ impl From<ComponentNode> for NodeType {
 impl StatefulWidget for &ComponentNode {
     type State = Runtime;
 
+    #[allow(clippy::unwrap_used)]
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
         // TODO: Fix error handling
 

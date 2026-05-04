@@ -56,4 +56,10 @@ pub enum RuntimeError {
 
     #[error("Attempting to execute instructions with an empty call stack")]
     CallStackEmpty,
+
+    #[error("Invalid assignment target ({ty})")]
+    InvalidAssignmentTarget { ty: String },
+
+    #[error("Method called for {name} without supplied `this` parameter")]
+    MissingThisInMethodCall { name: String }
 }

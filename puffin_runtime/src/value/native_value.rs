@@ -3,8 +3,7 @@ use std::cell::{Ref, RefCell, RefMut};
 use std::fmt::Display;
 use std::sync::Arc;
 use crate::RuntimeError;
-use crate::value::{FunctionType, Value};
-use crate::value::instance::InstanceType;
+use crate::value::{Value};
 use crate::value::ops::{ValueDef, ValueTruthy};
 
 pub type NativeValueType = NativeValue;
@@ -20,22 +19,14 @@ impl NativeValue {
         value.into()
     }
 
-    pub fn get<T: NativeValueTrait>(&self) -> Option<Ref<T>> {
-        Ref::filter_map(self.0.borrow(), |inner| (inner as &dyn Any).downcast_ref::<T>().into())
+    pub fn get<T: NativeValueTrait>(&self) -> Option<Ref<'_, T>> {
+        Ref::filter_map(self.0.borrow(), |inner| (inner as &dyn Any).downcast_ref::<T>())
             .ok()
     }
 
-    pub fn get_mut<T: NativeValueTrait>(&self) -> Option<RefMut<T>> {
-        RefMut::filter_map(self.0.borrow_mut(), |inner| (inner as &mut dyn Any).downcast_mut::<T>().into())
+    pub fn get_mut<T: NativeValueTrait>(&self) -> Option<RefMut<'_, T>> {
+        RefMut::filter_map(self.0.borrow_mut(), |inner| (inner as &mut dyn Any).downcast_mut::<T>())
             .ok()
-    }
-
-    pub fn unwrap<T: NativeValueTrait>(&self) -> Ref<T> {
-        Ref::map(self.0.borrow(), |inner| (inner as &dyn Any).downcast_ref::<T>().unwrap())
-    }
-
-    pub fn unwrap_mut<T: NativeValueTrait>(&self) -> RefMut<T> {
-        RefMut::map(self.0.borrow_mut(), |inner| (inner as &mut dyn Any).downcast_mut::<T>().unwrap())
     }
 }
 

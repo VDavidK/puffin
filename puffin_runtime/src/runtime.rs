@@ -1,11 +1,10 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
-use ratatui::DefaultTerminal;
 use crate::chunk::LocalOffset;
 use crate::vm::Vm;
 use crate::{Chunk, RuntimeError, value::Value};
-use crate::value::{new_instance, Module, LayoutDirection, LayoutNode, Node, FunctionType, InstanceType, Reactive};
+use crate::value::{new_instance, Module, FunctionType, InstanceType, Reactive};
 
 #[derive(Debug, Clone)]
 pub struct CallFrame {
@@ -25,14 +24,14 @@ pub struct Runtime {
 
 impl Default for Runtime {
     fn default() -> Self {
-        let runtime = Runtime {
+        
+
+        Runtime {
             stack: vec![],
             call_stack: vec![],
             globals: HashMap::new(),
             running: true,
-        };
-
-        runtime
+        }
     }
 }
 
@@ -76,7 +75,7 @@ impl Runtime {
                 Ok(ret_value)
             },
             Value::Class(cls) => {
-                let instance = new_instance(cls.clone());
+                let instance = new_instance(cls.clone())?;
 
                 if let Some(constructor) = cls.borrow().get_constructor() {
                     let func = constructor.clone();
@@ -91,10 +90,7 @@ impl Runtime {
     }
 
     fn bind_func(func: Value, value: InstanceType) {
-        match func {
-            Value::NativeFunction(func) => func.borrow_mut().bind(value),
-            _ => (),
-        }
+        if let Value::NativeFunction(func) = func { func.borrow_mut().bind(value) }
     }
 
     pub fn call_fn(&mut self, func: FunctionType) -> Result<Value, RuntimeError> {
@@ -123,10 +119,11 @@ impl Runtime {
 
     }
 
-    pub fn include_module(&mut self, module: Module) {
+    pub fn include_module(&mut self, module: Module) -> Result<(), RuntimeError> {
         let name = module.get_name().to_owned();
         let module = Rc::new(RefCell::new(module));
-        self.add_global(name, module);
+        self.add_global(name, module)?;
+        Ok(())
     }
 
     pub(crate) fn push_call_frame(&mut self, chunk: Rc<Chunk>, arity: usize) {
