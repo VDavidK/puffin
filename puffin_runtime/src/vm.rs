@@ -183,12 +183,17 @@ impl<'a> Vm<'a> {
                     Value::Instance(instance) => {
                         instance
                             .borrow_mut()
-                            .set_field(name, value.to_owned());
+                            .set_field(name, value.to_owned())?;
                     }
                     Value::Class(class) => {
                         class
                             .borrow_mut()
                             .set_field(name, value.to_owned())?;
+                    }
+                    Value::Dictionary(dict) => {
+                        dict
+                            .borrow_mut()
+                            .insert(Value::String(name), value.to_owned());
                     }
                     _ => panic!("Invalid assignment target"),
                 }
