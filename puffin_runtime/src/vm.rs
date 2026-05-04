@@ -103,7 +103,7 @@ impl<'a> Vm<'a> {
                     .take_string()?;
 
                 let top = self.runtime.pop_expecting()?;
-                self.runtime.add_global(constant, top);
+                self.runtime.add_global(constant, top)?;
             },
 
             OpCode::Pop => {
@@ -188,7 +188,7 @@ impl<'a> Vm<'a> {
                     Value::Class(class) => {
                         class
                             .borrow_mut()
-                            .set_field(name, value.to_owned());
+                            .set_field(name, value.to_owned())?;
                     }
                     _ => panic!("Invalid assignment target"),
                 }
@@ -246,7 +246,7 @@ impl<'a> Vm<'a> {
 
                 let reactive_value = match value {
                     Value::Reactive(inner) => Value::Reactive(inner),
-                    // TODO: Support derived
+                    Value::Derived(inner) => Value::Derived(inner),
 
                     val => Reactive::new(val).into(),
                 };
@@ -258,80 +258,80 @@ impl<'a> Vm<'a> {
                 let rhs = self.runtime.pop_expecting()?;
                 let lhs = self.runtime.pop_expecting()?;
 
-                self.runtime.push_value(lhs.try_add(&rhs)?);
+                self.runtime.push_value(lhs.try_add_derivable(&rhs)?);
             },
             OpCode::Sub => {
                 let rhs = self.runtime.pop_expecting()?;
                 let lhs = self.runtime.pop_expecting()?;
 
-                self.runtime.push_value(lhs.try_sub(&rhs)?);
+                self.runtime.push_value(lhs.try_sub_derivable(&rhs)?);
             },
             OpCode::Mul => {
                 let rhs = self.runtime.pop_expecting()?;
                 let lhs = self.runtime.pop_expecting()?;
 
-                self.runtime.push_value(lhs.try_mul(&rhs)?);
+                self.runtime.push_value(lhs.try_mul_derivable(&rhs)?);
             },
             OpCode::Div => {
                 let rhs = self.runtime.pop_expecting()?;
                 let lhs = self.runtime.pop_expecting()?;
 
-                self.runtime.push_value(lhs.try_div(&rhs)?);
+                self.runtime.push_value(lhs.try_div_derivable(&rhs)?);
             },
             OpCode::Mod => {
                 let rhs = self.runtime.pop_expecting()?;
                 let lhs = self.runtime.pop_expecting()?;
 
-                self.runtime.push_value(lhs.try_mod(&rhs)?);
+                self.runtime.push_value(lhs.try_mod_derivable(&rhs)?);
             },
             OpCode::Neg => {
                 let rhs = self.runtime.pop_expecting()?;
 
-                self.runtime.push_value(rhs.try_negate()?);
+                self.runtime.push_value(rhs.try_negate_derivable()?);
             },
             OpCode::Not => {
                 let rhs = self.runtime.pop_expecting()?;
 
-                self.runtime.push_value(rhs.not());
+                self.runtime.push_value(rhs.not_derivable()?);
             },
             
             OpCode::Eq => {
                 let rhs = self.runtime.pop_expecting()?;
                 let lhs = self.runtime.pop_expecting()?;
                 
-                self.runtime.push_value(lhs.is_equal(&rhs));
+                self.runtime.push_value(lhs.is_equal_derivable(&rhs)?);
             },
             OpCode::Neq => {
                 let rhs = self.runtime.pop_expecting()?;
                 let lhs = self.runtime.pop_expecting()?;
 
-                self.runtime.push_value(lhs.not_equal(&rhs));
+                self.runtime.push_value(lhs.not_equal_derivable(&rhs)?);
             },
             
             OpCode::Lt => {
                 let rhs = self.runtime.pop_expecting()?;
                 let lhs = self.runtime.pop_expecting()?;
 
-                self.runtime.push_value(lhs.lesser(&rhs));
+                self.runtime.push_value(lhs.lesser_derivable(&rhs)?);
             },
             OpCode::Le => {
                 let rhs = self.runtime.pop_expecting()?;
                 let lhs = self.runtime.pop_expecting()?;
 
-                self.runtime.push_value(lhs.lesser_equal(&rhs));
+                self.runtime.push_value(lhs.lesser_equal_derivable(&rhs)?);
             },
             
             OpCode::Gt => {
                 let rhs = self.runtime.pop_expecting()?;
                 let lhs = self.runtime.pop_expecting()?;
 
-                self.runtime.push_value(lhs.greater(&rhs));
+                self.runtime.push_value(lhs.greater_derivable(&rhs)?);
             },
             OpCode::Ge => {
                 let rhs = self.runtime.pop_expecting()?;
                 let lhs = self.runtime.pop_expecting()?;
 
-                self.runtime.push_value(lhs.greater_equal(&rhs));
+                self.runtime.push_value(lhs.greater_equal_derivable(&rhs)?);
             },
 
             OpCode::Jump => {
@@ -344,7 +344,7 @@ impl<'a> Vm<'a> {
                 let addr = self.fetch_instruction_offset()?;
                 let val = self.runtime.pop_expecting()?;
 
-                if val.truthy() {
+                if val.truthy()? {
                     #[cfg(feature = "debug_tracing")]
                     log::debug!("Value '{}' truthy, jumping from 0x{:x} -> 0x{:x}", val, self.runtime.pc()?, addr);
                     self.runtime.set_pc(addr as usize);

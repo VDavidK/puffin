@@ -5,7 +5,7 @@ use ratatui::DefaultTerminal;
 use crate::chunk::LocalOffset;
 use crate::vm::Vm;
 use crate::{Chunk, RuntimeError, value::Value};
-use crate::value::{new_instance, Module, LayoutDirection, LayoutNode, Node, FunctionType, InstanceType};
+use crate::value::{new_instance, Module, LayoutDirection, LayoutNode, Node, FunctionType, InstanceType, Reactive};
 
 #[derive(Debug, Clone)]
 pub struct CallFrame {
@@ -169,7 +169,12 @@ impl Runtime {
             return Err(RuntimeError::StackOutOfBounds { at: offset, pc: self.pc()? });
         }
 
-        self.stack[offset] = value;
+        if let Value::Reactive(reactive) = &self.stack[offset] {
+            Reactive::set(reactive.clone(), value.eval()?)?;
+        } else {
+            self.stack[offset] = value;
+        }
+
         Ok(())
     }
 
@@ -281,8 +286,16 @@ impl Runtime {
         }
     }
 
-    pub fn add_global(&mut self, name: impl Into<String>, value: impl Into<Value>) {
-        self.globals.insert(name.into(), value.into());
+    pub fn add_global(&mut self, name: impl Into<String>, value: impl Into<Value>) -> Result<(), RuntimeError> {
+        let name = name.into();
+
+        if let Some(Value::Reactive(reactive)) = self.globals.get(&name) {
+            Reactive::set(reactive.clone(), value.into())?;
+            return Ok(());
+        }
+
+        self.globals.insert(name, value.into());
+        Ok(())
     }
 
     pub fn remove_global(&mut self, name: impl AsRef<str>) {

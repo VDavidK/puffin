@@ -1,15 +1,13 @@
 use std::cell::RefCell;
 use std::fmt::Display;
 use std::rc::Rc;
-use serde_derive::{Serialize, Deserialize};
 use crate::RuntimeError;
-use crate::value::instance::InstanceType;
 use crate::value::ops::ValueTruthy;
 use crate::value::Value;
 
 pub type ReactiveType = Rc<RefCell<Reactive>>;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct Reactive(Value);
 
 impl Reactive {
@@ -17,8 +15,15 @@ impl Reactive {
         Self(value)
     }
 
-    pub fn set(&mut self, new_value: Value) {
-        self.0 = new_value;
+    pub fn set(this: ReactiveType, new_value: Value) -> Result<(), RuntimeError> {
+        let value = if new_value.references(&Value::Reactive(this.clone())) {
+            new_value.eval()?
+        } else {
+            new_value
+        };
+
+        this.borrow_mut().0 = value;
+        Ok(())
     }
 
     pub fn get(&self) -> &Value {
@@ -55,6 +60,6 @@ impl Display for Reactive {
 
 impl ValueTruthy for ReactiveType {
     fn truthy(&self) -> bool {
-        self.borrow().get().truthy()
+        self.borrow().get().truthy().is_ok_and(|val| val)
     }
 }

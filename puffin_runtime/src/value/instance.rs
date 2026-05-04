@@ -7,7 +7,7 @@ use serde_derive::{Deserialize, Serialize};
 use crate::event::Event;
 use crate::runtime::Runtime;
 use crate::RuntimeError;
-use crate::value::{Value, ClassType, IntType};
+use crate::value::{Value, ClassType, IntType, Reactive};
 use crate::value::ops::{ValueDef, ValueTruthy};
 
 pub type InstanceType = Rc<RefCell<Instance>>;
@@ -28,20 +28,21 @@ impl Instance {
         }
     }
 
-    pub fn set_field(&mut self, name: impl Into<String>, value: impl Into<Value>) {
+    pub fn set_field(&mut self, name: impl Into<String>, value: impl Into<Value>) -> Result<(), RuntimeError> {
         let name = name.into();
 
         if let Some(inner) = self.fields.get(&name) {
             match inner {
                 Value::Reactive(inner) => {
-                    inner.borrow_mut().set(value.into());
-                    return;
+                    Reactive::set(inner.clone(), value.into())?;
+                    return Ok(());
                 }
                 _ => (),
             }
         }
 
         self.fields.insert(name, value.into());
+        Ok(())
     }
 
     pub fn get_field(&self, name: impl AsRef<str>) -> Option<&Value> {
