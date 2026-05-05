@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use crate::scope::Scope;
 use puffin_ast::Ast;
 use puffin_ast::declaration::Declaration;
@@ -551,9 +552,13 @@ impl<'a> Compiler<'a> {
                 Ok(Value::Float(val))
             }
             TokenType::String => Ok(Value::String(
-                token.lexeme[1..token.lexeme.len() - 1].to_owned(),
+                Rc::new(
+                    RefCell::new(
+                        token.lexeme[1..token.lexeme.len() - 1].to_owned(),
+                    )
+                )
             )),
-            TokenType::Identifier => Ok(Value::String(token.lexeme.to_owned())),
+            TokenType::Identifier => Ok(Value::String(Rc::new(RefCell::new(token.lexeme.to_owned())))),
 
             _ => Err(CompileError::InvalidLiteral(token.lexeme.clone())),
         }

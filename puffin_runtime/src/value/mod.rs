@@ -110,7 +110,7 @@ impl Display for Value {
             Value::Int(v) => f.write_fmt(format_args!("{v}")),
             Value::Float(v) => f.write_fmt(format_args!("{v}")),
             Value::Bool(v) => f.write_fmt(format_args!("{v}")),
-            Value::String(v) => f.write_fmt(format_args!("{v}")),
+            Value::String(v) => f.write_fmt(format_args!("{}", v.borrow())),
             Value::Instance(v) => f.write_fmt(format_args!("{}", v.borrow())),
             Value::Function(v) => f.write_fmt(format_args!("{}", v.borrow())),
             Value::NativeFunction(v) => f.write_fmt(format_args!("{}", v.borrow())),
