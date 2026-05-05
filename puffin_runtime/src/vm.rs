@@ -110,20 +110,6 @@ impl<'a> Vm<'a> {
                 self.runtime.pop_expecting()?;
             },
 
-            OpCode::NewInstance => {
-                let class = self.runtime.pop_expecting()?
-                    .take_class()?;
-
-                let instance = new_instance(class.clone())?;
-
-                if let Some(constructor) = class.borrow().get_constructor() {
-                    self.runtime.push_value(instance.clone());
-                    self.runtime.call_fn(constructor.clone().take_function()?)?;
-                }
-
-                self.runtime.push_value(instance);
-            }
-
             OpCode::NewClass => {
                 let name = self.fetch_constant()?
                     .to_owned()

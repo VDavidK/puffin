@@ -6,7 +6,7 @@ use serde_derive::{Deserialize, Serialize};
 use crate::event::Event;
 use crate::runtime::Runtime;
 use crate::RuntimeError;
-use crate::value::{Value, ClassType, Reactive};
+use crate::value::{Value, ClassType, Reactive, NodeType, LayoutNode, LayoutDirection, Node, ComponentNode};
 use crate::value::ops::{ValueDef, ValueTruthy};
 
 pub type InstanceType = Rc<RefCell<Instance>>;
@@ -55,6 +55,12 @@ impl Instance {
         self.event_handlers.get(name.as_ref()).cloned()
     }
 
+    pub fn get_handler_for_event(&self, event: &Event) -> Option<Value> {
+        match event {
+            Event::KeyPress(_) => self.event_handlers.get("onkey").cloned(),
+        }
+    }
+
     pub fn dispatch_event(&self, runtime: &mut Runtime, event: &Event) -> Result<(), RuntimeError> {
         match event {
             Event::KeyPress(c) => {
@@ -65,6 +71,42 @@ impl Instance {
         }
 
         Ok(())
+    }
+
+    pub fn construct_layout(&self, runtime: &mut Runtime) -> Result<NodeType, RuntimeError> {
+        let layout = self
+            .get_field("<construct>")
+            .unwrap(); // TODO: Remove shitty code
+
+        let res = runtime.call(layout.to_owned(), &[])?;
+
+        let node = match res {
+            Value::List(nodes) => {
+                let nodes = nodes
+                    .borrow()
+                    .iter()
+                    .cloned()
+                    .map(|v| v.take_instance())
+                    .collect::<Result<Vec<InstanceType>, RuntimeError>>()?
+                    .into_iter()
+                    .map(|instance| Node::Component(ComponentNode { instance }))
+                    .map(|node| Rc::new(RefCell::new(node)))
+                    .collect::<Vec<NodeType>>();
+
+                let node = LayoutNode {
+                    nodes,
+                    direction: LayoutDirection::Vertical,
+                };
+
+                Rc::new(RefCell::new(Node::Layout(node)))
+            }
+
+            Value::Node(node) => node,
+
+            v => Err(RuntimeError::IncorrectType { expected: "node[] or node".to_owned(), ty: v.type_name().to_owned() })?
+        };
+
+        Ok(node)
     }
 }
 
@@ -96,7 +138,7 @@ impl From<Instance> for Value {
     }
 }
 
-pub fn new_instance(class: ClassType) -> Result<InstanceType, RuntimeError> {
+pub fn new_instance(class: ClassType, runtime: &mut Runtime, num_args: usize) -> Result<InstanceType, RuntimeError> {
     let mut instance = Instance::new(class.clone());
 
     let class = class.borrow();
@@ -134,6 +176,20 @@ pub fn new_instance(class: ClassType) -> Result<InstanceType, RuntimeError> {
             }
             _ => unreachable!("Class event handler needs to be of type function"),
         }
+    }
+
+    class.run_constructor(instance.clone(), num_args, runtime)?;
+
+    let inst = instance.borrow();
+    let construct_fn = inst
+        .get_field("<construct>")
+        .cloned();
+
+    drop(inst);
+
+    if construct_fn.is_some() {
+        let node = instance.borrow().construct_layout(runtime)?;
+        instance.borrow_mut().set_field("<layout>", node)?;
     }
 
     Ok(instance)

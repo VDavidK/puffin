@@ -75,13 +75,7 @@ impl Runtime {
                 Ok(ret_value)
             },
             Value::Class(cls) => {
-                let instance = new_instance(cls.clone())?;
-
-                if let Some(constructor) = cls.borrow().get_constructor() {
-                    let func = constructor.clone();
-                    Self::bind_func(func.to_owned(), instance.to_owned());
-                    self.call_val(func, num_args)?;
-                }
+                let instance = new_instance(cls.clone(), self, num_args)?;
 
                 Ok(Value::Instance(instance))
             },

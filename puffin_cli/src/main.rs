@@ -97,8 +97,8 @@ fn main() -> color_eyre::Result<()> {
                 .ok_or_eyre("Main component missing")?
                 .to_owned();
 
-            let mut dom = Dom::new();
-            dom.run_component(&mut runtime, main_component)?;
+            let mut dom = Dom::new(main_component, &mut runtime)?;
+            dom.run(&mut runtime)?;
         }
     }
 

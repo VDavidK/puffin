@@ -4,6 +4,7 @@ use std::rc::Rc;
 use ratatui::prelude::*;
 use ratatui::widgets::{Block, BorderType, Borders, Paragraph};
 use serde_derive::{Deserialize, Serialize};
+use crate::event::Event;
 use crate::runtime::Runtime;
 use crate::value::{InstanceType, Value};
 use crate::RuntimeError;
@@ -45,9 +46,57 @@ impl StatefulWidget for &Node {
     }
 }
 
+impl Node {
+    pub fn dispatch(&self, runtime: &mut Runtime, event: &Event) -> Result<(), RuntimeError> {
+        match self {
+            Node::Layout(layout) => layout.dispatch(runtime, event)?,
+            Node::Frame(frame) => frame.dispatch(runtime, event)?,
+            Node::Component(component) => component.dispatch(runtime, event)?,
+            _ => (),
+        }
+        Ok(())
+    }
+}
+
+impl From<NodeType> for Value {
+    fn from(value: NodeType) -> Self {
+        Value::Node(value)
+    }
+}
+
+impl From<Node> for Value {
+    fn from(value: Node) -> Self {
+        Rc::new(RefCell::new(value)).into()
+    }
+}
+
+impl TryFrom<Value> for NodeType {
+    type Error = RuntimeError;
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        match value {
+            Value::Node(v) => Ok(v),
+            _ => Err(RuntimeError::IncorrectType { ty: value.type_name().to_owned(), expected: "node".to_owned() }),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TextNode {
     pub content: String,
+}
+
+impl Widget for &TextNode {
+    fn render(self, area: Rect, buf: &mut Buffer) where Self: Sized {
+        Paragraph::new(self.content.as_str())
+            .render(area, buf);
+    }
+}
+
+impl From<TextNode> for Node {
+    fn from(value: TextNode) -> Self {
+        Node::Text(value)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -75,39 +124,12 @@ impl StatefulWidget for &FrameNode {
     }
 }
 
-impl Widget for &TextNode {
-    fn render(self, area: Rect, buf: &mut Buffer) where Self: Sized {
-        Paragraph::new(self.content.as_str())
-            .render(area, buf);
-    }
-}
-
-impl From<TextNode> for Node {
-    fn from(value: TextNode) -> Self {
-        Node::Text(value)
-    }
-}
-
-impl From<NodeType> for Value {
-    fn from(value: NodeType) -> Self {
-        Value::Node(value)
-    }
-}
-
-impl From<Node> for Value {
-    fn from(value: Node) -> Self {
-        Rc::new(RefCell::new(value)).into()
-    }
-}
-
-impl TryFrom<Value> for NodeType {
-    type Error = RuntimeError;
-
-    fn try_from(value: Value) -> Result<Self, Self::Error> {
-        match value {
-            Value::Node(v) => Ok(v),
-            _ => Err(RuntimeError::IncorrectType { ty: value.type_name().to_owned(), expected: "node".to_owned() }),
+impl FrameNode {
+    fn dispatch(&self, runtime: &mut Runtime, event: &Event) -> Result<(), RuntimeError> {
+        for node in &self.nodes {
+            node.borrow().dispatch(runtime, event)?;
         }
+        Ok(())
     }
 }
 
@@ -145,6 +167,15 @@ impl StatefulWidget for &LayoutNode {
     }
 }
 
+impl LayoutNode {
+    fn dispatch(&self, runtime: &mut Runtime, event: &Event) -> Result<(), RuntimeError> {
+        for node in &self.nodes {
+            node.borrow().dispatch(runtime, event)?;
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ComponentNode {
     pub instance: InstanceType,
@@ -166,15 +197,29 @@ impl StatefulWidget for &ComponentNode {
         let instance = self.instance.borrow();
         let layout = instance
             .get_field("<layout>")
-            .unwrap();
-
-        let node = state.call(layout.to_owned(), &[instance.to_owned().into()])
             .unwrap()
+            .to_owned();
+        let node = layout
             .take_node()
             .unwrap();
 
         node.borrow()
             .render(area, buf, state);
+    }
+}
+
+impl ComponentNode {
+    fn dispatch(&self, runtime: &mut Runtime, event: &Event) -> Result<(), RuntimeError> {
+        match event {
+            Event::KeyPress(c) => {
+                let handler = self.instance.borrow().get_handler("onkey");
+                if let Some(handler) = handler {
+                    runtime.call(handler, &[c.to_string().into()])?;
+                }
+            }
+        }
+
+        Ok(())
     }
 }
 

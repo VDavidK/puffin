@@ -46,17 +46,13 @@ pub enum OpCode {
     // Pushes a new class to the top of the stack with the specified name
     NewClass = 0x20,
 
-    // : new
-    // Pushes a new instance of a class to the top of the stack
-    NewInstance = 0x21,
-
     // : newlist
     // Pushes a new list to the top of the stack
-    NewList = 0x22,
+    NewList = 0x21,
 
     // : newdict
     // Pushes a new dictionary to the top of the stack
-    NewDictionary = 0x23,
+    NewDictionary = 0x22,
 
     // ----------------------------
     // Object Manipulation Instructions

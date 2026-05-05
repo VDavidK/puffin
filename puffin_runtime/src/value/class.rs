@@ -4,7 +4,8 @@ use std::fmt::Display;
 use std::rc::Rc;
 use serde_derive::{Serialize, Deserialize};
 use crate::{RuntimeError};
-use crate::value::{Reactive, Value};
+use crate::runtime::Runtime;
+use crate::value::{InstanceType, Reactive, Value};
 use crate::value::ops::{ValueDef, ValueTruthy};
 
 pub type ClassType = Rc<RefCell<Class>>;
@@ -35,6 +36,24 @@ impl Class {
 
     pub fn get_constructor(&self) -> Option<&Value> {
         self.constructor.as_ref()
+    }
+
+    pub fn run_constructor(&self, instance: InstanceType, num_args: usize, runtime: &mut Runtime) -> Result<(), RuntimeError> {
+        if let Some(constructor) = self.get_constructor() {
+            let func = match constructor {
+                Value::Function(func) => {
+                    Value::Function(Rc::new(RefCell::new(func.borrow().bound_copy(instance.clone()))))
+                },
+                Value::NativeFunction(func) => {
+                    Value::NativeFunction(Rc::new(RefCell::new(func.borrow().bound_copy(instance.clone()))))
+                },
+                v => Err(RuntimeError::IncorrectType { expected: "constructor".to_owned(), ty: v.type_name().to_owned() })?
+            };
+
+            runtime.call_val(func, num_args)?;
+        }
+
+        Ok(())
     }
 
     pub fn set_field(&mut self, name: impl Into<String>, value: impl Into<Value>) -> Result<(), RuntimeError> {

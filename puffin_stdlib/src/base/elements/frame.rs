@@ -27,7 +27,7 @@ pub fn define_frame_element(runtime: &mut Runtime) -> Result<(), RuntimeError> {
         Ok(Value::Null)
     }));
 
-    frame_class.borrow_mut().set_method("<layout>", NativeFunction::new(|_, _, this| {
+    frame_class.borrow_mut().set_method("<construct>", NativeFunction::new(|_, _, this| {
         let this = this.ok_or(RuntimeError::MissingThisInMethodCall{ name: "frame".to_owned() })?;
 
         Ok(this.borrow()

@@ -50,7 +50,7 @@ pub fn define_flow_elements(runtime: &mut Runtime) -> Result<(), RuntimeError>  
         Ok(Value::Null)
     }));
 
-    vbox_class.borrow_mut().set_method("<layout>", NativeFunction::new(|_, _, this| {
+    vbox_class.borrow_mut().set_method("<construct>", NativeFunction::new(|_, _, this| {
         let this = this.ok_or(RuntimeError::MissingThisInMethodCall{ name: "vbox".to_owned() })?;
 
         Ok(this.borrow()

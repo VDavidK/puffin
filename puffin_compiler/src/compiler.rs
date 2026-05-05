@@ -88,7 +88,7 @@ impl<'a> Compiler<'a> {
                 let name = layout.name
                     .as_ref()
                     .map(|name| name.lexeme.as_str())
-                    .unwrap_or("<layout>")
+                    .unwrap_or("<construct>")
                     .to_owned();
 
                 let mut chunk = Chunk::new(&name);

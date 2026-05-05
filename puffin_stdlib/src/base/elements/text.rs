@@ -16,7 +16,7 @@ pub fn define_text_element(runtime: &mut Runtime) -> Result<(), RuntimeError>  {
         Ok(Value::Null)
     }));
 
-    text_class.borrow_mut().set_method("<layout>", NativeFunction::new(|_runtime, _argc, this| {
+    text_class.borrow_mut().set_method("<construct>", NativeFunction::new(|_runtime, _argc, this| {
         let this = this.expect("How did you do this?");
 
         let text = this.borrow();
