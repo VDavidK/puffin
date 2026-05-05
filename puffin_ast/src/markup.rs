@@ -25,29 +25,6 @@ pub enum ComponentParameter {
 }
 
 #[derive(Debug)]
-pub enum MarkupProp {
-    DirectBindings(DirectBindings),
-    Lambda(LambdaFunctionBinding),
-}
-
-#[derive(Debug)]
-pub struct LambdaFunctionBinding {
-    pub parameters: Vec<Token>,
-    pub expressions: Vec<Expression>,
-}
-
-#[derive(Debug)]
-pub struct DirectBindings {
-    pub names: Vec<Token>,
-}
-
-#[derive(Debug)]
-pub struct MarkupBinding {
-    pub name: Token,
-    pub binding: MarkupProp,
-}
-
-#[derive(Debug)]
 pub struct MarkupBlock {
     pub markup: Vec<Markup>,
 }
@@ -55,7 +32,7 @@ pub struct MarkupBlock {
 #[derive(Debug)]
 pub struct ComponentRender {
     pub name: Token,
-    pub bindings: Vec<MarkupBinding>,
+    pub props: Vec<(Token, Box<Expression>)>,
     pub parameter: Option<ComponentParameter>,
 }
 
@@ -112,50 +89,24 @@ impl LayoutRender {
     }
 }
 
-impl LambdaFunctionBinding {
-    pub fn new(parameters: Vec<Token>, expressions: Vec<Expression>) -> Self {
-        Self {
-            parameters,
-            expressions,
-        }
-    }
-}
-
-impl DirectBindings {
-    pub fn new(names: Vec<Token>) -> Self {
-        Self {
-            names,
-        }
-    }
-}
-
-impl MarkupBinding {
-    pub fn new(name: Token, binding: MarkupProp) -> Self {
-        Self {
-            name,
-            binding,
-        }
-    }
-}
-
 impl ComponentRender {
-    pub fn new(name: Token, bindings: Vec<MarkupBinding>) -> Self {
+    pub fn new(name: Token, props: Vec<(Token, Expression)>) -> Self {
         Self {
             name,
-            bindings,
+            props: props.into_iter().map(|(t, e)| (t.to_owned(), Box::new(e))).collect::<Vec<(_, _)>>(),
             parameter: None,
         }
     }
-    pub fn new_with_expression(name: Token, bindings: Vec<MarkupBinding>, expression: Expression) -> Self {
+    pub fn new_with_expression(name: Token, props: Vec<(Token, Expression)>, expression: Expression) -> Self {
         Self {
             parameter: Some(expression.into()),
-            ..Self::new(name, bindings)
+            ..Self::new(name, props)
         }
     }
-    pub fn new_with_children(name: Token, bindings: Vec<MarkupBinding>, children: Markup) -> Self {
+    pub fn new_with_children(name: Token, props: Vec<(Token, Expression)>, children: Markup) -> Self {
         Self {
             parameter: Some(children.into()),
-            ..Self::new(name, bindings)
+            ..Self::new(name, props)
         }
     }
 }
@@ -231,16 +182,6 @@ impl From<IfConditionalRender> for Markup {
 impl From<IterativeRender> for Markup {
     fn from(m: IterativeRender) -> Self {
         Markup::Iterative(m)
-    }
-}
-impl From<DirectBindings> for MarkupProp {
-    fn from(m: DirectBindings) -> Self {
-        MarkupProp::DirectBindings(m)
-    }
-}
-impl From<LambdaFunctionBinding> for MarkupProp {
-    fn from(m: LambdaFunctionBinding) -> Self {
-        MarkupProp::Lambda(m)
     }
 }
 

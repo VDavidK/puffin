@@ -1,14 +1,18 @@
 use std::cell::RefCell;
 use std::fmt::{Display, Formatter};
 use std::rc::Rc;
+use std::str::FromStr;
+use ratatui::crossterm::event::{KeyEvent, KeyEventKind};
 use ratatui::prelude::*;
+use ratatui::style::Styled;
 use ratatui::widgets::{Block, BorderType, Borders, Paragraph};
 use serde_derive::{Deserialize, Serialize};
-use crate::event::Event;
+use crate::event::{key_code_name, Event, EVENT_NAME_ONKEY};
 use crate::runtime::Runtime;
-use crate::value::{InstanceType, Value};
-use crate::RuntimeError;
+use crate::value::{InstanceType, Module, Value};
+use crate::{make_dict_value, make_fields, RuntimeError};
 use crate::value::ops::{ValueDef, ValueTruthy};
+use crate::value::Value::Dictionary;
 
 pub type NodeType = Rc<RefCell<Node>>;
 
@@ -81,14 +85,23 @@ impl TryFrom<Value> for NodeType {
     }
 }
 
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TextNode {
-    pub content: String,
+    pub content: Value,
+    pub text_color: Value,
+    pub bg_color: Value,
 }
 
 impl Widget for &TextNode {
     fn render(self, area: Rect, buf: &mut Buffer) where Self: Sized {
-        Paragraph::new(self.content.as_str())
+        let text_color = TryInto::try_into(&self.text_color).unwrap_or(Color::Reset).to_owned();
+        let bg_color = TryInto::try_into(&self.bg_color).unwrap_or(Color::Reset).to_owned();
+        let style = Style::new()
+            .fg(text_color)
+            .bg(bg_color);
+        Paragraph::new(self.content.to_string())
+            .set_style(style)
             .render(area, buf);
     }
 }
@@ -124,12 +137,25 @@ impl StatefulWidget for &FrameNode {
     }
 }
 
+
 impl FrameNode {
     fn dispatch(&self, runtime: &mut Runtime, event: &Event) -> Result<(), RuntimeError> {
         for node in &self.nodes {
             node.borrow().dispatch(runtime, event)?;
         }
         Ok(())
+    }
+}
+
+impl TryFrom<&Value> for Color {
+    type Error = RuntimeError;
+
+    fn try_from(value: &Value) -> Result<Color, RuntimeError> {
+        match value {
+            Value::String(inner) => Ok(Color::from_str(inner.borrow().as_str())?),
+            Value::Int(inner) => Ok(Color::from_u32(inner.to_owned() as u32)),
+            _ => Err(RuntimeError::IncorrectType{ty: value.type_name().into(), expected: "hexadecimal string or integer".into() })
+        }
     }
 }
 
@@ -179,6 +205,7 @@ impl LayoutNode {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ComponentNode {
     pub instance: InstanceType,
+    pub root: NodeType,
 }
 
 impl From<ComponentNode> for NodeType {
@@ -187,23 +214,30 @@ impl From<ComponentNode> for NodeType {
     }
 }
 
+impl TryFrom<InstanceType> for ComponentNode {
+    type Error = RuntimeError;
+
+    fn try_from(value: InstanceType) -> Result<Self, Self::Error> {
+        let node = ComponentNode {
+            instance: value.to_owned(),
+            root: value
+                .borrow()
+                .get_field("<layout>")
+                .cloned()
+                .unwrap() // TODO: Better
+                .take_node()?,
+        };
+
+        Ok(node)
+    }
+}
+
 impl StatefulWidget for &ComponentNode {
     type State = Runtime;
 
     #[allow(clippy::unwrap_used)]
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
-        // TODO: Fix error handling
-
-        let instance = self.instance.borrow();
-        let layout = instance
-            .get_field("<layout>")
-            .unwrap()
-            .to_owned();
-        let node = layout
-            .take_node()
-            .unwrap();
-
-        node.borrow()
+        self.root.borrow()
             .render(area, buf, state);
     }
 }
@@ -211,15 +245,37 @@ impl StatefulWidget for &ComponentNode {
 impl ComponentNode {
     fn dispatch(&self, runtime: &mut Runtime, event: &Event) -> Result<(), RuntimeError> {
         match event {
-            Event::KeyPress(c) => {
-                let handler = self.instance.borrow().get_handler("onkey");
-                if let Some(handler) = handler {
-                    runtime.call(handler, &[c.to_string().into()])?;
+            // Key press event
+            Event::Key(KeyEvent {
+                code,
+                modifiers,
+                kind: KeyEventKind::Press,
+                state
+            }) => self.forward_event_fn(runtime, EVENT_NAME_ONKEY, || {
+                make_fields! {
+                    key: key_code_name(&code),
                 }
-            }
+            })?,
+
+            _ => (),
         }
 
+        // Propagate to child nodes
+        self.root.borrow().dispatch(runtime, event)?;
+
         Ok(())
+    }
+
+    fn forward_event(&self, runtime: &mut Runtime, name: impl AsRef<str>, event_value: impl Into<Value>) -> Result<(), RuntimeError> {
+        let handler = self.instance.borrow().get_handler(name);
+        if let Some(handler) = handler {
+            runtime.call(handler, &[event_value.into()])?;
+        }
+        Ok(())
+    }
+
+    fn forward_event_fn<F: FnOnce() -> R, R: Into<Value>>(&self, runtime: &mut Runtime, name: impl AsRef<str>, constructor: F) -> Result<(), RuntimeError> {
+        self.forward_event(runtime, name, constructor())
     }
 }
 

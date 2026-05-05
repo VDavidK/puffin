@@ -4,7 +4,7 @@ use puffin_runtime::value::{NativeFunction, LayoutNode, LayoutDirection, Node, n
 
 fn construct_flow(runtime: &mut Runtime, direction: LayoutDirection) -> Result<LayoutNode, RuntimeError> {
     let child_elements = runtime
-        .get_local(-1)?
+        .get_local(-2)?
         .to_owned()
         .take_list()?;
     let child_elements = child_elements.borrow()
@@ -12,8 +12,8 @@ fn construct_flow(runtime: &mut Runtime, direction: LayoutDirection) -> Result<L
         .map(|x| x.to_owned().take_instance())
         .collect::<Result<Vec<_>, _>>()?
         .into_iter()
-        .map(|instance| ComponentNode { instance }.into())
-        .collect::<Vec<_>>();
+        .map(|instance| ComponentNode::try_from(instance).map(Into::into))
+        .collect::<Result<Vec<_>, _>>()?;
 
     let node = LayoutNode {
         direction,
@@ -33,7 +33,7 @@ pub fn define_flow_elements(runtime: &mut Runtime) -> Result<(), RuntimeError>  
         Ok(Value::Null)
     }));
 
-    hbox_class.borrow_mut().set_method("<layout>", NativeFunction::new(|_, _, this| {
+    hbox_class.borrow_mut().set_method("<construct>", NativeFunction::new(|_, _, this| {
         let this = this.ok_or(RuntimeError::MissingThisInMethodCall{ name: "hbox".to_owned() })?;
 
         Ok(this.borrow()

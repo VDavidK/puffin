@@ -1,4 +1,6 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 use num_enum::TryFromPrimitive;
 
 use crate::{RuntimeError, op::OpCode, value::{Value, new_instance}};
@@ -93,7 +95,7 @@ impl<'a> Vm<'a> {
                     .to_owned()
                     .take_string()?;
 
-                let global = self.runtime.get_global(&constant).ok_or(RuntimeError::GlobalNotFound { name: constant })?.clone();
+                let global = self.runtime.get_global(constant.borrow().as_str()).ok_or(RuntimeError::GlobalNotFound { name: constant.borrow().as_str().to_owned() })?.clone();
                 self.runtime.push_value(global);
             },
 
@@ -103,7 +105,7 @@ impl<'a> Vm<'a> {
                     .take_string()?;
 
                 let top = self.runtime.pop_expecting()?;
-                self.runtime.add_global(constant, top)?;
+                self.runtime.add_global(constant.borrow().as_str(), top)?;
             },
 
             OpCode::Pop => {
@@ -115,7 +117,7 @@ impl<'a> Vm<'a> {
                     .to_owned()
                     .take_string()?;
 
-                self.runtime.push_value(new_class(name));
+                self.runtime.push_value(new_class(name.borrow().as_str()));
             }
 
             OpCode::SetConstructor => {
@@ -134,7 +136,7 @@ impl<'a> Vm<'a> {
 
                 let value = match self.runtime.pop_expecting()? {
                     Value::Class(_class) => {
-                        todo!()
+                        todo!("static")
                     }
                     Value::Module(module) => {
                         module.borrow().get_item(&name)
@@ -152,8 +154,14 @@ impl<'a> Vm<'a> {
                             )
                             .ok_or(RuntimeError::NoFieldMatchingName { name })?
                     }
+                    Value::Dictionary(dict) => {
+                        dict.borrow()
+                            .get(&name.into())
+                            .cloned()
+                            .unwrap_or(Value::Null)
+                    }
                     v => {
-                        return Err(RuntimeError::IncorrectType { ty: v.type_name().into(), expected: "instance, module, class, dictionary or array".into() })
+                        return Err(RuntimeError::IncorrectType { ty: v.type_name().into(), expected: "instance, module, class or dictionary".into() })
                     }
                 };
 
@@ -179,7 +187,7 @@ impl<'a> Vm<'a> {
                     Value::Dictionary(dict) => {
                         dict
                             .borrow_mut()
-                            .insert(Value::String(name), value.to_owned());
+                            .insert(Value::String(Rc::new(RefCell::new(name))), value.to_owned());
                     }
                     obj => Err(RuntimeError::InvalidAssignmentTarget{ ty: obj.type_name().to_owned() })?,
                 }
@@ -213,7 +221,7 @@ impl<'a> Vm<'a> {
                 let class = self.runtime.pop_expecting()?
                     .take_class()?;
 
-                class.borrow_mut().set_method(name, method);
+                class.borrow_mut().set_method(name.borrow().as_str(), method);
             }
 
             OpCode::NewList => {
@@ -248,7 +256,7 @@ impl<'a> Vm<'a> {
                 let class = self.runtime.pop_expecting()?
                     .take_class()?;
 
-                class.borrow_mut().set_handler(name, method);
+                class.borrow_mut().set_handler(name.borrow().as_str(), method);
             }
 
             OpCode::MakeReactive => {

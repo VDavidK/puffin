@@ -48,6 +48,12 @@ impl From<ModuleType> for Value {
     }
 }
 
+impl From<Module> for Value {
+    fn from(value: Module) -> Self {
+        Rc::new(RefCell::new(value)).into()
+    }
+}
+
 impl TryFrom<Value> for ModuleType {
     type Error = RuntimeError;
 

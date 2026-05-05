@@ -74,8 +74,8 @@ impl Dom {
 
         let event = ratatui::crossterm::event::read()?;
 
-        if let CrosstermEvent::Key(KeyEvent { code: KeyCode::Char(c), .. }) = event {
-            self.dispatch_event(runtime, Event::KeyPress(c))?;
+        if let CrosstermEvent::Key(evt) = event {
+            self.dispatch_event(runtime, Event::Key(evt))?;
         }
 
         Ok(())

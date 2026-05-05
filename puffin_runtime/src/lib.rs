@@ -5,7 +5,7 @@ pub mod runtime;
 pub mod value;
 pub mod vm;
 pub mod dom;
-mod event;
+pub mod event;
 
 pub use chunk::Chunk;
 
@@ -13,6 +13,9 @@ pub use chunk::Chunk;
 pub enum RuntimeError {
     #[error(transparent)]
     IoError(#[from] std::io::Error),
+
+    #[error(transparent)]
+    ParseColorError(#[from] ratatui::style::ParseColorError),
 
     #[error("Unrecognized op code (0x{op:x}) at: 0x{pc:x}")]
     UnrecognizedOpCode { op: u8, pc: usize },
@@ -61,5 +64,8 @@ pub enum RuntimeError {
     InvalidAssignmentTarget { ty: String },
 
     #[error("Method called for {name} without supplied `this` parameter")]
-    MissingThisInMethodCall { name: String }
+    MissingThisInMethodCall { name: String },
+
+    #[error("Invalid hexadecimal string length. Got {0}, expected {1} (not including '#' symbol)")]
+    InvalidHexStringLength(usize, usize)
 }

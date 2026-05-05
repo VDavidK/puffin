@@ -55,27 +55,11 @@ impl Instance {
         self.event_handlers.get(name.as_ref()).cloned()
     }
 
-    pub fn get_handler_for_event(&self, event: &Event) -> Option<Value> {
-        match event {
-            Event::KeyPress(_) => self.event_handlers.get("onkey").cloned(),
-        }
-    }
-
-    pub fn dispatch_event(&self, runtime: &mut Runtime, event: &Event) -> Result<(), RuntimeError> {
-        match event {
-            Event::KeyPress(c) => {
-                if let Some(handler) = self.event_handlers.get("onkey") {
-                    runtime.call(handler.to_owned(), &[(*c).into()])?;
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    pub fn construct_layout(&self, runtime: &mut Runtime) -> Result<NodeType, RuntimeError> {
-        let layout = self
+    pub fn construct_layout(instance: InstanceType, runtime: &mut Runtime) -> Result<NodeType, RuntimeError> {
+        let layout = instance
+            .borrow()
             .get_field("<construct>")
+            .cloned()
             .unwrap(); // TODO: Remove shitty code
 
         let res = runtime.call(layout.to_owned(), &[])?;
@@ -89,16 +73,29 @@ impl Instance {
                     .map(|v| v.take_instance())
                     .collect::<Result<Vec<InstanceType>, RuntimeError>>()?
                     .into_iter()
-                    .map(|instance| Node::Component(ComponentNode { instance }))
+                    .map(|instance| Node::Component(ComponentNode {
+                        instance: instance.to_owned(),
+                        root: instance.borrow().get_field("<layout>")
+                            .cloned()
+                            .unwrap()
+                            .take_node()
+                            .unwrap(),
+                    }))
                     .map(|node| Rc::new(RefCell::new(node)))
                     .collect::<Vec<NodeType>>();
 
-                let node = LayoutNode {
+                let root_node = LayoutNode {
                     nodes,
                     direction: LayoutDirection::Vertical,
                 };
 
-                Rc::new(RefCell::new(Node::Layout(node)))
+                let root = Rc::new(RefCell::new(Node::Layout(root_node)));
+
+                let component_node = ComponentNode {
+                    root,
+                    instance: instance.clone(),
+                };
+                Rc::new(RefCell::new(Node::Component(component_node)))
             }
 
             Value::Node(node) => node,
@@ -188,7 +185,7 @@ pub fn new_instance(class: ClassType, runtime: &mut Runtime, num_args: usize) ->
     drop(inst);
 
     if construct_fn.is_some() {
-        let node = instance.borrow().construct_layout(runtime)?;
+        let node = Instance::construct_layout(instance.to_owned(), runtime)?;
         instance.borrow_mut().set_field("<layout>", node)?;
     }
 

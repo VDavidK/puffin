@@ -28,7 +28,7 @@ impl Declaration for FileSystem {
                 .write(true)
                 .append(append)
                 .create(true)
-                .open(path)
+                .open(path.borrow().as_str())
                 .expect("Could not create file");
 
             writeln!(file, "{}", content)?;
