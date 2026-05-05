@@ -32,7 +32,7 @@ pub fn define_frame_element(runtime: &mut Runtime) -> Result<(), RuntimeError> {
 
         Ok(this.borrow()
             .get_field("<children>")
-            .expect("Vbox initialized without <children> property")
+            .expect("Frame initialized without <children> property")
             .to_owned()
         )
     }));
