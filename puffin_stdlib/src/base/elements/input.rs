@@ -23,10 +23,12 @@ pub fn define_input_element(runtime: &mut Runtime) -> Result<(), RuntimeError>  
         let text = this.borrow();
         let text = text
             .get_field("text")
-            .expect("How did you do this?");
-
+            .expect("How did you do this?")
+            .to_owned();
         let node = TextNode {
-            content: text.to_string(),
+            content: text,
+            text_color: Value::Null,
+            bg_color: Value::Null,
         };
 
         Ok(Node::Text(node).into())

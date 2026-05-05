@@ -519,6 +519,10 @@ impl Value {
         TryInto::<ListType>::try_into(self.eval()?)
     }
 
+    pub fn take_dictionary(self) -> Result<DictionaryType, RuntimeError> {
+        TryInto::<DictionaryType>::try_into(self.eval()?)
+    }
+
     pub fn take_node(self) -> Result<NodeType, RuntimeError> {
         TryInto::<NodeType>::try_into(self.eval()?)
     }

@@ -7,7 +7,7 @@ use puffin_ast::statement::{Statement, AssignStatement, ExpressionStatement, Bre
 use puffin_ast::declaration::{Declaration, VarDeclaration, Decorator, ComponentDeclaration, MethodDeclaration, SignalDeclaration, LayoutDeclaration, RequireDeclaration, UseDeclaration, EnumDeclaration, ErrorDeclaration, ConstructorDeclaration};
 use puffin_ast::expression::{AccessorExpression, BinaryExpression, Expression, FunctionCallExpression, LiteralExpression, UnaryExpression, ArrayExpression, DictionaryExpression, MatchExpression, IndexExpression};
 use puffin_ast::expression::Expression::FunctionCall;
-use puffin_ast::markup::{Markup, LambdaFunctionBinding, MarkupBinding, DirectBindings, ComponentRender, IterativeRender, IfConditionalRender, MatchConditionalRender, LayoutRender, StyleRender, MarkupBlock, ComponentParameter};
+use puffin_ast::markup::{Markup, ComponentRender, IterativeRender, IfConditionalRender, MatchConditionalRender, LayoutRender, StyleRender, MarkupBlock, ComponentParameter};
 use crate::lex::{PuffinLexer, LexerError};
 use crate::parse::ParserError::{DuplicateConstructor, InvalidExport, MissingComponentFileName};
 
@@ -1009,67 +1009,22 @@ impl<'a> PuffinParser<'a> {
 
     fn markup_item(&mut self) -> Result<Markup, ParserError> {
         let name = self.next_token()?;
-        let mut bindings = vec![];
+        let mut props = vec![];
         while self.peek_is(TokenType::Identifier)? && self.peek_n_is(TokenType::Assign, 1)? {
             let name = self.next_token()?;
             self.advance();
-            let mut is_lambda = false;
-            let parameters = if self.peek_is(TokenType::LeftParen)? {
-                self.advance();
-                is_lambda = true;
-                let mut parameters = vec![];
-                while !self.peek_is(TokenType::RightParen)? {
-                    parameters.push(self.expect(TokenType::Identifier)?);
-                    if self.peek_is(TokenType::Comma)? {
-                        self.advance();
-                    } else {
-                        self.expect(TokenType::RightParen)?;
-                        break;
-                    }
-                }
-                parameters
-            } else {
-                vec![]
-            };
-            //self.expect(TokenType::Assign)?;
-            if self.peek_is(TokenType::LeftBrace)? {
-                is_lambda = true;
-            }
-            let binding = if is_lambda {
-                self.expect(TokenType::LeftBrace)?;
-                let exprs = self.expr_list(TokenType::RightBrace, TokenType::Semicolon)?;
-                self.expect(TokenType::RightBrace)?;
-                LambdaFunctionBinding::new(parameters, exprs).into()
-            } else {
-                let tokens = if self.peek_is(TokenType::LeftBracket)? {
-                    let mut tokens = vec![];
-                    self.next_token()?;
-                    while !self.peek_is(TokenType::RightBracket)? {
-                        tokens.push(self.expect(TokenType::Identifier)?);
-                        if self.peek_is(TokenType::Comma)? {
-                            self.next_token()?;
-                        } else {
-                            break;
-                        }
-                    }
-                    self.expect(TokenType::RightBracket)?;
-                    tokens
-                } else {
-                    vec![self.expect(TokenType::Identifier)?]
-                };
-                DirectBindings::new(tokens).into()
-            };
-            bindings.push(MarkupBinding::new(name, binding))
+            let value = self.primary_expr()?;
+            props.push((name, value));
         }
         if self.peek_is(TokenType::LeftBrace)? {
             let children = self.markup_block()?;
-            Ok(ComponentRender::new_with_children(name, bindings, children).into())
+            Ok(ComponentRender::new_with_children(name, props, children).into())
         } else if !self.peek_is(TokenType::Semicolon)? {
             let expr = self.expression()?;
             self.expect(TokenType::Semicolon)?;
-            Ok(ComponentRender::new_with_expression(name, bindings, expr).into())
+            Ok(ComponentRender::new_with_expression(name, props, expr).into())
         } else {
-            Ok(ComponentRender::new(name, bindings).into())
+            Ok(ComponentRender::new(name, props).into())
         }
     }
 

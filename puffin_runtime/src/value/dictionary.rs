@@ -14,7 +14,7 @@ impl TryFrom<Value> for DictionaryType {
     fn try_from(value: Value) -> Result<Self, Self::Error> {
         match value {
             Value::Dictionary(v) => Ok(v),
-            _ => Err(RuntimeError::IncorrectType { ty: value.type_name().to_owned(), expected: "list".to_owned() }),
+            _ => Err(RuntimeError::IncorrectType { ty: value.type_name().to_owned(), expected: DictionaryType::type_name().to_owned() }),
         }
     }
 }

@@ -1,7 +1,10 @@
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::rc::Rc;
+use std::str::FromStr;
 use ratatui::prelude::*;
+use ratatui::style::Styled;
 use ratatui::widgets::{Block, BorderType, Borders, Paragraph};
 use serde_derive::{Deserialize, Serialize};
 use crate::runtime::Runtime;
@@ -47,7 +50,9 @@ impl StatefulWidget for &Node {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TextNode {
-    pub content: String,
+    pub content: Value,
+    pub text_color: Value,
+    pub bg_color: Value,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -75,9 +80,27 @@ impl StatefulWidget for &FrameNode {
     }
 }
 
+impl TryFrom<&Value> for Color {
+    type Error = RuntimeError;
+
+    fn try_from(value: &Value) -> Result<Color, RuntimeError> {
+        match value {
+            Value::String(inner) => Ok(Color::from_str(inner.borrow().as_str())?),
+            Value::Int(inner) => Ok(Color::from_u32(inner.to_owned() as u32)),
+            _ => Err(RuntimeError::IncorrectType{ty: value.type_name().into(), expected: "hexadecimal string or integer".into() })
+        }
+    }
+}
+
 impl Widget for &TextNode {
     fn render(self, area: Rect, buf: &mut Buffer) where Self: Sized {
-        Paragraph::new(self.content.as_str())
+        let text_color = TryInto::try_into(&self.text_color).unwrap_or(Color::Reset).to_owned();
+        let bg_color = TryInto::try_into(&self.bg_color).unwrap_or(Color::Reset).to_owned();
+        let style = Style::new()
+            .fg(text_color)
+            .bg(bg_color);
+        Paragraph::new(self.content.to_string())
+            .set_style(style)
             .render(area, buf);
     }
 }

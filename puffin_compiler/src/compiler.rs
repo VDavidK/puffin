@@ -435,30 +435,45 @@ impl<'a> Compiler<'a> {
                 for elem in &block.markup {
                     self.chunk.push_op(OpCode::GetLocal);
                     self.chunk.push_local_offset(children);
+                    self.scope.define_unnamed_local();
                     self.compile_markup(elem)?;
                     self.chunk.push_op(OpCode::PushList);
-                    self.scope.remove_top_local();
+                    self.scope.remove_top_n_locals(2);
                 }
             }
             Markup::Component(component) => {
-                let arg_count = match &component.parameter {
-                    None => 0,
+                match &component.parameter {
+                    None => {
+                        self.chunk.push_op(OpCode::Constant);
+                        let null = self.add_to_constants(Value::Null)?;
+                        self.chunk.push_constant_offset(null);
+                    },
                     Some(ComponentParameter::Expression(expr)) => {
                         self.compile_expression(expr)?;
-                        1
                     }
                     Some(ComponentParameter::Children(inner)) => {
                         self.compile_markup(inner)?;
-                        1
                     }
                 };
 
+                self.chunk.push_op(OpCode::NewDictionary);
+                let prop_map = self.scope.define_unnamed_local();
+                for (name, expr) in &component.props {
+                    self.chunk.push_op(OpCode::GetLocal);
+                    self.chunk.push_local_offset(prop_map);
+                    let name = self.token_to_constant(name)?;
+                    self.compile_expression(expr)?;
+                    self.chunk.push_op(OpCode::SetField);
+                    self.chunk.push_constant_offset(name);
+                    self.scope.remove_top_local();
+                }
                 let global = self.token_to_constant(&component.name)?;
                 self.chunk.push_op(OpCode::GetGlobal);
                 self.chunk.push_constant_offset(global);
                 self.chunk.push_op(OpCode::Call);
-                self.chunk.push_u8(arg_count);
-                self.scope.remove_top_local();
+                // 2 = arg count (content, props)
+                self.chunk.push_u8(2);
+                self.scope.remove_top_n_locals(2);
             }
             // Markup::Layout(_) => {}
             // Markup::Match(_) => {}
@@ -480,10 +495,6 @@ impl<'a> Compiler<'a> {
 
         Ok(())
     }
-
-    //fn compile_component(&mut self, component: &ComponentRender) -> Result<(), CompileError> {
-    //    Ok(())
-    //}
 
     fn ensure_return(&mut self) -> Result<(), CompileError> {
         if !self.chunk.last_op_is(OpCode::Return) {
