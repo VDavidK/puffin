@@ -6,7 +6,7 @@ pub fn define_frame_element(runtime: &mut Runtime) -> Result<(), RuntimeError> {
     let frame_class = new_class("Frame");
 
     frame_class.borrow_mut().set_constructor(NativeFunction::new(|runtime, _argc, this| {
-        let this = this.ok_or(RuntimeError::MissingThisInMethodCall{ name: "vbox".to_owned() })?;
+        let this = this.ok_or(RuntimeError::MissingThisInMethodCall{ name: "frame".to_owned() })?;
 
         let child_elements = runtime
             .get_local(-1)?
