@@ -9,10 +9,9 @@ use ratatui::widgets::{Block, BorderType, Borders, Paragraph};
 use serde_derive::{Deserialize, Serialize};
 use crate::event::{key_code_name, Event, EVENT_NAME_ONKEY};
 use crate::runtime::Runtime;
-use crate::value::{InstanceType, Module, Value};
-use crate::{make_dict_value, make_fields, RuntimeError};
+use crate::value::{InstanceType, Value};
+use crate::{make_fields, RuntimeError};
 use crate::value::ops::{ValueDef, ValueTruthy};
-use crate::value::Value::Dictionary;
 
 pub type NodeType = Rc<RefCell<Node>>;
 
@@ -22,6 +21,7 @@ pub enum Node {
     Layout(LayoutNode),
     Frame(FrameNode),
     Component(ComponentNode),
+    Conditional(ConditionalNode),
 }
 
 impl Display for Node {
@@ -39,13 +39,15 @@ impl StatefulWidget for &Node {
     {
         match self {
             Node::Text(text)
-            => text.render(area, buf),
+                => text.render(area, buf),
             Node::Layout(layout)
-            => layout.render(area, buf, state),
+                => layout.render(area, buf, state),
             Node::Component(component)
-            => component.render(area, buf, state),
+                => component.render(area, buf, state),
             Node::Frame(item)
-            => item.render(area, buf, state),
+                => item.render(area, buf, state),
+            Node::Conditional(_)
+                => panic!("cannot directly render conditional nodes. must be wrapped in a layout"),
         }
     }
 }
@@ -56,6 +58,7 @@ impl Node {
             Node::Layout(layout) => layout.dispatch(runtime, event)?,
             Node::Frame(frame) => frame.dispatch(runtime, event)?,
             Node::Component(component) => component.dispatch(runtime, event)?,
+            Node::Conditional(component) => component.dispatch(runtime, event)?,
             _ => (),
         }
         Ok(())
@@ -177,7 +180,17 @@ impl StatefulWidget for &LayoutNode {
     type State = Runtime;
 
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) where Self: Sized {
-        let len = self.nodes.len();
+        let nodes = self.nodes
+            .iter()
+            .map(|v| if let Node::Conditional(cond) = &*v.borrow() {
+                cond.expand()
+            } else {
+                vec![v.to_owned()]
+            })
+            .flatten()
+            .collect::<Vec<_>>();
+
+        let len = nodes.len();
         let mut constraints = get_constraints(&self.segments, len).unwrap_or(vec![]);
         constraints.resize(len, Default::default());
         let direction = match self.direction {
@@ -188,7 +201,7 @@ impl StatefulWidget for &LayoutNode {
         let layout = Layout::new(direction, constraints)
             .split(area);
 
-        for (node, area) in self.nodes.iter().zip(layout.iter()) {
+        for (node, area) in nodes.iter().zip(layout.iter()) {
             let node = node.borrow();
             node.render(*area, buf, state);
         }
@@ -348,4 +361,35 @@ impl ValueTruthy for NodeType {
 
 impl ValueDef for NodeType {
     const TYPE_NAME: &'static str = "node";
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConditionalNode {
+    pub condition: Value,
+    pub if_case: Vec<NodeType>,
+    pub else_case: Vec<NodeType>,
+}
+
+impl ConditionalNode {
+    pub fn expand(&self) -> Vec<NodeType> {
+        if self.truthy() {
+            self.if_case.clone()
+        } else {
+            self.else_case.clone()
+        }
+    }
+
+    pub fn truthy(&self) -> bool {
+        self.condition.truthy().is_ok_and(|v| v)
+    }
+}
+
+impl ConditionalNode {
+    fn dispatch(&self, runtime: &mut Runtime, event: &Event) -> Result<(), RuntimeError> {
+        let nodes = self.expand();
+        for node in nodes {
+            node.borrow().dispatch(runtime, event)?;
+        }
+        Ok(())
+    }
 }
