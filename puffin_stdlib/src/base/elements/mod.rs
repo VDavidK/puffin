@@ -1,6 +1,9 @@
+use std::collections::HashMap;
+use std::str::FromStr;
 use puffin_runtime::runtime::Runtime;
 use puffin_runtime::RuntimeError;
 use puffin_runtime::value::{ComponentNode, DictionaryType, ListType, NodeType, Value};
+use puffin_runtime::ratatui::prelude::*;
 
 pub mod text;
 pub mod flow;
@@ -16,7 +19,7 @@ pub(crate) fn get_props(runtime: &mut Runtime) -> Result<Props, RuntimeError> {
 }
 
 pub(crate) fn get_inner(runtime: &mut Runtime) -> Result<Value, RuntimeError> {
-    Ok(runtime.get_local(-1)?.to_owned())
+    Ok(runtime.get_local(-2)?.to_owned())
 }
 
 pub(crate) fn get_inner_nodes(runtime: &mut Runtime) -> Result<Vec<NodeType>, RuntimeError> {
@@ -29,7 +32,7 @@ pub(crate) fn get_inner_nodes(runtime: &mut Runtime) -> Result<Vec<NodeType>, Ru
 }
 
 pub(crate) fn get_inner_as<T: TryFrom<Value, Error = RuntimeError>>(runtime: &mut Runtime) -> Result<T, RuntimeError> {
-    T::try_from(runtime.get_local(-1)?.to_owned())
+    T::try_from(get_inner(runtime)?)
 }
 
 pub(crate) fn fetch_property<T: TryFrom<Value, Error = RuntimeError>>(props: &Props, name: impl Into<String>) -> Result<T, RuntimeError> {

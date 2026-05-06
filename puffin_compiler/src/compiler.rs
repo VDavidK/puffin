@@ -461,11 +461,12 @@ impl<'a> Compiler<'a> {
                 for (name, expr) in &component.props {
                     self.chunk.push_op(OpCode::GetLocal);
                     self.chunk.push_local_offset(prop_map);
+                    self.scope.define_unnamed_local();
                     let name = self.token_to_constant(name)?;
                     self.compile_expression(expr)?;
                     self.chunk.push_op(OpCode::SetField);
                     self.chunk.push_constant_offset(name);
-                    self.scope.remove_top_local();
+                    self.scope.remove_top_n_locals(2);
                 }
                 let global = self.token_to_constant(&component.name)?;
                 self.chunk.push_op(OpCode::GetGlobal);

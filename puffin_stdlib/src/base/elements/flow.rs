@@ -1,23 +1,20 @@
 use puffin_runtime::runtime::Runtime;
 use puffin_runtime::RuntimeError;
 use puffin_runtime::value::{NativeFunction, LayoutNode, LayoutDirection, Node, new_class, Value, ComponentNode};
+use crate::base::elements::{get_inner_nodes, get_props};
 
 fn construct_flow(runtime: &mut Runtime, direction: LayoutDirection) -> Result<LayoutNode, RuntimeError> {
-    let child_elements = runtime
-        .get_local(-2)?
-        .to_owned()
-        .take_list()?;
-    let child_elements = child_elements.borrow()
-        .iter()
-        .map(|x| x.to_owned().take_instance())
-        .collect::<Result<Vec<_>, _>>()?
-        .into_iter()
-        .map(|instance| ComponentNode::try_from(instance).map(Into::into))
-        .collect::<Result<Vec<_>, _>>()?;
-
+    let props = get_props(runtime)?;
+    let child_elements = get_inner_nodes(runtime)?;
+    let segments = if let Some(prop) = props.borrow().get(&"segments".into()) {
+        prop.to_owned()
+    } else {
+        Value::Null
+    };
     let node = LayoutNode {
         direction,
         nodes: child_elements,
+        segments,
     };
     Ok(node)
 }

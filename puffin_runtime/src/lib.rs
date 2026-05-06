@@ -7,7 +7,10 @@ pub mod vm;
 pub mod dom;
 pub mod event;
 
+use std::num::ParseIntError;
 pub use chunk::Chunk;
+
+pub use ratatui;
 
 #[derive(Debug, thiserror::Error)]
 pub enum RuntimeError {
@@ -16,6 +19,9 @@ pub enum RuntimeError {
 
     #[error(transparent)]
     ParseColorError(#[from] ratatui::style::ParseColorError),
+
+    #[error(transparent)]
+    ParseIntError(#[from] ParseIntError),
 
     #[error("Unrecognized op code (0x{op:x}) at: 0x{pc:x}")]
     UnrecognizedOpCode { op: u8, pc: usize },
@@ -66,6 +72,12 @@ pub enum RuntimeError {
     #[error("Method called for {name} without supplied `this` parameter")]
     MissingThisInMethodCall { name: String },
 
-    #[error("Invalid hexadecimal string length. Got {0}, expected {1} (not including '#' symbol)")]
-    InvalidHexStringLength(usize, usize)
+    #[error("Invalid hexadecimal string length. Got {got}, expected {expected} (not including '#' symbol)")]
+    InvalidHexStringLength { got: usize, expected: usize },
+
+    #[error("Invalid constraint ({name})")]
+    InvalidConstraintName { name: String },
+
+    #[error("Invalid constraint: {reason}")]
+    InvalidConstraint { reason: String }
 }

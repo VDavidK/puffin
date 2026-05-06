@@ -166,10 +166,11 @@ pub enum LayoutDirection {
     Horizontal,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LayoutNode {
     pub direction: LayoutDirection,
     pub nodes: Vec<NodeType>,
+    pub segments: Value,
 }
 
 impl StatefulWidget for &LayoutNode {
@@ -177,13 +178,14 @@ impl StatefulWidget for &LayoutNode {
 
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) where Self: Sized {
         let len = self.nodes.len();
-
+        let mut constraints = get_constraints(&self.segments, len).unwrap_or(vec![]);
+        constraints.resize(len, Default::default());
         let direction = match self.direction {
             LayoutDirection::Vertical => Direction::Vertical,
             LayoutDirection::Horizontal => Direction::Horizontal,
         };
 
-        let layout = Layout::new(direction, std::iter::repeat_n(Constraint::Fill(1), len))
+        let layout = Layout::new(direction, constraints)
             .split(area);
 
         for (node, area) in self.nodes.iter().zip(layout.iter()) {
@@ -200,6 +202,65 @@ impl LayoutNode {
         }
         Ok(())
     }
+}
+
+pub(crate) fn get_constraints(constraints: &Value, child_count: usize) -> Result<Vec<Constraint>, RuntimeError> {
+    let mut con = vec![];
+    match constraints {
+        Value::String(s) => {
+            let c = to_constraint(
+                &s.borrow()
+                    .to_owned()
+                    .split(":")
+                    .collect::<Vec<_>>()
+            )?;
+            con.push(c);
+            con.resize(child_count, Default::default());
+            con.fill(c);
+        },
+        Value::List(l) => {
+            for constraint in l.borrow().iter() {
+                let c = constraint
+                    .to_owned()
+                    .take_string()?
+                    .borrow()
+                    .to_owned();
+                let c = c
+                    .split(":")
+                    .collect::<Vec<_>>();
+                let constraint = to_constraint(&c)?;
+                con.push(constraint);
+            }
+            con.resize(child_count, Default::default());
+        },
+        t => return Err(RuntimeError::InvalidConstraint{ reason: format!("expected string or list, got {}", t.type_name())})
+    }
+    Ok(con)
+}
+
+fn to_constraint(values: &Vec<&str>) -> Result<Constraint, RuntimeError> {
+    let name = values
+        .get(0)
+        .ok_or(RuntimeError::InvalidConstraint { reason: "missing constraint name".to_string() })?
+        .to_owned();
+    let value = usize::from_str(values.get(1)
+        .ok_or(RuntimeError::InvalidConstraint { reason: "expected at least one value for constraint".to_string() })?.to_owned())?;
+    let constraint = match name {
+        "Length" => Constraint::Length(value as u16),
+        "Fill" => Constraint::Fill(value as u16),
+        "Min" => Constraint::Min(value as u16),
+        "Max" => Constraint::Max(value as u16),
+        "Percentage" => Constraint::Percentage(value as u16),
+        "Ratio" => {
+            let second_value = usize::from_str(values.get(2)
+                .filter(|v| !v.is_empty())
+                .ok_or(RuntimeError::InvalidConstraint { reason: "expected two values for Ratio".to_string() })?
+                .to_owned())?;
+            Constraint::Ratio(value as u32, second_value as u32)
+        },
+        name => return Err(RuntimeError::InvalidConstraintName{ name: name.to_owned() })
+    };
+    Ok(constraint)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -87,6 +87,7 @@ impl Instance {
                 let root_node = LayoutNode {
                     nodes,
                     direction: LayoutDirection::Vertical,
+                    segments: Value::from(Vec::<Value>::new()),
                 };
 
                 let root = Rc::new(RefCell::new(Node::Layout(root_node)));
