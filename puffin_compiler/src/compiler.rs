@@ -328,7 +328,59 @@ impl<'a> Compiler<'a> {
                 self.compile_expression(&var.value)?;
                 self.scope.replace_local(&var.name.lexeme);
             }
-            _ => (),
+            Statement::Break(_) => todo!(),
+            Statement::Continue(_) => todo!(),
+            Statement::Match(_) => todo!(),
+            Statement::Increment(increment) => {
+                let target = self.fetch_target(&increment.target)?;
+                self.compile_expression(&increment.target)?;
+                let offset = self.add_to_constants(1)?;
+                self.chunk.push_op(OpCode::Constant);
+                self.chunk.push_constant_offset(offset);
+                self.chunk.push_op(OpCode::Add);
+                match target {
+                    VariableTarget::Local(local) => {
+                        self.chunk.push_op(OpCode::SetLocal);
+                        self.chunk.push_local_offset(local);
+                    }
+                    VariableTarget::Global(global) => {
+                        self.chunk.push_op(OpCode::SetGlobal);
+                        self.chunk.push_constant_offset(global);
+                    }
+                    VariableTarget::Object(obj) => {
+                        self.chunk.push_op(OpCode::SetField);
+                        self.chunk.push_constant_offset(obj);
+                    }
+                }
+                self.scope.remove_top_local();
+            },
+            Statement::Decrement(decrement) => {
+                let target = self.fetch_target(&decrement.target)?;
+                self.compile_expression(&decrement.target)?;
+                let offset = self.add_to_constants(1)?;
+                self.chunk.push_op(OpCode::Constant);
+                self.chunk.push_constant_offset(offset);
+                self.chunk.push_op(OpCode::Sub);
+                match target {
+                    VariableTarget::Local(local) => {
+                        self.chunk.push_op(OpCode::SetLocal);
+                        self.chunk.push_local_offset(local);
+                    }
+                    VariableTarget::Global(global) => {
+                        self.chunk.push_op(OpCode::SetGlobal);
+                        self.chunk.push_constant_offset(global);
+                    }
+                    VariableTarget::Object(obj) => {
+                        self.chunk.push_op(OpCode::SetField);
+                        self.chunk.push_constant_offset(obj);
+                    }
+                }
+                self.scope.remove_top_local();
+            },
+            Statement::OpAssign(_) => todo!(),
+            Statement::Throw(_) => todo!(),
+            Statement::Catch(_) => todo!(),
+            Statement::Raise(_) => todo!(),
         }
 
         Ok(())
