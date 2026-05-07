@@ -951,7 +951,7 @@ impl<'a> PuffinParser<'a> {
                     None
                 };
                 self.expect(TokenType::Arrow)?;
-                let markup = self.markup()?;
+                let markup = self.markup_block()?;
                 if self.peek_is(TokenType::Comma)? {
                     self.next_token()?;
                 }
@@ -961,9 +961,9 @@ impl<'a> PuffinParser<'a> {
                 let lhs = self.expression()?;
                 self.expect(TokenType::Arrow)?;
                 let rhs = if self.peek_is(TokenType::LeftBrace)? {
-                    self.markup()?
+                    self.markup_block()?
                 } else {
-                    vec![self.markup_item()?]
+                    self.markup_item()?
                 };
                 if !self.peek_is(TokenType::RightBrace)? {
                     self.expect(TokenType::Comma)?;
