@@ -2,13 +2,13 @@ use std::collections::HashMap;
 use puffin_runtime::chunk::LocalOffset;
 
 #[derive(Default)]
-pub struct Scope<'a> {
-    local_table: HashMap<&'a str, LocalOffset>,
+pub struct Scope {
+    local_table: HashMap<String, LocalOffset>,
     local_count: usize,
-    parent: Option<Box<Scope<'a>>>,
+    parent: Option<Box<Scope>>,
 }
 
-impl<'a> Scope<'a> {
+impl Scope {
     pub fn new() -> Self {
         Self {
             local_table: HashMap::new(),
@@ -17,24 +17,24 @@ impl<'a> Scope<'a> {
         }
     }
 
-    pub fn set_parent(&mut self, parent: Box<Scope<'a>>) {
+    pub fn set_parent(&mut self, parent: Box<Scope>) {
         self.parent = Some(parent);
     }
 
-    pub fn remove_parent(&mut self) -> Option<Box<Scope<'a>>> {
+    pub fn remove_parent(&mut self) -> Option<Box<Scope>> {
         self.parent.take()
     }
 
-    pub fn define_local(&mut self, name: &'a str) -> LocalOffset {
+    pub fn define_local(&mut self, name: impl Into<String>) -> LocalOffset {
         let local_count = self.total_local_count() as LocalOffset;
-        self.local_table.insert(name, local_count);
+        self.local_table.insert(name.into(), local_count);
         self.local_count += 1;
         local_count
     }
 
-    pub fn replace_local(&mut self, name: &'a str) -> LocalOffset {
+    pub fn replace_local(&mut self, name: impl Into<String>) -> LocalOffset {
         let local_count = self.total_local_count() as LocalOffset;
-        self.local_table.insert(name, local_count - 1);
+        self.local_table.insert(name.into(), local_count - 1);
         local_count
     }
 
@@ -42,6 +42,10 @@ impl<'a> Scope<'a> {
         let local_count = self.total_local_count() as LocalOffset;
         self.local_count += 1;
         local_count
+    }
+
+    pub fn get_top_local(&mut self) -> LocalOffset {
+        self.total_local_count() as LocalOffset - 1
     }
 
     pub fn remove_top_local(&mut self) {

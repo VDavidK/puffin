@@ -22,6 +22,7 @@ pub enum Node {
     Frame(FrameNode),
     Component(ComponentNode),
     Conditional(ConditionalNode),
+    Block(BlockNode),
 }
 
 impl Display for Node {
@@ -46,6 +47,8 @@ impl StatefulWidget for &Node {
                 => component.render(area, buf, state),
             Node::Frame(item)
                 => item.render(area, buf, state),
+            Node::Block(block)
+                => block.render(area, buf, state),
             Node::Conditional(_)
                 => panic!("cannot directly render conditional nodes. must be wrapped in a layout"),
         }
@@ -59,9 +62,20 @@ impl Node {
             Node::Frame(frame) => frame.dispatch(runtime, event)?,
             Node::Component(component) => component.dispatch(runtime, event)?,
             Node::Conditional(component) => component.dispatch(runtime, event)?,
+            Node::Block(component) => component.dispatch(runtime, event)?,
             _ => (),
         }
         Ok(())
+    }
+
+    fn expand(node: NodeType) -> Vec<NodeType> {
+        if let Node::Conditional(cond) = &*node.borrow() {
+            cond.expand()
+        } else if let Node::Block(block) = &*node.borrow() {
+            block.expand()
+        } else {
+            vec![node]
+        }
     }
 }
 
@@ -181,12 +195,9 @@ impl StatefulWidget for &LayoutNode {
 
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) where Self: Sized {
         let nodes = self.nodes
-            .iter()
-            .map(|v| if let Node::Conditional(cond) = &*v.borrow() {
-                cond.expand()
-            } else {
-                vec![v.to_owned()]
-            })
+            .to_owned()
+            .into_iter()
+            .map(Node::expand)
             .flatten()
             .collect::<Vec<_>>();
 
@@ -366,27 +377,16 @@ impl ValueDef for NodeType {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConditionalNode {
     pub condition: Value,
-    pub if_case: Vec<NodeType>,
-    pub else_case: Vec<NodeType>,
+    pub if_case: NodeType,
+    pub else_case: NodeType,
 }
 
 impl ConditionalNode {
     pub fn expand(&self) -> Vec<NodeType> {
         if self.truthy() {
-            self.if_case.clone()
+            Node::expand(self.if_case.to_owned())
         } else {
-            self.else_case
-                .to_owned()
-                .into_iter()
-                .map(|e| {
-                    if let Node::Conditional(cond) = &*e.borrow() {
-                        cond.expand()
-                    } else {
-                        vec![e]
-                    }
-                })
-                .flatten()
-                .collect()
+            Node::expand(self.else_case.to_owned())
         }
     }
 
@@ -406,5 +406,62 @@ impl ConditionalNode {
 impl From<ConditionalNode> for Value {
     fn from(value: ConditionalNode) -> Self {
         Node::Conditional(value).into()
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BlockNode {
+    pub inner: Vec<NodeType>,
+}
+
+impl BlockNode {
+    pub fn expand(&self) -> Vec<NodeType> {
+        self.inner
+            .to_owned()
+            .into_iter()
+            .map(Node::expand)
+            .flatten()
+            .collect()
+    }
+
+    fn dispatch(&self, runtime: &mut Runtime, event: &Event) -> Result<(), RuntimeError> {
+        for node in &self.inner {
+            node.borrow().dispatch(runtime, event)?;
+        }
+        Ok(())
+    }
+}
+
+impl StatefulWidget for &BlockNode {
+    type State = Runtime;
+
+    fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) where Self: Sized {
+        let nodes = self.inner
+            .to_owned()
+            .into_iter()
+            .map(Node::expand)
+            .flatten()
+            .collect::<Vec<_>>();
+
+        let len = nodes.len();
+        let layout = Layout::new(Direction::Vertical, std::iter::repeat_n(Constraint::Fill(1), len))
+            .split(area);
+
+        for (node, area) in nodes.iter().zip(layout.iter()) {
+            let node = node.borrow();
+            node.render(*area, buf, state);
+        }
+    }
+}
+
+impl From<Vec<NodeType>> for BlockNode {
+    fn from(value: Vec<NodeType>) -> Self {
+        BlockNode { inner: value }
+    }
+}
+
+impl From<BlockNode> for NodeType {
+    fn from(value: BlockNode) -> Self {
+        Rc::new(RefCell::new(Node::Block(value)))
     }
 }

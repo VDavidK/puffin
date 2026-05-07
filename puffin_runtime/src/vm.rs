@@ -6,7 +6,7 @@ use num_enum::TryFromPrimitive;
 use crate::{RuntimeError, op::OpCode, value::{Value, new_instance}};
 use crate::chunk::{InstructionOffset, ConstantOffset, LocalOffset};
 use crate::runtime::Runtime;
-use crate::value::{new_class, ComponentNode, ConditionalNode, NodeType, Reactive};
+use crate::value::{new_class, BlockNode, ComponentNode, ConditionalNode, Node, NodeType, Reactive};
 
 #[derive(Debug)]
 pub(crate) struct Vm<'a> {
@@ -110,6 +110,16 @@ impl<'a> Vm<'a> {
 
             OpCode::Pop => {
                 self.runtime.pop_expecting()?;
+            },
+
+            OpCode::ReservePush => {
+                let value = self.runtime.pop_expecting()?;
+                self.runtime.push_intermediate(value);
+            },
+
+            OpCode::ReservePop => {
+                let value = self.runtime.pop_intermediate().ok_or(RuntimeError::IntermediateStackEmpty)?;
+                self.runtime.push_value(value);
             },
 
             OpCode::NewClass => {
@@ -384,44 +394,47 @@ impl<'a> Vm<'a> {
                 return Ok(Some(self.runtime.ret()?));
             },
 
-            OpCode::NewComponentNode => {
+            OpCode::NewNodeComponent => {
                 let instance = self.runtime.pop_expecting()?
                     .take_instance()?;
                 let node = ComponentNode::try_from(instance).map(Into::<NodeType>::into)?;
                 self.runtime.push_value(node);
             }
 
-            OpCode::NewNodeIf => {
-                let condition = self.runtime.pop_expecting()?;
-                let then_branch = self.runtime.pop_expecting()?
+            OpCode::NewNodeBlock => {
+                let list = self.runtime
+                    .pop_expecting()?
                     .take_list()?;
 
-                let then_nodes = then_branch
+                let nodes = list
                     .borrow()
                     .to_owned()
                     .into_iter()
-                    .map(|v| v.take_node())
-                    .collect::<Result<Vec<NodeType>, _>>()?;
+                    .map(Value::take_node)
+                    .collect::<Result<Vec<_>, _>>()?;
 
-                let else_nodes = match self.runtime.pop_expecting()? {
-                    Value::Null => vec![],
-                    Value::List(list) => {
-                        list.borrow()
-                            .to_owned()
-                            .into_iter()
-                            .map(|v| v.take_node())
-                            .collect::<Result<Vec<_>, _>>()?
-                    }
-                    Value::Node(node) => {
-                        vec![node]
-                    }
-                    v => Err(RuntimeError::IncorrectType { expected: "node list or null".to_owned(), ty: v.type_name().to_owned() })?,
+                let node = BlockNode::from(nodes);
+
+                self.runtime.push_value(Node::Block(node));
+            }
+
+            OpCode::NewNodeIf => {
+                let condition = self.runtime.pop_expecting()?;
+
+                let then_branch = self.runtime
+                    .pop_expecting()?
+                    .take_node()?;
+
+                let else_branch = match self.runtime.pop_expecting()? {
+                    Value::Null => BlockNode::from(vec![]).into(),
+                    Value::Node(node) => node,
+                    v => Err(RuntimeError::IncorrectType { expected: "node or null".to_owned(), ty: v.type_name().to_owned() })?,
                 };
 
                 self.runtime.push_value(ConditionalNode {
                     condition,
-                    if_case: then_nodes,
-                    else_case: else_nodes,
+                    if_case: then_branch,
+                    else_case: else_branch,
                 })
             }
         }

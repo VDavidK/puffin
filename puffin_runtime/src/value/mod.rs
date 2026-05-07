@@ -22,7 +22,7 @@ pub use native_function::{NativeFunction, NativeFunctionType};
 pub use class::{new_class, Class, ClassType};
 pub use module::{new_module, Module, ModuleType};
 pub use native_value::{NativeValue, NativeValueTrait, NativeValueType};
-pub use node::{Node, LayoutNode, LayoutDirection, TextNode, ComponentNode, NodeType, FrameNode, ConditionalNode};
+pub use node::{Node, LayoutNode, LayoutDirection, TextNode, ComponentNode, NodeType, FrameNode, ConditionalNode, BlockNode};
 pub use reactive::{Reactive, ReactiveType};
 pub use list::{ListDisplay, ListType};
 pub use float::FloatType;

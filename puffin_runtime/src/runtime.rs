@@ -17,6 +17,7 @@ pub struct CallFrame {
 #[derive(Debug)]
 pub struct Runtime {
     stack: Vec<Value>,
+    intermediate_stack: Vec<Value>,
     call_stack: Vec<CallFrame>,
     globals: HashMap<String, Value>,
     running: bool,
@@ -24,10 +25,9 @@ pub struct Runtime {
 
 impl Default for Runtime {
     fn default() -> Self {
-        
-
         Runtime {
             stack: vec![],
+            intermediate_stack: vec![],
             call_stack: vec![],
             globals: HashMap::new(),
             running: true,
@@ -185,6 +185,14 @@ impl Runtime {
         }
 
         val
+    }
+
+    pub fn push_intermediate<T: Into<Value>>(&mut self, value: T) {
+        self.intermediate_stack.push(value.into());
+    }
+
+    pub fn pop_intermediate(&mut self) -> Option<Value> {
+        self.intermediate_stack.pop()
     }
 
     pub fn peek_value(&mut self) -> Option<&Value> {

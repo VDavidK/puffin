@@ -181,6 +181,8 @@ impl<'a> ChunkFormatter<'a> {
                     // Stack
                     OpCode::Constant => self.push_with_constant("const"),
                     OpCode::Pop => self.push("pop"),
+                    OpCode::ReservePush => self.push("rpush"),
+                    OpCode::ReservePop => self.push("rpop"),
 
                     OpCode::GetLocal => self.push_with_local_offset("getl"),
                     OpCode::SetLocal => self.push_with_local_offset("setl"),
@@ -224,7 +226,8 @@ impl<'a> ChunkFormatter<'a> {
                     OpCode::Return  => self.push("return"),
 
                     // Node Manipulation
-                    OpCode::NewComponentNode => self.push("nodecomp"),
+                    OpCode::NewNodeComponent => self.push("nodecomp"),
+                    OpCode::NewNodeBlock => self.push("nodeblk"),
                     OpCode::NewNodeIf => self.push("nodeif"),
                 },
                 Err(_) => self.inst.push(format!("{:<4x}| unknown [0x{:x}]", byte, self.idx)),

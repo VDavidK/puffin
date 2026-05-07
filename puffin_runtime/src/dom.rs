@@ -2,7 +2,7 @@ use ratatui::DefaultTerminal;
 use crate::event::Event;
 use crate::runtime::Runtime;
 use crate::RuntimeError;
-use crate::value::{new_instance, InstanceType, LayoutDirection, LayoutNode, NodeType, Value};
+use crate::value::{new_instance, ComponentNode, InstanceType, LayoutDirection, LayoutNode, NodeType, Value};
 
 pub struct Dom {
     tree: NodeType,
@@ -19,12 +19,17 @@ impl Dom {
 
         let instance = new_instance(component.clone(), runtime, 0)?;
 
-        let tree = instance
+        let root = instance
             .borrow()
             .get_field("<layout>")
             .expect("<layout> does not contain a node") // TODO: Better
             .to_owned()
             .take_node()?;
+
+        let tree = ComponentNode {
+            instance,
+            root,
+        }.into();
 
         Ok(Self {
             tree,
@@ -56,8 +61,6 @@ impl Dom {
     }
 
     pub fn dispatch_event(&self, runtime: &mut Runtime, event: Event) -> Result<(), RuntimeError> {
-        // event.dispatch(runtime, elem.to_owned())?;
-
         self.tree
             .borrow()
             .dispatch(runtime, &event)?;

@@ -38,6 +38,15 @@ pub enum OpCode {
     // Expected stack: TOP > [value: any]
     SetGlobal = 0x15,
 
+    // : rpush
+    // Pops the top value off the stack and pushes it into an intermediate stack for future use
+    // Expected stack: TOP > [value: any]
+    ReservePush = 0x18,
+
+    // : rpop
+    // Pops the top value of the intermediate stack and pushes it onto the main stack
+    ReservePop = 0x19,
+
     // ----------------------------
     // Object Creation Instructions
     // ----------------------------
@@ -205,11 +214,15 @@ pub enum OpCode {
     // : nodecomp
     // Takes the top instance off the stack and wraps it in a component node
     // Expected stack: TOP > [component: instance]
-    NewComponentNode = 0xA0,
+    NewNodeComponent = 0xA0,
+
+    // : nodeblk
+    // Takes the top list of nodes off the stack and wraps it in a node block
+    NewNodeBlock = 0xA1,
 
     // : nodeif
-    // Takes two node lists and a condition from the top of the stack and constructs a new Conditional node from them.
-    // Expected stack: TOP > [condition: any] > [if_nodes: list] > [else_nodes: list]
-    NewNodeIf = 0xA1,
+    // Takes two nodes and a condition from the top of the stack and constructs a new Conditional node from them.
+    // Expected stack: TOP > [condition: any] > [if_nodes: node] > [else_nodes: node]
+    NewNodeIf = 0xA2,
 
 }

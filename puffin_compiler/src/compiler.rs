@@ -37,7 +37,7 @@ pub enum CompileError {
 pub struct Compiler<'a> {
     chunk: &'a mut Chunk,
     constant_table: HashMap<Value, ConstantOffset>,
-    scope: Scope<'a>,
+    scope: Scope,
 }
 
 impl<'a> Compiler<'a> {
@@ -440,6 +440,8 @@ impl<'a> Compiler<'a> {
                     self.chunk.push_op(OpCode::PushList);
                     self.scope.remove_top_n_locals(2);
                 }
+
+                self.chunk.push_op(OpCode::NewNodeBlock);
             }
             Markup::Component(component) => {
                 match &component.parameter {
@@ -474,11 +476,83 @@ impl<'a> Compiler<'a> {
                 self.chunk.push_op(OpCode::Call);
                 // 2 = arg count (content, props)
                 self.chunk.push_u8(2);
-                self.chunk.push_op(OpCode::NewComponentNode);
+                self.chunk.push_op(OpCode::NewNodeComponent);
                 self.scope.remove_top_local();
             }
             // Markup::Layout(_) => {}
-            // Markup::Match(_) => {}
+            Markup::Match(match_markup) => 'exit: {
+                let null = self.add_to_constants(Value::Null)?;
+
+                if match_markup.cases.is_empty() {
+                    if let Some((name, markup)) = &match_markup.default_case {
+                        if let Some(name) = name {
+                            self.compile_expression(&match_markup.comparator)?;
+                            self.scope.replace_local(&name.lexeme);
+                        }
+
+                        self.compile_markup(&markup)?;
+
+                        if name.is_some() {
+                            self.chunk.push_op(OpCode::ReservePush);
+                            self.chunk.push_op(OpCode::Pop);
+                            self.chunk.push_op(OpCode::ReservePop);
+                            self.scope.remove_top_local();
+                        }
+                    } else {
+                        self.chunk.push_op(OpCode::Constant);
+                        self.chunk.push_constant_offset(null);
+                        self.chunk.push_op(OpCode::Constant);
+                        self.chunk.push_constant_offset(null);
+                        self.chunk.push_op(OpCode::NewList);
+                        self.chunk.push_op(OpCode::NewNodeIf);
+                        self.scope.define_unnamed_local();
+                    }
+
+                    break 'exit;
+                }
+
+                self.compile_expression(&match_markup.comparator)?;
+                let comparator_expr = self.scope.get_top_local();
+
+                if let Some((name, markup)) = &match_markup.default_case {
+                    if let Some(name) = name {
+                        self.compile_expression(&match_markup.comparator)?;
+                        self.scope.replace_local(&name.lexeme);
+                    }
+
+                    self.compile_markup(&markup)?;
+
+                    if name.is_some() {
+                        self.chunk.push_op(OpCode::ReservePush);
+                        self.chunk.push_op(OpCode::Pop);
+                        self.chunk.push_op(OpCode::ReservePop);
+                        self.scope.remove_top_local();
+                    }
+                } else {
+                    self.chunk.push_op(OpCode::Constant);
+                    self.chunk.push_constant_offset(null);
+                    self.scope.define_unnamed_local();
+                }
+
+                for (expr, markup) in &match_markup.cases {
+                    self.compile_markup(&markup)?;
+
+                    self.chunk.push_op(OpCode::GetLocal);
+                    self.chunk.push_local_offset(comparator_expr);
+                    self.scope.define_unnamed_local();
+
+                    self.compile_expression(expr)?;
+
+                    self.chunk.push_op(OpCode::Eq);
+                    self.chunk.push_op(OpCode::NewNodeIf);
+                    self.scope.remove_top_local();
+                }
+
+                self.chunk.push_op(OpCode::ReservePush);
+                self.chunk.push_op(OpCode::Pop);
+                self.chunk.push_op(OpCode::ReservePop);
+                self.scope.remove_top_local();
+            }
             Markup::If(markup) => {
                 match &markup.else_markup {
                     Some(markup) => {

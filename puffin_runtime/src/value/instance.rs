@@ -65,29 +65,6 @@ impl Instance {
         let res = runtime.call(layout.to_owned(), &[])?;
 
         let node = match res {
-            Value::List(nodes) => {
-                let nodes = nodes
-                    .borrow()
-                    .iter()
-                    .cloned()
-                    .map(|v| v.take_node())
-                    .collect::<Result<Vec<NodeType>, RuntimeError>>()?;
-
-                let root_node = LayoutNode {
-                    nodes,
-                    direction: LayoutDirection::Vertical,
-                    segments: Value::from(Vec::<Value>::new()),
-                };
-
-                let root = Rc::new(RefCell::new(Node::Layout(root_node)));
-
-                let component_node = ComponentNode {
-                    root,
-                    instance: instance.clone(),
-                };
-                Rc::new(RefCell::new(Node::Component(component_node)))
-            }
-
             Value::Node(node) => node,
 
             v => Err(RuntimeError::IncorrectType { expected: "node[] or node".to_owned(), ty: v.type_name().to_owned() })?

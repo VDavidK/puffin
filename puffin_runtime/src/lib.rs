@@ -57,6 +57,9 @@ pub enum RuntimeError {
     #[error("Expected value on the stack but the stack was empty")]
     StackEmpty,
 
+    #[error("Expected value on the intermediate stack but the stack was empty")]
+    IntermediateStackEmpty,
+
     #[error("Global variable of name '{name}' not found")]
     GlobalNotFound { name: String },
 
