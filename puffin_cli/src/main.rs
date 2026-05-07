@@ -76,7 +76,7 @@ fn main() -> color_eyre::Result<()> {
                 .to_owned();
 
             for chunk in chunks {
-            runtime.execute(Rc::new(chunk))?;
+                runtime.execute(Rc::new(chunk))?;
             }
 
             let main_component = runtime.get_global(main_component_name)
