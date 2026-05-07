@@ -14,10 +14,7 @@ pub fn define_frame_element(runtime: &mut Runtime) -> Result<(), RuntimeError> {
             .take_list()?;
         let child_elements = child_elements.borrow()
             .iter()
-            .map(|x| x.to_owned().take_instance())
-            .collect::<Result<Vec<_>, _>>()?
-            .into_iter()
-            .map(|instance| ComponentNode::try_from(instance).map(Into::into))
+            .map(|x| x.to_owned().take_node())
             .collect::<Result<Vec<_>, _>>()?;
 
         let node = FrameNode {

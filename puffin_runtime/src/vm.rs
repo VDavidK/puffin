@@ -6,7 +6,7 @@ use num_enum::TryFromPrimitive;
 use crate::{RuntimeError, op::OpCode, value::{Value, new_instance}};
 use crate::chunk::{InstructionOffset, ConstantOffset, LocalOffset};
 use crate::runtime::Runtime;
-use crate::value::{new_class, Reactive};
+use crate::value::{new_class, ComponentNode, ConditionalNode, NodeType, Reactive};
 
 #[derive(Debug)]
 pub(crate) struct Vm<'a> {
@@ -383,6 +383,47 @@ impl<'a> Vm<'a> {
             OpCode::Return => {
                 return Ok(Some(self.runtime.ret()?));
             },
+
+            OpCode::NewComponentNode => {
+                let instance = self.runtime.pop_expecting()?
+                    .take_instance()?;
+                let node = ComponentNode::try_from(instance).map(Into::<NodeType>::into)?;
+                self.runtime.push_value(node);
+            }
+
+            OpCode::NewNodeIf => {
+                let condition = self.runtime.pop_expecting()?;
+                let then_branch = self.runtime.pop_expecting()?
+                    .take_list()?;
+
+                let then_nodes = then_branch
+                    .borrow()
+                    .to_owned()
+                    .into_iter()
+                    .map(|v| v.take_node())
+                    .collect::<Result<Vec<NodeType>, _>>()?;
+
+                let else_nodes = match self.runtime.pop_expecting()? {
+                    Value::Null => vec![],
+                    Value::List(list) => {
+                        list.borrow()
+                            .to_owned()
+                            .into_iter()
+                            .map(|v| v.take_node())
+                            .collect::<Result<Vec<_>, _>>()?
+                    }
+                    Value::Node(node) => {
+                        vec![node]
+                    }
+                    v => Err(RuntimeError::IncorrectType { expected: "node list or null".to_owned(), ty: v.type_name().to_owned() })?,
+                };
+
+                self.runtime.push_value(ConditionalNode {
+                    condition,
+                    if_case: then_nodes,
+                    else_case: else_nodes,
+                })
+            }
         }
 
         Ok(None)

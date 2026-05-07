@@ -474,20 +474,28 @@ impl<'a> Compiler<'a> {
                 self.chunk.push_op(OpCode::Call);
                 // 2 = arg count (content, props)
                 self.chunk.push_u8(2);
+                self.chunk.push_op(OpCode::NewComponentNode);
                 self.scope.remove_top_local();
             }
             // Markup::Layout(_) => {}
             // Markup::Match(_) => {}
             Markup::If(markup) => {
-                self.compile_expression(&markup.condition)?;
-                self.chunk.push_op(OpCode::Not);
-                let jmp = self.chunk.push_jump(OpCode::JumpIf);
-                // TODO: Else case
-                self.compile_markup(&markup.if_markup)?;
-                let end_addr = self.chunk.addr();
+                match &markup.else_markup {
+                    Some(markup) => {
+                        self.compile_markup(markup)?;
+                    }
+                    None => {
+                        let null = self.add_to_constants(Value::Null)?;
+                        self.chunk.push_op(OpCode::Constant);
+                        self.chunk.push_constant_offset(null);
+                        self.scope.define_unnamed_local();
+                    }
+                }
 
-                self.chunk.patch_jump(jmp, end_addr);
-                self.scope.remove_top_local();
+                self.compile_markup(&markup.if_markup)?;
+                self.compile_expression(&markup.condition)?;
+                self.chunk.push_op(OpCode::NewNodeIf);
+                self.scope.remove_top_n_locals(2);
             }
             // Markup::Iterative(_) => {}
             // Markup::Style(_) => {}

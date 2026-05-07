@@ -154,7 +154,7 @@ impl TryFrom<&Value> for Color {
     type Error = RuntimeError;
 
     fn try_from(value: &Value) -> Result<Color, RuntimeError> {
-        match value {
+        match value.eval()? {
             Value::String(inner) => Ok(Color::from_str(inner.borrow().as_str())?),
             Value::Int(inner) => Ok(Color::from_u32(inner.to_owned() as u32)),
             _ => Err(RuntimeError::IncorrectType{ty: value.type_name().into(), expected: "hexadecimal string or integer".into() })
@@ -375,21 +375,36 @@ impl ConditionalNode {
         if self.truthy() {
             self.if_case.clone()
         } else {
-            self.else_case.clone()
+            self.else_case
+                .to_owned()
+                .into_iter()
+                .map(|e| {
+                    if let Node::Conditional(cond) = &*e.borrow() {
+                        cond.expand()
+                    } else {
+                        vec![e]
+                    }
+                })
+                .flatten()
+                .collect()
         }
     }
 
     pub fn truthy(&self) -> bool {
         self.condition.truthy().is_ok_and(|v| v)
     }
-}
 
-impl ConditionalNode {
     fn dispatch(&self, runtime: &mut Runtime, event: &Event) -> Result<(), RuntimeError> {
         let nodes = self.expand();
         for node in nodes {
             node.borrow().dispatch(runtime, event)?;
         }
         Ok(())
+    }
+}
+
+impl From<ConditionalNode> for Value {
+    fn from(value: ConditionalNode) -> Self {
+        Node::Conditional(value).into()
     }
 }

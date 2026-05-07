@@ -222,6 +222,10 @@ impl<'a> ChunkFormatter<'a> {
                     OpCode::JumpIf => self.push_with_instruction_offset("jmpi"),
                     OpCode::Call => self.push_with_u8("call"),
                     OpCode::Return  => self.push("return"),
+
+                    // Node Manipulation
+                    OpCode::NewComponentNode => self.push("nodecomp"),
+                    OpCode::NewNodeIf => self.push("nodeif"),
                 },
                 Err(_) => self.inst.push(format!("{:<4x}| unknown [0x{:x}]", byte, self.idx)),
             }

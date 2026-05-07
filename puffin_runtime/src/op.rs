@@ -198,4 +198,18 @@ pub enum OpCode {
     // Expected stack: TOP > [return_val: any] > ...
     Return = 0x83,
 
+    // ----------------------------
+    // Node Instructions
+    // ----------------------------
+
+    // : nodecomp
+    // Takes the top instance off the stack and wraps it in a component node
+    // Expected stack: TOP > [component: instance]
+    NewComponentNode = 0xA0,
+
+    // : nodeif
+    // Takes two node lists and a condition from the top of the stack and constructs a new Conditional node from them.
+    // Expected stack: TOP > [condition: any] > [if_nodes: list] > [else_nodes: list]
+    NewNodeIf = 0xA1,
+
 }

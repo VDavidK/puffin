@@ -27,7 +27,7 @@ pub(crate) fn get_inner_nodes(runtime: &mut Runtime) -> Result<Vec<NodeType>, Ru
         .borrow()
         .iter()
         .cloned()
-        .map(|v| ComponentNode::try_from(v.take_instance()?).map(Into::into))
+        .map(|v| v.take_node())
         .collect::<Result<Vec<_>, _>>()?)
 }
 

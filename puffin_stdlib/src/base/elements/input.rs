@@ -35,10 +35,13 @@ pub fn define_input_element(runtime: &mut Runtime) -> Result<(), RuntimeError>  
     }));
 
     class.borrow_mut().set_handler(EVENT_NAME_ONKEY, NativeFunction::new(|runtime, _, this| {
-        let this = this.ok_or(RuntimeError::MissingThisInMethodCall{ name: "input".to_owned() })?;
-        let event = runtime.get_local(-1)?
+        let this = this
+            .ok_or(RuntimeError::MissingThisInMethodCall{ name: "input".to_owned() })?;
+        let event = runtime
+            .get_local(-1)?
             .to_owned();
-        let char = event.take_dictionary()?
+        let char = event
+            .take_dictionary()?
             .borrow()
             .get(&Value::from("key"))
             .ok_or(RuntimeError::NoFieldMatchingName { name: "key".to_owned() })?
@@ -48,12 +51,15 @@ pub fn define_input_element(runtime: &mut Runtime) -> Result<(), RuntimeError>  
             .chars()
             .nth(0)
             .expect("");
-        let current = this.borrow()
+        let current = this
+            .borrow()
             .get_field("text")
             .expect("text property undefined for input element")
             .to_owned()
             .take_string()?;
-        current.borrow_mut().push(char);
+        current
+            .borrow_mut()
+            .push(char);
         Ok(Value::Null)
     }));
 

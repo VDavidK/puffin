@@ -70,19 +70,8 @@ impl Instance {
                     .borrow()
                     .iter()
                     .cloned()
-                    .map(|v| v.take_instance())
-                    .collect::<Result<Vec<InstanceType>, RuntimeError>>()?
-                    .into_iter()
-                    .map(|instance| Node::Component(ComponentNode {
-                        instance: instance.to_owned(),
-                        root: instance.borrow().get_field("<layout>")
-                            .cloned()
-                            .unwrap()
-                            .take_node()
-                            .unwrap(),
-                    }))
-                    .map(|node| Rc::new(RefCell::new(node)))
-                    .collect::<Vec<NodeType>>();
+                    .map(|v| v.take_node())
+                    .collect::<Result<Vec<NodeType>, RuntimeError>>()?;
 
                 let root_node = LayoutNode {
                     nodes,
