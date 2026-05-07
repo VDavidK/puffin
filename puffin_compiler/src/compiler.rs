@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use crate::scope::Scope;
 use puffin_ast::Ast;
 use puffin_ast::declaration::Declaration;
-use puffin_ast::expression::Expression;
+use puffin_ast::expression::{BinaryExpression, Expression};
 use puffin_ast::markup::{ComponentParameter, Markup};
 use puffin_ast::statement::Statement;
 use puffin_ast::token::{Token, TokenType};
@@ -20,6 +20,9 @@ pub enum CompileError {
 
     #[error("Invalid binary operator '{0}'")]
     InvalidBinaryOperator(TokenType),
+
+    #[error("Invalid shorthand operator '{0}'")]
+    InvalidShorthandOperator(TokenType),
 
     #[error("Variable '{0}' not found")]
     VariableNotFound(String),
@@ -330,7 +333,80 @@ impl<'a> Compiler<'a> {
                 self.compile_expression(&var.value)?;
                 self.scope.replace_local(&var.name.lexeme);
             }
-            _ => (),
+            Statement::Break(_) => todo!(),
+            Statement::Continue(_) => todo!(),
+            Statement::Match(_) => todo!(),
+            Statement::Increment(increment) => {
+                let target = self.fetch_target(&increment.target)?;
+                self.compile_expression(&increment.target)?;
+                let offset = self.add_to_constants(1)?;
+                self.chunk.push_op(OpCode::Constant);
+                self.chunk.push_constant_offset(offset);
+                self.chunk.push_op(OpCode::Add);
+                match target {
+                    VariableTarget::Local(local) => {
+                        self.chunk.push_op(OpCode::SetLocal);
+                        self.chunk.push_local_offset(local);
+                    }
+                    VariableTarget::Global(global) => {
+                        self.chunk.push_op(OpCode::SetGlobal);
+                        self.chunk.push_constant_offset(global);
+                    }
+                    VariableTarget::Object(obj) => {
+                        self.chunk.push_op(OpCode::SetField);
+                        self.chunk.push_constant_offset(obj);
+                    }
+                }
+                self.scope.remove_top_local();
+            },
+            Statement::Decrement(decrement) => {
+                let target = self.fetch_target(&decrement.target)?;
+                self.compile_expression(&decrement.target)?;
+                let offset = self.add_to_constants(1)?;
+                self.chunk.push_op(OpCode::Constant);
+                self.chunk.push_constant_offset(offset);
+                self.chunk.push_op(OpCode::Sub);
+                match target {
+                    VariableTarget::Local(local) => {
+                        self.chunk.push_op(OpCode::SetLocal);
+                        self.chunk.push_local_offset(local);
+                    }
+                    VariableTarget::Global(global) => {
+                        self.chunk.push_op(OpCode::SetGlobal);
+                        self.chunk.push_constant_offset(global);
+                    }
+                    VariableTarget::Object(obj) => {
+                        self.chunk.push_op(OpCode::SetField);
+                        self.chunk.push_constant_offset(obj);
+                    }
+                }
+                self.scope.remove_top_local();
+            },
+            Statement::OpAssign(op_assign) => {
+                let target = self.fetch_target(&op_assign.lhs)?;
+                self.compile_expression(&op_assign.lhs)?;
+                self.compile_expression(&op_assign.rhs)?;
+                let op = Self::get_shorthand_operator(op_assign.op.ty)?;
+                self.chunk.push_op(op);
+                match target {
+                    VariableTarget::Local(local) => {
+                        self.chunk.push_op(OpCode::SetLocal);
+                        self.chunk.push_local_offset(local);
+                    }
+                    VariableTarget::Global(global) => {
+                        self.chunk.push_op(OpCode::SetGlobal);
+                        self.chunk.push_constant_offset(global);
+                    }
+                    VariableTarget::Object(obj) => {
+                        self.chunk.push_op(OpCode::SetField);
+                        self.chunk.push_constant_offset(obj);
+                    }
+                }
+                self.scope.remove_top_local();
+            },
+            Statement::Throw(_) => todo!(),
+            Statement::Catch(_) => todo!(),
+            Statement::Raise(_) => todo!(),
         }
 
         Ok(())
@@ -360,6 +436,40 @@ impl<'a> Compiler<'a> {
                     self.scope.define_unnamed_local();
                 }
             }
+            Expression::Binary(BinaryExpression{ lhs, rhs, op: Token { ty: t @ (TokenType::KwAnd | TokenType::KwOr), .. }}) => {
+                self.compile_expression(lhs)?;
+                let loc = self.scope.get_top_local();
+
+                self.chunk.push_op(OpCode::GetLocal);
+                self.chunk.push_local_offset(loc);
+
+                if let TokenType::KwAnd = t {
+                self.chunk.push_op(OpCode::Not);
+                }
+                let jmp = self.chunk.push_jump(OpCode::JumpIf);
+                self.chunk.push_op(OpCode::Pop);
+
+                self.compile_expression(rhs)?;
+
+                let chunk_addr = self.chunk.addr();
+                self.chunk.patch_jump(jmp, chunk_addr);
+            }
+
+            Expression::Binary(BinaryExpression{ lhs, rhs, op: Token { ty: TokenType::KwOr, .. }}) => {
+                self.compile_expression(lhs)?;
+                let loc = self.scope.get_top_local();
+
+                self.chunk.push_op(OpCode::GetLocal);
+                self.chunk.push_local_offset(loc);
+
+                let jmp = self.chunk.push_jump(OpCode::JumpIf);
+                self.chunk.push_op(OpCode::Pop);
+
+                self.compile_expression(rhs)?;
+
+                let chunk_addr = self.chunk.addr();
+                self.chunk.patch_jump(jmp, chunk_addr);
+            },
             Expression::Binary(binary) => {
                 self.compile_expression(&binary.lhs)?;
                 self.compile_expression(&binary.rhs)?;
@@ -764,8 +874,6 @@ impl<'a> Compiler<'a> {
 
     fn get_binary_operator(ty: TokenType) -> Result<OpCode, CompileError> {
         match ty {
-            TokenType::KwAnd => todo!(),
-            TokenType::KwOr => todo!(),
             TokenType::Plus => Ok(OpCode::Add),
             TokenType::Minus => Ok(OpCode::Sub),
             TokenType::Star => Ok(OpCode::Mul),
@@ -778,6 +886,16 @@ impl<'a> Compiler<'a> {
             TokenType::LessOrEqual => Ok(OpCode::Le),
 
             _ => Err(CompileError::InvalidBinaryOperator(ty)),
+        }
+    }
+
+    fn get_shorthand_operator(ty: TokenType) -> Result<OpCode, CompileError> {
+        match ty {
+            TokenType::IncrementAssign => Ok(OpCode::Add),
+            TokenType::DecrementAssign => Ok(OpCode::Sub),
+            TokenType::MulAssign => Ok(OpCode::Mul),
+            TokenType::DivAssign => Ok(OpCode::Div),
+            _ => Err(CompileError::InvalidShorthandOperator(ty)),
         }
     }
 
