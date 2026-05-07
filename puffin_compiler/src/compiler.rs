@@ -21,6 +21,9 @@ pub enum CompileError {
     #[error("Invalid binary operator '{0}'")]
     InvalidBinaryOperator(TokenType),
 
+    #[error("Invalid shorthand operator '{0}'")]
+    InvalidShorthandOperator(TokenType),
+
     #[error("Variable '{0}' not found")]
     VariableNotFound(String),
 
@@ -377,7 +380,28 @@ impl<'a> Compiler<'a> {
                 }
                 self.scope.remove_top_local();
             },
-            Statement::OpAssign(_) => todo!(),
+            Statement::OpAssign(op_assign) => {
+                let target = self.fetch_target(&op_assign.lhs)?;
+                self.compile_expression(&op_assign.lhs)?;
+                self.compile_expression(&op_assign.rhs)?;
+                let op = Self::get_shorthand_operator(op_assign.op.ty)?;
+                self.chunk.push_op(op);
+                match target {
+                    VariableTarget::Local(local) => {
+                        self.chunk.push_op(OpCode::SetLocal);
+                        self.chunk.push_local_offset(local);
+                    }
+                    VariableTarget::Global(global) => {
+                        self.chunk.push_op(OpCode::SetGlobal);
+                        self.chunk.push_constant_offset(global);
+                    }
+                    VariableTarget::Object(obj) => {
+                        self.chunk.push_op(OpCode::SetField);
+                        self.chunk.push_constant_offset(obj);
+                    }
+                }
+                self.scope.remove_top_local();
+            },
             Statement::Throw(_) => todo!(),
             Statement::Catch(_) => todo!(),
             Statement::Raise(_) => todo!(),
@@ -726,6 +750,16 @@ impl<'a> Compiler<'a> {
             TokenType::LessOrEqual => Ok(OpCode::Le),
 
             _ => Err(CompileError::InvalidBinaryOperator(ty)),
+        }
+    }
+
+    fn get_shorthand_operator(ty: TokenType) -> Result<OpCode, CompileError> {
+        match ty {
+            TokenType::IncrementAssign => Ok(OpCode::Add),
+            TokenType::DecrementAssign => Ok(OpCode::Sub),
+            TokenType::MulAssign => Ok(OpCode::Mul),
+            TokenType::DivAssign => Ok(OpCode::Div),
+            _ => Err(CompileError::InvalidShorthandOperator(ty)),
         }
     }
 
