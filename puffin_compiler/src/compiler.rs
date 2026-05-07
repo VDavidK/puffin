@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use crate::scope::Scope;
 use puffin_ast::Ast;
 use puffin_ast::declaration::Declaration;
-use puffin_ast::expression::Expression;
+use puffin_ast::expression::{BinaryExpression, Expression};
 use puffin_ast::markup::{ComponentParameter, Markup};
 use puffin_ast::statement::Statement;
 use puffin_ast::token::{Token, TokenType};
@@ -434,6 +434,22 @@ impl<'a> Compiler<'a> {
                     self.scope.define_unnamed_local();
                 }
             }
+            Expression::Binary(BinaryExpression{ lhs, rhs, op: Token { ty: TokenType::KwAnd, .. }}) => {
+                self.compile_expression(lhs)?;
+                let loc = self.scope.get_top_local();
+
+                self.chunk.push_op(OpCode::GetLocal);
+                self.chunk.push_local_offset(loc);
+
+                self.chunk.push_op(OpCode::Not);
+                let jmp = self.chunk.push_jump(OpCode::JumpIf);
+                self.chunk.push_op(OpCode::Pop);
+
+                self.compile_expression(rhs)?;
+
+                let chunk_addr = self.chunk.addr();
+                self.chunk.patch_jump(jmp, chunk_addr);
+            },
             Expression::Binary(binary) => {
                 self.compile_expression(&binary.lhs)?;
                 self.compile_expression(&binary.rhs)?;
@@ -736,8 +752,6 @@ impl<'a> Compiler<'a> {
 
     fn get_binary_operator(ty: TokenType) -> Result<OpCode, CompileError> {
         match ty {
-            TokenType::KwAnd => todo!(),
-            TokenType::KwOr => todo!(),
             TokenType::Plus => Ok(OpCode::Add),
             TokenType::Minus => Ok(OpCode::Sub),
             TokenType::Star => Ok(OpCode::Mul),
