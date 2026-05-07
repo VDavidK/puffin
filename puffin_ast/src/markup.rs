@@ -45,8 +45,8 @@ pub struct LayoutRender {
 #[derive(Debug)]
 pub struct MatchConditionalRender {
     pub comparator: Box<Expression>,
-    pub cases: Vec<(Expression, Vec<Markup>)>,
-    pub default_case: Option<(Option<Token>, Vec<Markup>)>
+    pub cases: Vec<(Expression, Box<Markup>)>,
+    pub default_case: Option<(Option<Token>, Box<Markup>)>
 }
 
 #[derive(Debug)]
@@ -114,13 +114,13 @@ impl ComponentRender {
 impl MatchConditionalRender {
     pub fn new(
         comparator: Expression,
-        cases: Vec<(Expression, Vec<Markup>)>,
-        default_case: Option<(Option<Token>, Vec<Markup>)>
+        cases: Vec<(Expression, Markup)>,
+        default_case: Option<(Option<Token>, Markup)>
     ) -> Self {
         Self {
             comparator: Box::new(comparator),
-            cases,
-            default_case,
+            cases: cases.into_iter().map(|(e, m)| (e, Box::new(m))).collect::<Vec<_>>(),
+            default_case: default_case.map(|(t, m)| (t, Box::new(m))),
         }
     }
 }
