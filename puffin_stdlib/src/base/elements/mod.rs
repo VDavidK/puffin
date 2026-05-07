@@ -32,7 +32,7 @@ pub(crate) fn get_inner_nodes(runtime: &mut Runtime) -> Result<Vec<NodeType>, Ru
 }
 
 pub(crate) fn get_inner_as<T: TryFrom<Value, Error = RuntimeError>>(runtime: &mut Runtime) -> Result<T, RuntimeError> {
-    T::try_from(get_inner(runtime)?)
+    T::try_from(get_inner(runtime)?.eval()?)
 }
 
 pub(crate) fn fetch_property<T: TryFrom<Value, Error = RuntimeError>>(props: &Props, name: impl Into<String>) -> Result<T, RuntimeError> {

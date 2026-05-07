@@ -4,7 +4,7 @@ use puffin_runtime::Chunk;
 use std::io::Read;
 use std::rc::Rc;
 use std::{fs::File, path::PathBuf};
-
+use std::path::Path;
 use puffin_runtime::runtime::Runtime;
 #[cfg(feature = "logging")]
 use simplelog::{Config, LevelFilter, WriteLogger};
@@ -61,24 +61,7 @@ fn main() -> color_eyre::Result<()> {
             ciborium::into_writer(&chunk, file)?;
         }
         Operation::Run { input } => {
-            let mut file = File::open(&input)?;
-            let input_path_str = input
-                .to_str()
-                .ok_or_eyre("File name must be valid UTF-8 name")?;
-
-            let chunk = if let Some(ext) = input.extension()
-                && ext == "pfb"
-            {
-                ciborium::from_reader::<Chunk, File>(file)?
-            } else {
-                let mut file_contents = String::new();
-                file.read_to_string(&mut file_contents)?;
-                let ast = puffin_parser::run_parser(file_contents, input_path_str)?;
-                puffin_compiler::compile_ast(input_path_str, &ast)?
-            };
-
-            #[cfg(feature = "logging")]
-            log::debug!("-- Running chunk --\n{chunk}");
+            let main = compile_file(&input)?;
 
             let mut runtime = Runtime::default();
             runtime.include_module(puffin_stdlib::core::fs::module())?;
@@ -91,7 +74,10 @@ fn main() -> color_eyre::Result<()> {
                 .ok_or_eyre("File path must be a valid string")?
                 .to_owned();
 
-            runtime.execute(Rc::new(chunk))?;
+            #[cfg(feature = "logging")]
+            log::debug!("-- Running chunk --\n{main}");
+
+            runtime.execute(Rc::new(main))?;
 
             let main_component = runtime.get_global(main_component_name)
                 .ok_or_eyre("Main component missing")?
@@ -103,4 +89,25 @@ fn main() -> color_eyre::Result<()> {
     }
 
     Ok(())
+}
+
+fn compile_file(path: impl AsRef<Path>) -> color_eyre::Result<Chunk> {
+    let mut file = File::open(&path)?;
+    let input_path_str = path
+        .as_ref()
+        .to_str()
+        .ok_or_eyre("File name must be valid UTF-8 name")?;
+
+    let chunk = if let Some(ext) = path.as_ref().extension()
+        && ext == "pfb"
+    {
+        ciborium::from_reader::<Chunk, File>(file)?
+    } else {
+        let mut file_contents = String::new();
+        file.read_to_string(&mut file_contents)?;
+        let ast = puffin_parser::run_parser(file_contents, input_path_str)?;
+        puffin_compiler::compile_ast(input_path_str, &ast)?
+    };
+
+    Ok(chunk)
 }

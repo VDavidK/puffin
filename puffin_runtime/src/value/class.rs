@@ -51,6 +51,10 @@ impl Class {
             };
 
             runtime.call_val(func, num_args)?;
+        } else {
+            for _ in 0..num_args {
+                runtime.pop_value();
+            }
         }
 
         Ok(())

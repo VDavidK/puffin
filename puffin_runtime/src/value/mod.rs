@@ -472,8 +472,10 @@ impl Value {
             Value::Null => "null",
 
             // TODO: Possibly show reactive outer. For example: reactive<inner>
-            Value::Reactive(inner) => inner.borrow().get().type_name(),
-            Value::Derived(inner) => inner.eval_or_null().type_name(),
+            // Value::Reactive(inner) => inner.borrow().get().type_name(),
+            // Value::Derived(inner) => inner.eval_or_null().type_name(),
+            Value::Reactive(_) => "reactive",
+            Value::Derived(_) => "derived",
         }
     }
 
