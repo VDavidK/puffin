@@ -355,6 +355,7 @@ impl<'a> Compiler<'a> {
                     VariableTarget::Object(obj) => {
                         self.chunk.push_op(OpCode::SetField);
                         self.chunk.push_constant_offset(obj);
+                        self.scope.remove_top_local();
                     }
                 }
                 self.scope.remove_top_local();
@@ -378,6 +379,7 @@ impl<'a> Compiler<'a> {
                     VariableTarget::Object(obj) => {
                         self.chunk.push_op(OpCode::SetField);
                         self.chunk.push_constant_offset(obj);
+                        self.scope.remove_top_local();
                     }
                 }
                 self.scope.remove_top_local();
@@ -400,9 +402,10 @@ impl<'a> Compiler<'a> {
                     VariableTarget::Object(obj) => {
                         self.chunk.push_op(OpCode::SetField);
                         self.chunk.push_constant_offset(obj);
+                        self.scope.remove_top_local();
                     }
                 }
-                self.scope.remove_top_local();
+                self.scope.remove_top_n_locals(2);
             },
             Statement::Throw(_) => todo!(),
             Statement::Catch(_) => todo!(),
@@ -444,32 +447,17 @@ impl<'a> Compiler<'a> {
                 self.chunk.push_local_offset(loc);
 
                 if let TokenType::KwAnd = t {
-                self.chunk.push_op(OpCode::Not);
+                    self.chunk.push_op(OpCode::Not);
                 }
                 let jmp = self.chunk.push_jump(OpCode::JumpIf);
                 self.chunk.push_op(OpCode::Pop);
+                self.scope.remove_top_local();
 
                 self.compile_expression(rhs)?;
 
                 let chunk_addr = self.chunk.addr();
                 self.chunk.patch_jump(jmp, chunk_addr);
             }
-
-            Expression::Binary(BinaryExpression{ lhs, rhs, op: Token { ty: TokenType::KwOr, .. }}) => {
-                self.compile_expression(lhs)?;
-                let loc = self.scope.get_top_local();
-
-                self.chunk.push_op(OpCode::GetLocal);
-                self.chunk.push_local_offset(loc);
-
-                let jmp = self.chunk.push_jump(OpCode::JumpIf);
-                self.chunk.push_op(OpCode::Pop);
-
-                self.compile_expression(rhs)?;
-
-                let chunk_addr = self.chunk.addr();
-                self.chunk.patch_jump(jmp, chunk_addr);
-            },
             Expression::Binary(binary) => {
                 self.compile_expression(&binary.lhs)?;
                 self.compile_expression(&binary.rhs)?;
@@ -810,14 +798,17 @@ impl<'a> Compiler<'a> {
                     VariableTarget::Local(local) => {
                         self.chunk.push_op(OpCode::GetLocal);
                         self.chunk.push_local_offset(local);
+                        self.scope.define_unnamed_local();
                     }
                     VariableTarget::Global(global) => {
                         self.chunk.push_op(OpCode::GetGlobal);
                         self.chunk.push_constant_offset(global);
+                        self.scope.define_unnamed_local();
                     }
                     VariableTarget::Object(obj) => {
                         self.chunk.push_op(OpCode::GetField);
                         self.chunk.push_constant_offset(obj);
+                        self.scope.define_unnamed_local();
                     }
                 };
                 let name = self.token_to_constant(&accessor.field)?;

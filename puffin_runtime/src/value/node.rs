@@ -131,35 +131,29 @@ impl From<TextNode> for Node {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FrameNode {
-    pub nodes: Vec<NodeType>,
+    pub node: NodeType,
 }
 
 impl StatefulWidget for &FrameNode {
     type State = Runtime;
 
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) where Self: Sized {
-        let len = self.nodes.len();
         let frame = Block::default()
             .borders(Borders::ALL)
             .border_type(BorderType::Plain);
 
-        let layout = Layout::new(Direction::Vertical, std::iter::repeat_n(Constraint::Fill(1), len))
-            .split(frame.inner(area));
-        frame.render(area, buf);
+        let inner = frame.inner(area);
+        let node = self.node.borrow();
+        node.render(inner, buf, state);
 
-        for (node, area) in self.nodes.iter().zip(layout.iter()) {
-            let node = node.borrow();
-            node.render(*area, buf, state);
-        }
+        frame.render(area, buf);
     }
 }
 
 
 impl FrameNode {
     fn dispatch(&self, runtime: &mut Runtime, event: &Event) -> Result<(), RuntimeError> {
-        for node in &self.nodes {
-            node.borrow().dispatch(runtime, event)?;
-        }
+        self.node.borrow().dispatch(runtime, event)?;
         Ok(())
     }
 }

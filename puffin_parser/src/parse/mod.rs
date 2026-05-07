@@ -13,12 +13,12 @@ use crate::parse::ParserError::{DuplicateConstructor, InvalidExport, MissingComp
 
 fn get_op_precedence(ty: TokenType) -> usize {
     match ty {
-        TokenType::Plus | TokenType::Minus => 1,
-        TokenType::Star | TokenType::Slash | TokenType::Percent => 2,
-        TokenType::GreaterThan | TokenType::GreaterOrEqual | TokenType::LessThan | TokenType::LessOrEqual => 3,
-        TokenType::IsEqualTo | TokenType::IsNotEqualTo => 4,
-        TokenType::KwAnd => 5,
-        TokenType::KwOr => 6,
+        TokenType::KwAnd => 1,
+        TokenType::KwOr => 2,
+        TokenType::IsEqualTo | TokenType::IsNotEqualTo => 3,
+        TokenType::GreaterThan | TokenType::GreaterOrEqual | TokenType::LessThan | TokenType::LessOrEqual => 4,
+        TokenType::Star | TokenType::Slash | TokenType::Percent => 5,
+        TokenType::Plus | TokenType::Minus => 6,
         _ => 0,
     }
 }
