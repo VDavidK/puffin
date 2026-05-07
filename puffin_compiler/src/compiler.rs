@@ -601,12 +601,8 @@ impl<'a> Compiler<'a> {
                             self.markup_declarations.remove(&name.lexeme);
                         }
                     } else {
-                        self.chunk.push_op(OpCode::Constant);
-                        self.chunk.push_constant_offset(null);
-                        self.chunk.push_op(OpCode::Constant);
-                        self.chunk.push_constant_offset(null);
                         self.chunk.push_op(OpCode::NewList);
-                        self.chunk.push_op(OpCode::NewNodeIf);
+                        self.chunk.push_op(OpCode::NewNodeBlock);
                         self.scope.define_unnamed_local();
                     }
 
@@ -649,7 +645,7 @@ impl<'a> Compiler<'a> {
 
                     self.chunk.push_op(OpCode::Eq);
                     self.chunk.push_op(OpCode::NewNodeIf);
-                    self.scope.remove_top_local();
+                    self.scope.remove_top_n_locals(3);
                 }
 
                 self.chunk.push_op(OpCode::ReservePush);
