@@ -434,14 +434,32 @@ impl<'a> Compiler<'a> {
                     self.scope.define_unnamed_local();
                 }
             }
-            Expression::Binary(BinaryExpression{ lhs, rhs, op: Token { ty: TokenType::KwAnd, .. }}) => {
+            Expression::Binary(BinaryExpression{ lhs, rhs, op: Token { ty: t @ (TokenType::KwAnd | TokenType::KwOr), .. }}) => {
                 self.compile_expression(lhs)?;
                 let loc = self.scope.get_top_local();
 
                 self.chunk.push_op(OpCode::GetLocal);
                 self.chunk.push_local_offset(loc);
 
+                if let TokenType::KwAnd = t {
                 self.chunk.push_op(OpCode::Not);
+                }
+                let jmp = self.chunk.push_jump(OpCode::JumpIf);
+                self.chunk.push_op(OpCode::Pop);
+
+                self.compile_expression(rhs)?;
+
+                let chunk_addr = self.chunk.addr();
+                self.chunk.patch_jump(jmp, chunk_addr);
+            }
+
+            Expression::Binary(BinaryExpression{ lhs, rhs, op: Token { ty: TokenType::KwOr, .. }}) => {
+                self.compile_expression(lhs)?;
+                let loc = self.scope.get_top_local();
+
+                self.chunk.push_op(OpCode::GetLocal);
+                self.chunk.push_local_offset(loc);
+
                 let jmp = self.chunk.push_jump(OpCode::JumpIf);
                 self.chunk.push_op(OpCode::Pop);
 
