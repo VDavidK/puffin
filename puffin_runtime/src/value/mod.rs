@@ -36,8 +36,11 @@ use crate::RuntimeError;
 use crate::value::derived::{derive_binary, derive_unary, DerivedType};
 use crate::value::ops::{ValueAdd, ValueSub, ValueMul, ValueDiv, ValueMod, ValueDef, ValueTruthy, ValueNeg};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub enum Value {
+    #[default]
+    Null,
+
     Int(IntType),
     Float(FloatType),
     Bool(BoolType),
@@ -47,7 +50,6 @@ pub enum Value {
     Module(ModuleType),
     List(ListType),
     Dictionary(DictionaryType),
-    Null,
 
     #[serde(skip)]
     Reactive(ReactiveType),

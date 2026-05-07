@@ -224,6 +224,7 @@ impl<'a> ChunkFormatter<'a> {
                     OpCode::JumpIf => self.push_with_instruction_offset("jmpi"),
                     OpCode::Call => self.push_with_u8("call"),
                     OpCode::Return  => self.push("return"),
+                    OpCode::Bind  => self.push("bind"),
 
                     // Node Manipulation
                     OpCode::NewNodeComponent => self.push("nodecomp"),

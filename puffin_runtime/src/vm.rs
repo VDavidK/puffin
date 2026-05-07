@@ -394,6 +394,27 @@ impl<'a> Vm<'a> {
                 return Ok(Some(self.runtime.ret()?));
             },
 
+            OpCode::Bind => {
+                let func = self.runtime
+                    .pop_expecting()?;
+                let value = self.runtime
+                    .pop_expecting()?
+                    .take_instance()?;
+
+                match func.to_owned() {
+                    Value::Function(func) => {
+                        func.borrow_mut().bound_value = Some(value);
+                    }
+                    Value::NativeFunction(func) => {
+                        func.borrow_mut().bound_value = Some(value);
+                    }
+
+                    v => Err(RuntimeError::IncorrectType { expected: "function or native_function".to_owned(), ty: v.type_name().to_owned() })?
+                }
+
+                self.runtime.push_value(func);
+            }
+
             OpCode::NewNodeComponent => {
                 let instance = self.runtime.pop_expecting()?
                     .take_instance()?;

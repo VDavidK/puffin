@@ -37,6 +37,7 @@ pub enum CompileError {
 pub struct Compiler<'a> {
     chunk: &'a mut Chunk,
     constant_table: HashMap<Value, ConstantOffset>,
+    markup_declarations: HashMap<String, LocalOffset>,
     scope: Scope,
 }
 
@@ -46,6 +47,7 @@ impl<'a> Compiler<'a> {
             chunk,
             constant_table: HashMap::new(),
             scope: Scope::new(),
+            markup_declarations: HashMap::new(),
         }
     }
 
@@ -252,9 +254,9 @@ impl<'a> Compiler<'a> {
 
                     self.push_scope();
                     self.compile_expression(&stmt.iterable)?;
-                    let start_local = self.scope.define_local(&stmt.var_name.lexeme);
+                    let start_local = self.scope.replace_local(&stmt.var_name.lexeme);
                     self.compile_expression(end)?;
-                    let end_local = self.scope.define_unnamed_local();
+                    let end_local = self.scope.get_top_local();
 
                     self.chunk.push_op(OpCode::GetLocal);
                     self.chunk.push_local_offset(end_local);
@@ -479,7 +481,7 @@ impl<'a> Compiler<'a> {
                 self.chunk.push_op(OpCode::NewNodeComponent);
                 self.scope.remove_top_local();
             }
-            // Markup::Layout(_) => {}
+            Markup::Layout(_) => todo!(),
             Markup::Match(match_markup) => 'exit: {
                 let null = self.add_to_constants(Value::Null)?;
 
@@ -487,16 +489,18 @@ impl<'a> Compiler<'a> {
                     if let Some((name, markup)) = &match_markup.default_case {
                         if let Some(name) = name {
                             self.compile_expression(&match_markup.comparator)?;
-                            self.scope.replace_local(&name.lexeme);
+                            let offset = self.scope.replace_local(&name.lexeme);
+                            self.markup_declarations.insert(name.lexeme.to_owned(), offset);
                         }
 
                         self.compile_markup(&markup)?;
 
-                        if name.is_some() {
+                        if let Some(name) = name {
                             self.chunk.push_op(OpCode::ReservePush);
                             self.chunk.push_op(OpCode::Pop);
                             self.chunk.push_op(OpCode::ReservePop);
                             self.scope.remove_top_local();
+                            self.markup_declarations.remove(&name.lexeme);
                         }
                     } else {
                         self.chunk.push_op(OpCode::Constant);
@@ -517,16 +521,18 @@ impl<'a> Compiler<'a> {
                 if let Some((name, markup)) = &match_markup.default_case {
                     if let Some(name) = name {
                         self.compile_expression(&match_markup.comparator)?;
-                        self.scope.replace_local(&name.lexeme);
+                        let offset = self.scope.replace_local(&name.lexeme);
+                        self.markup_declarations.insert(name.lexeme.to_owned(), offset);
                     }
 
                     self.compile_markup(&markup)?;
 
-                    if name.is_some() {
+                    if let Some(name) = name {
                         self.chunk.push_op(OpCode::ReservePush);
                         self.chunk.push_op(OpCode::Pop);
                         self.chunk.push_op(OpCode::ReservePop);
                         self.scope.remove_top_local();
+                        self.markup_declarations.remove(&name.lexeme);
                     }
                 } else {
                     self.chunk.push_op(OpCode::Constant);
@@ -571,9 +577,107 @@ impl<'a> Compiler<'a> {
                 self.chunk.push_op(OpCode::NewNodeIf);
                 self.scope.remove_top_n_locals(2);
             }
-            // Markup::Iterative(_) => {}
-            // Markup::Style(_) => {}
-            _ => (),
+            Markup::Iterative(markup) => {
+                let mut chunk = Chunk::new("for_generator");
+                let mut gen_compiler = Compiler::new(&mut chunk);
+
+                for (name, offset) in &self.markup_declarations {
+                    self.chunk.push_op(OpCode::GetLocal);
+                    self.chunk.push_local_offset(*offset);
+                    gen_compiler.scope.define_local(name);
+                }
+
+                self.chunk.push_op(OpCode::GetLocal);
+                self.chunk.push_local_offset(0);
+
+                gen_compiler.scope.define_local("self");
+
+                if let Some(end) = &markup.end_range {
+                    //   <start> #start_local
+                    //   <end>   #end_local
+                    //   getl #start_local
+                    //   getl #end_local
+                    //   lt
+                    //   jumpi :end
+                    // loop:
+                    //   <body>
+                    //   getl #start_local
+                    //   const 1
+                    //   add
+                    //   setl #start_local
+                    //   getl #start_local
+                    //   getl #end_local
+                    //   lt
+                    //   jumpi :loop
+                    // end:
+
+                    gen_compiler.chunk.push_op(OpCode::NewList);
+                    let list = gen_compiler.scope.define_unnamed_local();
+
+                    gen_compiler.compile_expression(&markup.iterable)?;
+                    let start_local = gen_compiler.scope.replace_local(&markup.var_name.lexeme);
+                    gen_compiler.compile_expression(end)?;
+                    let end_local = gen_compiler.scope.get_top_local();
+
+                    gen_compiler.chunk.push_op(OpCode::GetLocal);
+                    gen_compiler.chunk.push_local_offset(end_local);
+                    gen_compiler.chunk.push_op(OpCode::GetLocal);
+                    gen_compiler.chunk.push_local_offset(start_local);
+                    gen_compiler.chunk.push_op(OpCode::Lt);
+                    let end_jump = gen_compiler.chunk.push_jump(OpCode::JumpIf);
+
+                    let one = gen_compiler.add_to_constants(1)?;
+
+                    let loop_addr = gen_compiler.chunk.addr();
+
+                    gen_compiler.chunk.push_op(OpCode::GetLocal);
+                    gen_compiler.chunk.push_local_offset(list);
+                    gen_compiler.scope.define_unnamed_local();
+                    gen_compiler.compile_markup(&markup.block)?;
+                    gen_compiler.chunk.push_op(OpCode::PushList);
+                    gen_compiler.scope.remove_top_n_locals(2);
+
+                    gen_compiler.chunk.push_op(OpCode::GetLocal);
+                    gen_compiler.chunk.push_local_offset(start_local);
+                    gen_compiler.chunk.push_op(OpCode::Constant);
+                    gen_compiler.chunk.push_constant_offset(one);
+                    gen_compiler.chunk.push_op(OpCode::Add);
+                    gen_compiler.chunk.push_op(OpCode::SetLocal);
+                    gen_compiler.chunk.push_local_offset(start_local);
+                    gen_compiler.chunk.push_op(OpCode::GetLocal);
+                    gen_compiler.chunk.push_local_offset(start_local);
+                    gen_compiler.chunk.push_op(OpCode::GetLocal);
+                    gen_compiler.chunk.push_local_offset(end_local);
+                    gen_compiler.chunk.push_op(OpCode::Lt);
+                    gen_compiler.chunk.push_jump_im(OpCode::JumpIf, loop_addr);
+
+                    gen_compiler.chunk.patch_jump(end_jump, gen_compiler.chunk.addr());
+
+                    gen_compiler.chunk.push_op(OpCode::Pop);
+                    gen_compiler.chunk.push_op(OpCode::Pop);
+
+                    gen_compiler.chunk.push_op(OpCode::NewNodeBlock);
+                    gen_compiler.chunk.push_op(OpCode::Return);
+                } else {
+                    todo!("Generic for loops not supported yet");
+                }
+
+                let func = Function {
+                    chunk: Rc::new(chunk),
+                    identifier: "for_generator".to_owned(),
+                    arity: 0,
+                    bound_value: None,
+                };
+
+                let constant = self.chunk.new_constant(func);
+                self.chunk.push_op(OpCode::Constant);
+                self.chunk.push_constant_offset(constant);
+                self.chunk.push_op(OpCode::Bind);
+                self.chunk.push_op(OpCode::Call);
+                self.chunk.push_u8(self.markup_declarations.len() as u8);
+                self.scope.define_unnamed_local();
+            },
+            Markup::Style(_) => todo!(),
         }
 
         Ok(())

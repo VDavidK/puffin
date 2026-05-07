@@ -207,6 +207,11 @@ pub enum OpCode {
     // Expected stack: TOP > [return_val: any] > ...
     Return = 0x83,
 
+    // : bind
+    // Takes an instance and a function off the stack and binds the instance to the function. Pushes the function back onto the stack
+    // Expected stack: TOP > [func: function|native_function] > [value: instance]
+    Bind = 0x84,
+
     // ----------------------------
     // Node Instructions
     // ----------------------------

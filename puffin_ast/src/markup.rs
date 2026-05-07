@@ -61,7 +61,7 @@ pub struct IterativeRender {
     pub var_name: Token,
     pub iterable: Box<Expression>,
     pub end_range: Option<Box<Expression>>,
-    pub block: Option<Box<Markup>>
+    pub block: Box<Markup>
 }
 
 #[derive(Debug)]
@@ -129,13 +129,13 @@ impl IterativeRender {
     pub fn new(var_name: Token,
        iterable: Expression,
        end_range: Option<Expression>,
-       block: Option<Markup>
+       block: Markup
     ) -> Self {
         Self {
             var_name,
             iterable: Box::new(iterable),
             end_range: end_range.map(Box::new),
-            block: block.map(Box::new),
+            block: Box::new(block),
         }
     }
 }

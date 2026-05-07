@@ -1003,7 +1003,7 @@ impl<'a> PuffinParser<'a> {
         } else {
             None
         };
-        let block = Some(self.markup_block()?);
+        let block = self.markup_block()?;
         Ok(IterativeRender::new(name, iterable, end_range, block).into())
     }
 

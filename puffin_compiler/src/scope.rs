@@ -35,7 +35,7 @@ impl Scope {
     pub fn replace_local(&mut self, name: impl Into<String>) -> LocalOffset {
         let local_count = self.total_local_count() as LocalOffset;
         self.local_table.insert(name.into(), local_count - 1);
-        local_count
+        local_count - 1
     }
 
     pub fn define_unnamed_local(&mut self) -> LocalOffset {
