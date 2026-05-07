@@ -61,7 +61,8 @@ fn main() -> color_eyre::Result<()> {
             ciborium::into_writer(&chunk, file)?;
         }
         Operation::Run { input } => {
-            let main = compile_file(&input)?;
+            let mut chunks = vec![];
+            compile_file(&input, &mut chunks)?;
 
             let mut runtime = Runtime::default();
             runtime.include_module(puffin_stdlib::core::fs::module())?;
@@ -74,10 +75,9 @@ fn main() -> color_eyre::Result<()> {
                 .ok_or_eyre("File path must be a valid string")?
                 .to_owned();
 
-            #[cfg(feature = "logging")]
-            log::debug!("-- Running chunk --\n{main}");
-
-            runtime.execute(Rc::new(main))?;
+            for chunk in chunks {
+            runtime.execute(Rc::new(chunk))?;
+            }
 
             let main_component = runtime.get_global(main_component_name)
                 .ok_or_eyre("Main component missing")?
@@ -91,23 +91,24 @@ fn main() -> color_eyre::Result<()> {
     Ok(())
 }
 
-fn compile_file(path: impl AsRef<Path>) -> color_eyre::Result<Chunk> {
+fn compile_file(path: impl AsRef<Path>, chunks: &mut Vec<Chunk>) -> color_eyre::Result<()> {
     let mut file = File::open(&path)?;
     let input_path_str = path
         .as_ref()
         .to_str()
         .ok_or_eyre("File name must be valid UTF-8 name")?;
 
-    let chunk = if let Some(ext) = path.as_ref().extension()
-        && ext == "pfb"
-    {
-        ciborium::from_reader::<Chunk, File>(file)?
-    } else {
-        let mut file_contents = String::new();
-        file.read_to_string(&mut file_contents)?;
-        let ast = puffin_parser::run_parser(file_contents, input_path_str)?;
-        puffin_compiler::compile_ast(input_path_str, &ast)?
-    };
-
-    Ok(chunk)
+    let mut file_contents = String::new();
+    file.read_to_string(&mut file_contents)?;
+    let ast = puffin_parser::run_parser(file_contents, input_path_str)?;
+    let (chunk, deps) = puffin_compiler::compile_ast(input_path_str, &ast)?;
+    chunks.push(chunk);
+    for dep in deps {
+        let base_dir = path.as_ref()
+            .parent()
+            .ok_or_eyre(format!("Could not find dependency {}", dep.to_str().ok_or_eyre("Malformed file path")?))?;
+        let file_path = base_dir.join(dep);
+        compile_file(file_path, chunks)?;
+    }
+    Ok(())
 }

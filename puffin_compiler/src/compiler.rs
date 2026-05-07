@@ -11,6 +11,7 @@ use puffin_runtime::op::OpCode;
 use puffin_runtime::value::{FloatType, Function, IntType};
 use puffin_runtime::{Chunk, value::Value};
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 #[derive(thiserror::Error, Debug)]
@@ -35,12 +36,16 @@ pub enum CompileError {
 
     #[error("Cannot pop top scope")]
     TopScopePopped,
+
+    #[error("Invalid 'use' path")]
+    InvalidUsePath,
 }
 
 pub struct Compiler<'a> {
     chunk: &'a mut Chunk,
     constant_table: HashMap<Value, ConstantOffset>,
     markup_declarations: HashMap<String, LocalOffset>,
+    dependencies: Vec<PathBuf>,
     scope: Scope,
 }
 
@@ -49,8 +54,9 @@ impl<'a> Compiler<'a> {
         Self {
             chunk,
             constant_table: HashMap::new(),
-            scope: Scope::new(),
             markup_declarations: HashMap::new(),
+            dependencies: vec![],
+            scope: Scope::new(),
         }
     }
 
@@ -68,6 +74,10 @@ impl<'a> Compiler<'a> {
         self.chunk.push_constant_offset(name);
         self.scope.remove_top_local();
         Ok(())
+    }
+
+    pub fn get_dependencies(self) -> Vec<PathBuf> {
+        self.dependencies.to_owned()
     }
 
     fn compile_declaration(&mut self, declaration: &'a Declaration) -> Result<(), CompileError> {
@@ -195,12 +205,37 @@ impl<'a> Compiler<'a> {
                 self.scope.remove_top_n_locals(2);
             }
             // Declaration::Require(_) => {}
-            // Declaration::Use(_) => {}
+            Declaration::Use(use_decl) => {
+                let path = Self::expr_to_filepath(&use_decl.name)?;
+                self.dependencies.push(path.into());
+            }
             // Declaration::Export(_) => {}
             // Declaration::Enum(_) => {}
             _ => (),
         }
 
+        Ok(())
+    }
+
+    fn expr_to_filepath(expr: &Expression) -> Result<String, CompileError> {
+        let mut names = vec![];
+        Self::extract_file_path_from_accessor_expr(expr, &mut names)?;
+        let mut path = names.join("/");
+        path.push_str(".puff");
+        Ok(path)
+    }
+
+    fn extract_file_path_from_accessor_expr(expr: &Expression, v: &mut Vec<String>) -> Result<(), CompileError> {
+        match expr {
+            Expression::Literal(ex) => {
+                v.push(ex.token.lexeme.to_owned());
+            }
+            Expression::Accessor(acc) => {
+                Self::extract_file_path_from_accessor_expr(&acc.expression, v)?;
+                v.push(acc.field.lexeme.to_owned());
+            }
+            _ => return Err(CompileError::InvalidUsePath)?,
+        }
         Ok(())
     }
 

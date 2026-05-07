@@ -53,7 +53,7 @@ pub struct RequireDeclaration {
 
 #[derive(Debug)]
 pub struct UseDeclaration {
-    name: Box<Expression>,
+    pub name: Box<Expression>,
 }
 
 #[derive(Debug)]
