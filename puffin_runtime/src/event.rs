@@ -1,10 +1,19 @@
-use ratatui::crossterm::event::{KeyCode, KeyEvent, MediaKeyCode, ModifierKeyCode};
+use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MediaKeyCode, ModifierKeyCode, MouseEvent};
 
-pub const EVENT_NAME_ONFOCUSKEY: &'static str = "onfocuskey";
-pub const EVENT_NAME_ONKEY: &'static str = "onkey";
+pub const EVENT_NAME_ONKEY: &'static str = "on_key";
+pub const EVENT_NAME_ONBUTTON: &'static str = "on_button";
+pub const EVENT_NAME_ONFOCUSGAINED: &'static str = "on_focus";
+pub const EVENT_NAME_ONFOCUSLOST: &'static str = "on_unfocus";
+pub const EVENT_NAME_ONPASTE: &'static str = "on_paste";
+pub const EVENT_NAME_ONRESIZE: &'static str = "on_resize";
 
 pub enum Event {
     Key(KeyEvent),
+    Mouse(MouseEvent),
+    FocusGained,
+    FocusLost,
+    Paste(String),
+    Resize(u16, u16),
 }
 
 pub fn key_code_name(key: &KeyCode) -> String {
@@ -66,4 +75,29 @@ pub fn key_code_name(key: &KeyCode) -> String {
             ModifierKeyCode::IsoLevel5Shift => "ilv5s",
         }.into()
     }
+}
+
+pub fn to_modifier_names(modifiers: &KeyModifiers) -> Vec<String> {
+    let mut mods = vec![];
+
+    if modifiers.contains(KeyModifiers::SHIFT) {
+        mods.push("shift".into());
+    }
+    if modifiers.contains(KeyModifiers::CONTROL) {
+        mods.push("control".into());
+    }
+    if modifiers.contains(KeyModifiers::ALT) {
+        mods.push("alt".into());
+    }
+    if modifiers.contains(KeyModifiers::SUPER) {
+        mods.push("super".into());
+    }
+    if modifiers.contains(KeyModifiers::HYPER) {
+        mods.push("hyper".into());
+    }
+    if modifiers.contains(KeyModifiers::META) {
+        mods.push("meta".into());
+    }
+
+    mods
 }

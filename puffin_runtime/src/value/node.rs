@@ -2,14 +2,14 @@ use std::cell::RefCell;
 use std::fmt::{Display, Formatter};
 use std::rc::Rc;
 use std::str::FromStr;
-use ratatui::crossterm::event::{KeyEvent, KeyEventKind};
+use ratatui::crossterm::event::{KeyEvent, KeyEventKind, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::prelude::*;
 use ratatui::style::Styled;
 use ratatui::widgets::{Block, BorderType, Borders, Paragraph};
 use serde_derive::{Deserialize, Serialize};
-use crate::event::{key_code_name, Event, EVENT_NAME_ONKEY};
+use crate::event::{key_code_name, to_modifier_names, Event, EVENT_NAME_ONBUTTON, EVENT_NAME_ONFOCUSGAINED, EVENT_NAME_ONFOCUSLOST, EVENT_NAME_ONKEY, EVENT_NAME_ONPASTE, EVENT_NAME_ONRESIZE};
 use crate::runtime::Runtime;
-use crate::value::{InstanceType, Value};
+use crate::value::{InstanceType, IntType, Value};
 use crate::{make_fields, RuntimeError};
 use crate::value::ops::{ValueDef, ValueTruthy};
 
@@ -325,11 +325,47 @@ impl ComponentNode {
                 code,
                 modifiers,
                 kind: KeyEventKind::Press,
-                state
+                ..
             }) => self.forward_event_fn(runtime, EVENT_NAME_ONKEY, || {
                 make_fields! {
                     key: key_code_name(&code),
+                    modifiers: to_modifier_names(modifiers)
+                        .into_iter()
+                        .map(Value::from)
+                        .collect::<Vec<_>>()
                 }
+            })?,
+
+            Event::Mouse(MouseEvent {
+                kind: MouseEventKind::Down(btn),
+                column,
+                row,
+                modifiers,
+            }) => self.forward_event_fn(runtime, EVENT_NAME_ONBUTTON, || {
+                make_fields! {
+                    button: match btn {
+                        MouseButton::Left => "left",
+                        MouseButton::Right => "right",
+                        MouseButton::Middle => "middle"
+                    },
+                    column: *column as IntType,
+                    row: *row as IntType,
+                    modifiers: to_modifier_names(modifiers)
+                        .into_iter()
+                        .map(Value::from)
+                        .collect::<Vec<_>>()
+                }
+            })?,
+
+            Event::FocusGained => self.forward_event(runtime, EVENT_NAME_ONFOCUSGAINED, Value::Null)?,
+            Event::FocusLost => self.forward_event(runtime, EVENT_NAME_ONFOCUSLOST, Value::Null)?,
+
+            Event::Paste(buffer) => self.forward_event(runtime, EVENT_NAME_ONPASTE, make_fields! {
+                content: buffer.to_owned(),
+            })?,
+            Event::Resize(rows, cols) => self.forward_event(runtime, EVENT_NAME_ONRESIZE, make_fields! {
+                rows: *rows as IntType,
+                columns: *cols as IntType,
             })?,
 
             _ => (),
