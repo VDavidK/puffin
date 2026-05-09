@@ -67,6 +67,7 @@ fn main() -> color_eyre::Result<()> {
             let mut runtime = Runtime::default();
             runtime.include_module(puffin_stdlib::core::fs::module())?;
             runtime.include_module(puffin_stdlib::core::math::module())?;
+            runtime.include_module(puffin_stdlib::core::list::module())?;
 
             puffin_stdlib::base::define(&mut runtime)?;
 
