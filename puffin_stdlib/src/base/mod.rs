@@ -2,7 +2,6 @@ use puffin_runtime::runtime::Runtime;
 use puffin_runtime::RuntimeError;
 use crate::base::casting::{define_bool_cast_fn, define_float_cast_fn, define_int_cast_fn, define_string_cast_fn};
 
-mod dictionary;
 mod elements;
 mod debug;
 mod casting;
