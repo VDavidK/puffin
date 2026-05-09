@@ -103,6 +103,10 @@ fn compile_file(path: impl AsRef<Path>, chunks: &mut Vec<Chunk>) -> color_eyre::
     file.read_to_string(&mut file_contents)?;
     let ast = puffin_parser::run_parser(file_contents, input_path_str)?;
     let (chunk, deps) = puffin_compiler::compile_ast(input_path_str, &ast)?;
+
+    #[cfg(feature = "logging")]
+    log::debug!("Compiling chunk: {}\n{}", chunk.get_name(), chunk);
+
     chunks.push(chunk);
     for dep in deps {
         let base_dir = path.as_ref()

@@ -264,6 +264,7 @@ impl<'a> Compiler<'a> {
                     VariableTarget::Object(obj) => {
                         self.chunk.push_op(OpCode::SetField);
                         self.chunk.push_constant_offset(obj);
+                        self.scope.remove_top_local();
                     }
                 }
                 self.scope.remove_top_local();
@@ -332,6 +333,8 @@ impl<'a> Compiler<'a> {
                 self.compile_expression(&stmt.condition)?;
                 self.chunk.push_op(OpCode::Not);
                 let jmp = self.chunk.push_jump(OpCode::JumpIf);
+                self.scope.remove_top_local();
+
                 self.compile_statement(&stmt.if_block)?;
 
                 let end_addr = if let Some(else_stmt) = &stmt.else_stat {
@@ -344,7 +347,6 @@ impl<'a> Compiler<'a> {
                     self.chunk.addr()
                 };
 
-                self.scope.remove_top_local();
                 self.chunk.patch_jump(jmp, end_addr);
             }
             Statement::Expression(expr_stmt) => {
@@ -359,6 +361,7 @@ impl<'a> Compiler<'a> {
                     let null = self.add_to_constants(Value::Null)?;
                     self.chunk.push_op(OpCode::Constant);
                     self.chunk.push_constant_offset(null);
+                    self.scope.define_unnamed_local();
                 }
                 self.chunk.push_op(OpCode::Return);
                 self.scope.remove_top_local();
