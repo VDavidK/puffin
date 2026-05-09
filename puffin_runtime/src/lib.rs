@@ -7,7 +7,7 @@ pub mod vm;
 pub mod dom;
 pub mod event;
 
-use std::num::ParseIntError;
+use std::num::{ParseFloatError, ParseIntError};
 pub use chunk::Chunk;
 
 pub use ratatui;
@@ -22,6 +22,9 @@ pub enum RuntimeError {
 
     #[error(transparent)]
     ParseIntError(#[from] ParseIntError),
+
+    #[error(transparent)]
+    ParseFloatError(#[from] ParseFloatError),
 
     #[error("Unrecognized op code (0x{op:x}) at: 0x{pc:x}")]
     UnrecognizedOpCode { op: u8, pc: usize },
