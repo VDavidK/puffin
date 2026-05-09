@@ -94,5 +94,9 @@ pub enum RuntimeError {
     InvalidConstraint { reason: String },
     
     #[error("Index {index} is out of bounds for list of size {size}")]
-    IndexOutOfBounds { index: usize, size: usize }
+    IndexOutOfBounds { index: usize, size: usize },
+
+    #[error("Unexpected negative number ({var_name} = {num})")]
+    UnexpectedNegativeNumber { var_name: String, num: isize },
+
 }

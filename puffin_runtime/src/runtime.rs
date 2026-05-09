@@ -180,16 +180,26 @@ impl Runtime {
     }
 
     pub fn get_local(&self, offset: LocalOffset) -> Result<&Value, RuntimeError> {
-        let offset = if offset >= 0 {
-            offset + self.stack_offset() as LocalOffset
-        } else {
-            self.stack.len() as LocalOffset + offset
-        };
+        let offset = self.to_local_offset(offset);
 
         let value = self.stack.get(offset as usize)
             .ok_or(RuntimeError::StackOutOfBounds { at: offset as usize, pc: self.pc()? })?;
 
         Ok(value)
+    }
+
+    pub fn to_local_offset(&self, offset: LocalOffset) -> LocalOffset {
+        if offset >= 0 {
+            offset + self.stack_offset() as LocalOffset
+        } else {
+            self.stack.len() as LocalOffset + offset
+        }
+    }
+
+    pub fn get_locals(&self, from: LocalOffset, to: LocalOffset) -> Result<Vec<&Value>, RuntimeError> {
+        let from = self.to_local_offset(from);
+        let to = self.to_local_offset(to);
+        Ok(self.stack.iter().skip(from as usize).take(from.abs_diff(to) as usize).collect::<Vec<_>>())
     }
 
     pub fn set_local(&mut self, offset: LocalOffset, value: Value) -> Result<(), RuntimeError> {
