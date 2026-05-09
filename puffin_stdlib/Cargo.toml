@@ -1,12 +1,15 @@
 [package]
-name = "puffin_compiler"
+name = "puffin_stdlib"
 version = "0.1.0"
 edition = "2024"
 
 [lints]
 workspace = true
 
+[features]
+default = ["vendor"]
+vendor = []
+
 [dependencies]
-puffin_ast = { path = "../puffin_ast" }
+log = "0.4.29"
 puffin_runtime = { path = "../puffin_runtime" }
-thiserror = "2.0.18"

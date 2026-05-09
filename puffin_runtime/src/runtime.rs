@@ -1,0 +1,361 @@
+use std::cell::RefCell;
+use std::collections::hash_map::Entry;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::rc::Rc;
+use image::DynamicImage;
+use ratatui::prelude::{Rect, Size};
+use ratatui_image::picker::Picker;
+use ratatui_image::protocol::{Protocol, StatefulProtocol};
+use ratatui_image::Resize;
+use crate::chunk::LocalOffset;
+use crate::vm::Vm;
+use crate::{Chunk, RuntimeError, value::Value};
+use crate::value::{new_instance, Module, FunctionType, InstanceType, Reactive};
+
+#[derive(Debug, Clone)]
+pub struct CallFrame {
+    pub chunk: Rc<Chunk>,
+    pub stack_offset: usize,
+    pub local_count: usize,
+    pub pc: usize,
+}
+
+pub struct Runtime {
+    stack: Vec<Value>,
+    intermediate_stack: Vec<Value>,
+    call_stack: Vec<CallFrame>,
+    globals: HashMap<String, Value>,
+    picker: Picker,
+    image_cache: HashMap<PathBuf, DynamicImage>,
+    protocol_cache: HashMap<PathBuf, StatefulProtocol>,
+    running: bool,
+}
+
+
+impl Runtime {
+    pub fn new() -> Result<Self, RuntimeError> {
+        let picker = Picker::from_query_stdio()?;
+
+        Ok(Runtime {
+            stack: vec![],
+            intermediate_stack: vec![],
+            call_stack: vec![],
+            globals: HashMap::new(),
+            picker,
+            image_cache: HashMap::new(),
+            protocol_cache: HashMap::new(),
+            running: true,
+        })
+    }
+
+    pub fn get_image(&mut self, path: impl Into<PathBuf>) -> Result<&DynamicImage, RuntimeError> {
+        let path = path.into();
+
+        if !self.image_cache.contains_key(&path) {
+            let img = image::ImageReader::open(&path)?.decode()?;
+            self.image_cache.insert(path.clone(), img);
+        }
+
+        Ok(self.image_cache.get(&path).unwrap())
+    }
+
+    pub fn get_protocol(&mut self, path: impl Into<PathBuf>) -> Result<&mut StatefulProtocol, RuntimeError> {
+        let path = path.into();
+
+        if !self.protocol_cache.contains_key(&path) {
+            let img = self
+                .get_image(&path)?
+                .to_owned();
+            let protocol = self.picker.new_resize_protocol(img);
+            self.protocol_cache.insert(path.clone(), protocol);
+        }
+
+        Ok(self.protocol_cache.get_mut(&path).unwrap())
+
+    }
+
+    pub fn execute(&mut self, chunk: Rc<Chunk>) -> Result<Value, RuntimeError> {
+        log::debug!("Executing chunk '{}'", chunk.get_name());
+
+        self.push_call_frame(chunk.clone(), 0);
+
+        let ret_value = Vm::new(self)
+            .run()?;
+
+        Ok(ret_value)
+    }
+
+
+    pub fn call(&mut self, value: Value, args: &[Value]) -> Result<Value, RuntimeError> {
+        for arg in args {
+            self.push_value(arg.to_owned());
+        }
+
+        self.call_val(value, args.len())
+    }
+
+    pub fn call_val(&mut self, value: Value, num_args: usize) -> Result<Value, RuntimeError> {
+        match value.eval()? {
+            Value::NativeFunction(func) => {
+                let callable = &func.borrow().fun;
+                let local_count = self.local_count()? - num_args;
+                let value = callable(self, num_args, func.borrow().bound_value.to_owned())?;
+                self.pop_until(local_count)?;
+                Ok(value)
+            }
+            Value::Function(func) => {
+                self.match_function_param_count(func.borrow().arity, num_args);
+                self.push_value(match func.borrow().bound_value.to_owned() {
+                    Some(value) => Value::Instance(value),
+                    None => Value::Null,
+                });
+                let ret_value = self.call_fn(func)?;
+                Ok(ret_value)
+            },
+            Value::Class(cls) => {
+                let instance = new_instance(cls.clone(), self, num_args)?;
+
+                Ok(Value::Instance(instance))
+            },
+            v => Err(RuntimeError::IncorrectType { ty: v.type_name().to_owned(), expected: "function".to_owned() }),
+        }
+    }
+
+    fn bind_func(func: Value, value: InstanceType) {
+        if let Value::NativeFunction(func) = func { func.borrow_mut().bind(value) }
+    }
+
+    pub fn call_fn(&mut self, func: FunctionType) -> Result<Value, RuntimeError> {
+        log::debug!("Executing function '{}'", func.borrow().identifier);
+
+        self.push_call_frame(func.borrow().chunk.clone(), func.borrow().arity + 1);
+
+        let ret_value = Vm::new(self)
+            .run()?;
+
+        Ok(ret_value)
+    }
+
+    fn match_function_param_count(&mut self, arity: usize, passed_in: usize) {
+        let arg_diff = passed_in as i32 - arity as i32;
+
+        if arg_diff < 0 {
+            for _ in 0..-arg_diff {
+                self.push_value(Value::Null);
+            }
+        } else {
+            for _ in 0..arg_diff {
+                self.pop_value();
+            }
+        }
+
+    }
+
+    pub fn include_module(&mut self, module: Module) -> Result<(), RuntimeError> {
+        let name = module.get_name().to_owned();
+        let module = Rc::new(RefCell::new(module));
+        self.add_global(name, module)?;
+        Ok(())
+    }
+
+    pub(crate) fn push_call_frame(&mut self, chunk: Rc<Chunk>, arity: usize) {
+        if let Some(frame) = self.call_stack.last_mut() {
+            frame.local_count -= arity;
+        }
+
+        let frame = CallFrame {
+            chunk,
+            stack_offset: self.stack.len() - arity,
+            local_count: arity,
+            pc: 0,
+        };
+
+        self.call_stack.push(frame);
+    }
+
+
+    pub fn call_stack_empty(&self) -> bool {
+        self.call_stack.is_empty()
+    }
+
+    pub fn get_local(&self, offset: LocalOffset) -> Result<&Value, RuntimeError> {
+        let offset = if offset >= 0 {
+            offset + self.stack_offset() as LocalOffset
+        } else {
+            self.stack.len() as LocalOffset + offset
+        };
+
+        let value = self.stack.get(offset as usize)
+            .ok_or(RuntimeError::StackOutOfBounds { at: offset as usize, pc: self.pc()? })?;
+
+        Ok(value)
+    }
+
+    pub fn set_local(&mut self, offset: LocalOffset, value: Value) -> Result<(), RuntimeError> {
+        let offset = offset as usize + self.stack_offset();
+
+        if offset >= self.stack.len() {
+            return Err(RuntimeError::StackOutOfBounds { at: offset, pc: self.pc()? });
+        }
+
+        if let Value::Reactive(reactive) = &self.stack[offset] {
+            Reactive::set(reactive.clone(), value.eval()?)?;
+        } else {
+            self.stack[offset] = value;
+        }
+
+        Ok(())
+    }
+
+    pub fn push_value<T: Into<Value>>(&mut self, value: T) {
+        self.stack.push(value.into());
+
+        if let Some(frame) = self.call_stack.last_mut() {
+            frame.local_count += 1;
+        }
+    }
+
+    pub fn pop_value(&mut self) -> Option<Value> {
+        let val = self.stack.pop();
+
+        if let Some(frame) = self.call_stack.last_mut() && val.is_some() {
+            frame.local_count -= 1;
+        }
+
+        val
+    }
+
+    pub fn push_intermediate<T: Into<Value>>(&mut self, value: T) {
+        self.intermediate_stack.push(value.into());
+    }
+
+    pub fn pop_intermediate(&mut self) -> Option<Value> {
+        self.intermediate_stack.pop()
+    }
+
+    pub fn peek_value(&mut self) -> Option<&Value> {
+        self.stack.last()
+    }
+
+    pub fn pop_expecting(&mut self) -> Result<Value, RuntimeError> {
+        let val = self.stack.pop().ok_or(RuntimeError::StackEmpty)?;
+
+        if let Some(frame) = self.call_stack.last_mut() {
+            frame.local_count -= 1;
+        }
+
+        Ok(val)
+    }
+
+    #[cfg(feature = "debug_tracing")]
+    pub fn log_stack(&self) {
+        let mut values = self.stack.iter().map(|v| v.to_string()).collect::<Vec<_>>().join("> <");
+        if !values.is_empty() {
+            values = format!("<{values}>");
+        }
+
+        log::debug!("stack: {values}");
+    }
+
+    pub(crate) fn ret(&mut self) -> Result<Value, RuntimeError> {
+        let ret_value = self.pop_expecting()?;
+
+        if let Some(frame) = self.call_stack.pop() {
+            // Pop all values pushed in the current call frame
+            for _ in 0..frame.local_count {
+                self.stack.pop();
+            }
+
+            Ok(ret_value)
+        } else {
+            Err(RuntimeError::CallStackEmpty)
+        }
+    }
+
+    pub(crate) fn local_count(&self) -> Result<usize, RuntimeError> {
+        self.call_stack
+            .last()
+            .map(|frame| frame.local_count)
+            .ok_or(RuntimeError::CallStackEmpty)
+    }
+
+    pub(crate) fn pop_until(&mut self, target_local_count: usize) -> Result<(), RuntimeError> {
+        let local_count = self.local_count()?;
+
+        for _ in 0..(local_count - target_local_count) {
+            self.pop_expecting()?;
+        }
+
+        Ok(())
+    }
+
+    pub fn stack_offset(&self) -> usize {
+        self.call_stack.last()
+            .map(|frame| frame.stack_offset)
+            .unwrap_or(0)
+    }
+
+    pub fn chunk(&self) -> Result<&Chunk, RuntimeError> {
+        self.call_stack.last()
+            .map(|frame| frame.chunk.as_ref())
+            .ok_or(RuntimeError::StackEmpty)
+    }
+
+    pub fn chunk_name(&self) -> Result<&str, RuntimeError> {
+        Ok(self.chunk()?.get_name())
+    }
+
+    pub fn pc(&self) -> Result<usize, RuntimeError> {
+        self.call_stack.last()
+            .map(|frame| frame.pc)
+            .ok_or(RuntimeError::StackEmpty)
+    }
+
+    pub fn move_pc(&mut self, amount: usize) {
+        if let Some(frame) = self.call_stack.last_mut() {
+            frame.pc += amount
+        }
+    }
+
+    pub fn set_pc(&mut self, pc: usize) {
+        if let Some(frame) = self.call_stack.last_mut() {
+            frame.pc = pc
+        }
+    }
+
+    pub fn add_global(&mut self, name: impl Into<String>, value: impl Into<Value>) -> Result<(), RuntimeError> {
+        let name = name.into();
+
+        if let Some(Value::Reactive(reactive)) = self.globals.get(&name) {
+            Reactive::set(reactive.clone(), value.into())?;
+            return Ok(());
+        }
+
+        self.globals.insert(name, value.into());
+        Ok(())
+    }
+
+    pub fn remove_global(&mut self, name: impl AsRef<str>) {
+        self.globals.remove(name.as_ref());
+    }
+
+    pub fn get_global(&self, name: impl AsRef<str>) -> Option<&Value> {
+        self.globals.get(name.as_ref())
+    }
+
+    pub fn exit(&mut self) {
+        self.running = false;
+    }
+
+    pub fn exit_requested(&self) -> bool {
+        !self.running
+    }
+}
+
+
+impl Drop for Runtime {
+    fn drop(&mut self) {
+        ratatui::restore();
+    }
+}

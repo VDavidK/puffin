@@ -3,3 +3,4 @@ target/
 .vs/
 .idea/
 .DS_Store
+*.log
