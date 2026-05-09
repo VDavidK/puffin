@@ -1,5 +1,6 @@
 use puffin_runtime::runtime::Runtime;
 use puffin_runtime::RuntimeError;
+use crate::base::casting::{define_bool_cast_fn, define_float_cast_fn, define_int_cast_fn, define_string_cast_fn};
 
 mod array;
 mod dictionary;
@@ -27,5 +28,9 @@ pub fn define(runtime: &mut Runtime) -> Result<(), RuntimeError>  {
     define_frame_element(runtime)?;
     define_input_element(runtime)?;
     define_len_fn(runtime)?;
+    define_string_cast_fn(runtime)?;
+    define_int_cast_fn(runtime)?;
+    define_float_cast_fn(runtime)?;
+    define_bool_cast_fn(runtime)?;
     Ok(())
 }
