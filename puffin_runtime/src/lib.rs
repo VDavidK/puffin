@@ -18,6 +18,12 @@ pub enum RuntimeError {
     IoError(#[from] std::io::Error),
 
     #[error(transparent)]
+    ImageWidgetError(#[from] ratatui_image::errors::Errors),
+
+    #[error(transparent)]
+    ImageError(#[from] image::ImageError),
+
+    #[error(transparent)]
     ParseColorError(#[from] ratatui::style::ParseColorError),
 
     #[error(transparent)]

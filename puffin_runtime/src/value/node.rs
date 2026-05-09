@@ -6,6 +6,7 @@ use ratatui::crossterm::event::{KeyEvent, KeyEventKind, MouseButton, MouseEvent,
 use ratatui::prelude::*;
 use ratatui::style::Styled;
 use ratatui::widgets::{Block, BorderType, Borders, Paragraph};
+use ratatui_image::{Image, Resize, StatefulImage};
 use serde_derive::{Deserialize, Serialize};
 use crate::event::{key_code_name, to_modifier_names, Event, EVENT_NAME_ONBUTTON, EVENT_NAME_ONFOCUSGAINED, EVENT_NAME_ONFOCUSLOST, EVENT_NAME_ONKEY, EVENT_NAME_ONPASTE, EVENT_NAME_ONRESIZE};
 use crate::runtime::Runtime;
@@ -23,6 +24,7 @@ pub enum Node {
     Component(ComponentNode),
     Conditional(ConditionalNode),
     Block(BlockNode),
+    Image(ImageNode),
 }
 
 impl Display for Node {
@@ -41,6 +43,8 @@ impl StatefulWidget for &Node {
         match self {
             Node::Text(text)
                 => text.render(area, buf),
+            Node::Image(img)
+                => img.render(area, buf, state),
             Node::Layout(layout)
                 => layout.render(area, buf, state),
             Node::Component(component)
@@ -499,3 +503,35 @@ impl From<BlockNode> for NodeType {
         Rc::new(RefCell::new(Node::Block(value)))
     }
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImageNode {
+    pub path: Value,
+}
+
+impl StatefulWidget for &ImageNode {
+    type State = Runtime;
+
+    fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) where Self: Sized {
+        let path = self.path
+            .eval()
+            .unwrap()
+            .take_string()
+            .unwrap();
+
+        let img = state
+            .get_protocol(&*path.borrow())
+            .unwrap();
+
+        StatefulImage::new()
+            .resize(Resize::Scale(None))
+            .render(area, buf, img);
+    }
+}
+
+impl From<ImageNode> for Node {
+    fn from(value: ImageNode) -> Self {
+        Node::Image(value)
+    }
+}
+

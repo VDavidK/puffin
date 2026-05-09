@@ -8,7 +8,6 @@ use crate::chunk::{InstructionOffset, ConstantOffset, LocalOffset};
 use crate::runtime::Runtime;
 use crate::value::{new_class, BlockNode, ComponentNode, ConditionalNode, Node, NodeType, Reactive};
 
-#[derive(Debug)]
 pub(crate) struct Vm<'a> {
     running: bool,
     runtime: &'a mut Runtime,
