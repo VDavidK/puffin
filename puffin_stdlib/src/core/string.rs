@@ -4,6 +4,7 @@ use puffin_runtime::value::{Module, NativeFunction, Value};
 use crate::declaration::Declaration;
 use std::fs::OpenOptions;
 use std::io::Write;
+use puffin_runtime::chunk::LocalOffset;
 
 struct StringSystem;
 
@@ -131,6 +132,64 @@ impl Declaration for StringSystem {
                 .eval()?
                 .take_string()?;
             Ok(string.borrow_mut().to_uppercase().into())
+        }));
+        // string.split(<str>, <delim>, <n>?)
+        module.set_item("split", NativeFunction::new(|runtime, argc, _| {
+            let arg_start = -(argc as LocalOffset);
+            let string = runtime.get_local(arg_start)?
+                .to_owned()
+                .eval()?
+                .take_string()?;
+            let delim = runtime.get_local(arg_start + 1)?
+                .to_owned()
+                .eval()?
+                .take_string()?;
+            let res = if argc > 2 {
+                let max_splits = runtime.get_local(arg_start + 2)?
+                    .to_owned()
+                    .eval()?
+                    .take_int()? as usize;
+                string.borrow_mut()
+                    .splitn(max_splits, delim.borrow().as_str())
+                    .map(String::from)
+                    .map(Value::from)
+                    .collect::<Vec<Value>>()
+            } else {
+                string.borrow_mut()
+                    .split(delim.borrow().as_str())
+                    .map(String::from)
+                    .map(Value::from)
+                    .collect::<Vec<Value>>()
+            };
+
+            Ok(Value::from(res))
+        }));
+        // string.substring(<str>, <idx>, <len>)
+        module.set_item("substring", NativeFunction::new(|runtime, _, _| {
+            let string = runtime.get_local(-3)?
+                .to_owned()
+                .eval()?
+                .take_string()?;
+            let idx = runtime.get_local(-2)?
+                .to_owned()
+                .eval()?
+                .take_int()?;
+            let len = runtime.get_local(-1)?
+                .to_owned()
+                .eval()?
+                .take_int()?;
+            if idx < 0 {
+                Err(RuntimeError::UnexpectedNegativeNumber { var_name: "string.substring(.., idx, ..)".to_string(), num: idx as isize, })?
+            }
+            if len < 0 {
+                Err(RuntimeError::UnexpectedNegativeNumber { var_name: "string.substring(.., .., len)".to_string(), num: idx as isize, })?
+            }
+            if idx as usize + len as usize >= string.borrow().len() {
+                Err(RuntimeError::IndexOutOfBounds { index: idx as usize, size: string.borrow().len() })?
+            }
+            let slice = string.borrow();
+            let slice = slice.as_str();
+            Ok(slice[(idx as usize)..(idx+len) as usize].to_string().into())
         }));
     }
 }
