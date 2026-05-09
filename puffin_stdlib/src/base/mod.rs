@@ -5,6 +5,8 @@ mod array;
 mod dictionary;
 mod elements;
 mod debug;
+mod casting;
+mod utils;
 
 // use array::define_array_class;
 // use dictionary::define_dictionary_class;
@@ -13,6 +15,7 @@ use crate::base::elements::text::define_text_element;
 use crate::base::elements::flow::{define_flow_elements};
 use crate::base::elements::frame::define_frame_element;
 use crate::base::elements::input::define_input_element;
+use crate::base::utils::define_len_fn;
 
 pub fn define(runtime: &mut Runtime) -> Result<(), RuntimeError>  {
     // define_array_class(runtime);
@@ -23,5 +26,6 @@ pub fn define(runtime: &mut Runtime) -> Result<(), RuntimeError>  {
     define_flow_elements(runtime)?;
     define_frame_element(runtime)?;
     define_input_element(runtime)?;
+    define_len_fn(runtime)?;
     Ok(())
 }
