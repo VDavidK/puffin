@@ -9,7 +9,7 @@ pub fn define_string_cast_fn(runtime: &mut Runtime) -> Result<(), RuntimeError> 
         Ok(val.to_string().into())
     });
 
-    runtime.add_global("string", func)?;
+    runtime.add_global("str", func)?;
     Ok(())
 }
 

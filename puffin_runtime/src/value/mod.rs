@@ -482,7 +482,7 @@ impl Value {
     pub fn take_string(self) -> Result<StringType, RuntimeError> {
         TryInto::<StringType>::try_into(self.eval()?)
     }
-
+    
     pub fn take_int(self) -> Result<IntType, RuntimeError> {
         TryInto::<IntType>::try_into(self.eval()?)
     }

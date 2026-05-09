@@ -85,5 +85,8 @@ pub enum RuntimeError {
     InvalidConstraintName { name: String },
 
     #[error("Invalid constraint: {reason}")]
-    InvalidConstraint { reason: String }
+    InvalidConstraint { reason: String },
+    
+    #[error("Index {index} is out of bounds for list of size {size}")]
+    IndexOutOfBounds { index: usize, size: usize }
 }

@@ -69,6 +69,7 @@ fn main() -> color_eyre::Result<()> {
             runtime.include_module(puffin_stdlib::core::math::module())?;
             runtime.include_module(puffin_stdlib::core::list::module())?;
             runtime.include_module(puffin_stdlib::core::dict::module())?;
+            runtime.include_module(puffin_stdlib::core::string::module())?;
 
             puffin_stdlib::base::define(&mut runtime)?;
 
