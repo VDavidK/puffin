@@ -109,7 +109,7 @@ pub fn new_instance(class: ClassType, runtime: &mut Runtime, num_args: usize) ->
     let fields = class.get_fields();
 
     for (k, v) in fields.iter() {
-        instance.set_field(k, v.clone())?;
+        instance.set_field(k, Reactive::new(v.to_owned().deep_clone()?))?;
     }
 
     let instance = Rc::new(RefCell::new(instance));

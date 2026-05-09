@@ -25,6 +25,15 @@ impl Function {
             bound_value: Some(instance),
         }
     }
+
+    pub fn copy(&self, bound_value: Option<InstanceType>) -> Self {
+        Self {
+            chunk: self.chunk.to_owned(),
+            identifier: self.identifier.to_owned(),
+            arity: self.arity,
+            bound_value,
+        }
+    }
 }
 
 impl Display for Function {

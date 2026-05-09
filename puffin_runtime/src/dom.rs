@@ -4,7 +4,7 @@ use ratatui::DefaultTerminal;
 use crate::event::Event;
 use crate::runtime::Runtime;
 use crate::RuntimeError;
-use crate::value::{new_instance, ComponentNode, InstanceType, LayoutDirection, LayoutNode, NodeType, Value};
+use crate::value::{new_instance, ComponentNode, Instance, InstanceType, LayoutDirection, LayoutNode, Node, NodeType, Value};
 
 pub struct Dom {
     tree: NodeType,

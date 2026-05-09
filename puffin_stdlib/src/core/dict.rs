@@ -10,10 +10,9 @@ impl Declaration for DictSystem {
         module.set_item("insert", NativeFunction::new(|runtime, _, _| {
             let dict = runtime.get_local(-3)?
                 .to_owned()
-                .eval()?
                 .take_dictionary()?;
-            let key = runtime.get_local(-2)?.eval()?;
-            let value = runtime.get_local(-1)?.eval()?;
+            let key = runtime.get_local(-2)?.to_owned();
+            let value = runtime.get_local(-1)?.to_owned();
 
             dict.borrow_mut().insert(key.to_owned(), value.to_owned());
             Ok(value)
@@ -21,25 +20,22 @@ impl Declaration for DictSystem {
         module.set_item("contains", NativeFunction::new(|runtime, _, _| {
             let dict = runtime.get_local(-2)?
                 .to_owned()
-                .eval()?
                 .take_dictionary()?;
 
-            let key = runtime.get_local(-1)?.eval()?;
+            let key = runtime.get_local(-1)?;
             Ok(dict.borrow_mut().contains_key(&key).into())
         }));
         module.set_item("remove", NativeFunction::new(|runtime, _, _| {
             let dict = runtime.get_local(-2)?
                 .to_owned()
-                .eval()?
                 .take_dictionary()?;
-            let key = runtime.get_local(-1)?.eval()?;
+            let key = runtime.get_local(-1)?.to_owned();
 
             Ok(dict.borrow_mut().remove(&key).unwrap_or(Value::Null))
         }));
         module.set_item("keys", NativeFunction::new(|runtime, _, _| {
             let dict = runtime.get_local(-1)?
                 .to_owned()
-                .eval()?
                 .take_dictionary()?;
             let list = dict.borrow()
                 .keys()
@@ -51,7 +47,6 @@ impl Declaration for DictSystem {
         module.set_item("values", NativeFunction::new(|runtime, _, _| {
             let dict = runtime.get_local(-1)?
                 .to_owned()
-                .eval()?
                 .take_dictionary()?;
             let list = dict.borrow()
                 .values()
@@ -63,7 +58,6 @@ impl Declaration for DictSystem {
         module.set_item("entries", NativeFunction::new(|runtime, _, _| {
             let dict = runtime.get_local(-1)?
                 .to_owned()
-                .eval()?
                 .take_dictionary()?;
             let list = dict.borrow()
                 .iter()

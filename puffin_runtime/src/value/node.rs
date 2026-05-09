@@ -184,7 +184,7 @@ pub enum LayoutDirection {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LayoutNode {
     pub direction: LayoutDirection,
-    pub node: NodeType,
+    pub node: Value,
     pub segments: Value,
 }
 
@@ -192,7 +192,8 @@ impl StatefulWidget for &LayoutNode {
     type State = Runtime;
 
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) where Self: Sized {
-        let nodes = Node::expand(self.node.to_owned());
+        let node = self.node.eval().unwrap().take_node().unwrap();
+        let nodes = Node::expand(node);
 
         let len = nodes.len();
         let mut constraints = get_constraints(&self.segments, len).unwrap_or(vec![]);
@@ -214,7 +215,8 @@ impl StatefulWidget for &LayoutNode {
 
 impl LayoutNode {
     fn dispatch(&self, runtime: &mut Runtime, event: &Event) -> Result<(), RuntimeError> {
-        let nodes = Node::expand(self.node.to_owned());
+        let node = self.node.eval()?.take_node()?;
+        let nodes = Node::expand(node);
         for node in nodes {
             node.borrow().dispatch(runtime, event)?;
         }
