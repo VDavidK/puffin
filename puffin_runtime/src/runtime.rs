@@ -1,6 +1,13 @@
 use std::cell::RefCell;
+use std::collections::hash_map::Entry;
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
+use image::DynamicImage;
+use ratatui::prelude::{Rect, Size};
+use ratatui_image::picker::Picker;
+use ratatui_image::protocol::{Protocol, StatefulProtocol};
+use ratatui_image::Resize;
 use crate::chunk::LocalOffset;
 use crate::vm::Vm;
 use crate::{Chunk, RuntimeError, value::Value};
@@ -14,28 +21,60 @@ pub struct CallFrame {
     pub pc: usize,
 }
 
-#[derive(Debug)]
 pub struct Runtime {
     stack: Vec<Value>,
     intermediate_stack: Vec<Value>,
     call_stack: Vec<CallFrame>,
     globals: HashMap<String, Value>,
+    picker: Picker,
+    image_cache: HashMap<PathBuf, DynamicImage>,
+    protocol_cache: HashMap<PathBuf, StatefulProtocol>,
     running: bool,
 }
 
-impl Default for Runtime {
-    fn default() -> Self {
-        Runtime {
+
+impl Runtime {
+    pub fn new() -> Result<Self, RuntimeError> {
+        let picker = Picker::from_query_stdio()?;
+
+        Ok(Runtime {
             stack: vec![],
             intermediate_stack: vec![],
             call_stack: vec![],
             globals: HashMap::new(),
+            picker,
+            image_cache: HashMap::new(),
+            protocol_cache: HashMap::new(),
             running: true,
-        }
+        })
     }
-}
 
-impl Runtime {
+    pub fn get_image(&mut self, path: impl Into<PathBuf>) -> Result<&DynamicImage, RuntimeError> {
+        let path = path.into();
+
+        if !self.image_cache.contains_key(&path) {
+            let img = image::ImageReader::open(&path)?.decode()?;
+            self.image_cache.insert(path.clone(), img);
+        }
+
+        Ok(self.image_cache.get(&path).unwrap())
+    }
+
+    pub fn get_protocol(&mut self, path: impl Into<PathBuf>) -> Result<&mut StatefulProtocol, RuntimeError> {
+        let path = path.into();
+
+        if !self.protocol_cache.contains_key(&path) {
+            let img = self
+                .get_image(&path)?
+                .to_owned();
+            let protocol = self.picker.new_resize_protocol(img);
+            self.protocol_cache.insert(path.clone(), protocol);
+        }
+
+        Ok(self.protocol_cache.get_mut(&path).unwrap())
+
+    }
+
     pub fn execute(&mut self, chunk: Rc<Chunk>) -> Result<Value, RuntimeError> {
         log::debug!("Executing chunk '{}'", chunk.get_name());
 

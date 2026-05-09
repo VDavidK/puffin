@@ -64,7 +64,7 @@ fn main() -> color_eyre::Result<()> {
             let mut chunks = vec![];
             compile_file(&input, &mut chunks)?;
 
-            let mut runtime = Runtime::default();
+            let mut runtime = Runtime::new()?;
             runtime.include_module(puffin_stdlib::core::fs::module())?;
             runtime.include_module(puffin_stdlib::core::math::module())?;
             runtime.include_module(puffin_stdlib::core::list::module())?;

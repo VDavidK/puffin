@@ -9,6 +9,7 @@ pub mod text;
 pub mod flow;
 pub mod frame;
 pub mod input;
+pub mod image;
 
 pub(crate) type Props = DictionaryType;
 
