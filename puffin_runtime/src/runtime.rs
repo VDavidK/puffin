@@ -57,7 +57,7 @@ impl Runtime {
     }
 
     pub fn call_val(&mut self, value: Value, num_args: usize) -> Result<Value, RuntimeError> {
-        match value {
+        match value.eval()? {
             Value::NativeFunction(func) => {
                 let callable = &func.borrow().fun;
                 let local_count = self.local_count()? - num_args;
