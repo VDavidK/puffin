@@ -46,3 +46,21 @@ impl ValueTruthy for ListType {
 impl ValueDef for ListType {
     const TYPE_NAME: &'static str = "list";
 }
+
+#[macro_export]
+macro_rules! make_list {
+    () => { std::rc::Rc::new(std::cell::RefCell::new(Vec::<crate::value::Value>::new())) };
+    ($($v:expr),+ $(,)?) => {
+        std::rc::Rc::new(std::cell::RefCell::new(
+            vec![$(crate::value::Value::from($v)),+]
+        ))
+    }
+}
+
+#[macro_export]
+macro_rules! make_list_value {
+    () => { Value::List(crate::make_list!()) };
+    ($($v:expr),+ $(,)?) => {
+        Value::List(crate::make_list![$($v),*])
+    }
+}

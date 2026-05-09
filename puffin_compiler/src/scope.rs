@@ -63,7 +63,7 @@ impl Scope {
     pub fn total_local_count(&self) -> usize {
         self.local_count + self.parent
             .as_ref()
-            .map(|parent| parent.local_count())
+            .map(|parent| parent.total_local_count())
             .unwrap_or(0)
     }
 

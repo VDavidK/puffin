@@ -1,3 +1,5 @@
+use ratatui::crossterm::event::{DisableBracketedPaste, DisableFocusChange, DisableMouseCapture, EnableBracketedPaste, EnableFocusChange, EnableMouseCapture};
+use ratatui::crossterm::execute;
 use ratatui::DefaultTerminal;
 use crate::event::Event;
 use crate::runtime::Runtime;
@@ -12,6 +14,10 @@ pub struct Dom {
 impl Dom {
     pub fn new(component: Value, runtime: &mut Runtime) -> Result<Self, RuntimeError> {
         let term = ratatui::init();
+
+        execute!(std::io::stdout(), EnableMouseCapture)?;
+        execute!(std::io::stdout(), EnableBracketedPaste)?;
+        execute!(std::io::stdout(), EnableFocusChange)?;
 
         let component = component
             .clone()
@@ -71,16 +77,39 @@ impl Dom {
     pub fn poll(&self, runtime: &mut Runtime) -> Result<(), RuntimeError> {
         use ratatui::crossterm::event::{
             Event as CrosstermEvent,
-            KeyEvent,
-            KeyCode,
         };
 
         let event = ratatui::crossterm::event::read()?;
 
-        if let CrosstermEvent::Key(evt) = event {
-            self.dispatch_event(runtime, Event::Key(evt))?;
+        match event {
+            CrosstermEvent::Key(evt) => {
+                self.dispatch_event(runtime, Event::Key(evt))?;
+            }
+            CrosstermEvent::Mouse(evt) => {
+                self.dispatch_event(runtime, Event::Mouse(evt))?;
+            }
+            CrosstermEvent::FocusGained => {
+                self.dispatch_event(runtime, Event::FocusGained)?;
+            }
+            CrosstermEvent::FocusLost => {
+                self.dispatch_event(runtime, Event::FocusLost)?;
+            }
+            CrosstermEvent::Paste(buffer) => {
+                self.dispatch_event(runtime, Event::Paste(buffer))?;
+            }
+            CrosstermEvent::Resize(width, height) => {
+                self.dispatch_event(runtime, Event::Resize(width, height))?;
+            }
         }
 
         Ok(())
+    }
+}
+
+impl Drop for Dom {
+    fn drop(&mut self) {
+        _ = execute!(std::io::stdout(), DisableMouseCapture);
+        _ = execute!(std::io::stdout(), DisableBracketedPaste);
+        _ = execute!(std::io::stdout(), DisableFocusChange);
     }
 }
