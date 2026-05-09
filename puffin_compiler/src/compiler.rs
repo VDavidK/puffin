@@ -301,7 +301,7 @@ impl<'a> Compiler<'a> {
                     self.chunk.push_local_offset(end_local);
                     self.chunk.push_op(OpCode::GetLocal);
                     self.chunk.push_local_offset(start_local);
-                    self.chunk.push_op(OpCode::Lt);
+                    self.chunk.push_op(OpCode::Le);
                     let end_jump = self.chunk.push_jump(OpCode::JumpIf);
 
                     let one = self.add_to_constants(1)?;
@@ -759,7 +759,7 @@ impl<'a> Compiler<'a> {
                     gen_compiler.chunk.push_local_offset(end_local);
                     gen_compiler.chunk.push_op(OpCode::GetLocal);
                     gen_compiler.chunk.push_local_offset(start_local);
-                    gen_compiler.chunk.push_op(OpCode::Lt);
+                    gen_compiler.chunk.push_op(OpCode::Le);
                     let end_jump = gen_compiler.chunk.push_jump(OpCode::JumpIf);
 
                     let one = gen_compiler.add_to_constants(1)?;
