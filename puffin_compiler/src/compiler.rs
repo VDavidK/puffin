@@ -725,14 +725,18 @@ impl<'a> Compiler<'a> {
                 gen_compiler.scope.define_local("self");
 
                 if let Some(end) = &markup.end_range {
-                    //   <start> #start_local
-                    //   <end>   #end_local
+                    //   <collector> #collection
+                    //   <start>     #start_local
+                    //   <end>       #end_local
+                    //   newlist
                     //   getl #start_local
                     //   getl #end_local
                     //   lt
                     //   jumpi :end
                     // loop:
-                    //   <body>
+                    //   getl #collection
+                    //   <markup>
+                    //   pushl
                     //   getl #start_local
                     //   const 1
                     //   add
