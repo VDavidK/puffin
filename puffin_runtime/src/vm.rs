@@ -215,6 +215,14 @@ impl<'a> Vm<'a> {
                     Value::Dictionary(dict) => {
                         dict.borrow().get(&idx).cloned().unwrap_or(Value::Null)
                     }
+                    Value::String(string) => {
+                        let char = string.borrow().chars().nth(idx.take_int()? as usize);
+                        if let Some(c) = char {
+                            Value::String(Rc::new(RefCell::new(c.to_string())))
+                        } else {
+                            Value::Null
+                        }
+                    }
                     v => {
                         return Err(RuntimeError::IncorrectType { ty: v.type_name().into(), expected: "list or dictionary".into() })
                     }
