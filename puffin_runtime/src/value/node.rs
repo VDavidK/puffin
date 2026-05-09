@@ -312,6 +312,14 @@ impl StatefulWidget for &ComponentNode {
 
     #[allow(clippy::unwrap_used)]
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
+        // Should not be able to fail, unless the user has defined an
+        _ = self.instance.borrow_mut().set_field("bounds", make_fields! {
+            x: area.x as IntType,
+            y: area.y as IntType,
+            columns: area.width as IntType,
+            rows: area.height as IntType
+        });
+
         self.root.borrow()
             .render(area, buf, state);
     }
