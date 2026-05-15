@@ -32,6 +32,7 @@ impl<'a> Vm<'a> {
 
             match self.execute() {
                 Err(err) => {
+                    #[cfg(feature = "debug_tracing")]
                     log::error!("Runtime error occurred: {}", err);
                     return Err(err);
                 }
@@ -42,6 +43,7 @@ impl<'a> Vm<'a> {
             }
         };
 
+        #[cfg(feature = "debug_tracing")]
         log::debug!("Execution finished without errors");
 
         Ok(ret_value)

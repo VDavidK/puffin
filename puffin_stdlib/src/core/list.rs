@@ -12,20 +12,20 @@ impl Declaration for ListSystem {
 
     fn declare(module: &mut Module) {
         module.set_item("push", NativeFunction::new(|runtime, _, _| {
-            let value = runtime.get_local(-1)?.eval()?;
+            let value = runtime.get_local(-1)?
+                .to_owned();
             let list = runtime.get_local(-2)?
                 .to_owned()
-                .eval()?
                 .take_list()?;
 
             list.borrow_mut().push(value.to_owned());
             Ok(value)
         }));
         module.set_item("push_front", NativeFunction::new(|runtime, _, _| {
-            let value = runtime.get_local(-1)?.eval()?;
+            let value = runtime.get_local(-1)?
+                .to_owned();
             let list = runtime.get_local(-2)?
                 .to_owned()
-                .eval()?
                 .take_list()?;
 
             list.borrow_mut().insert(0, value.to_owned());
@@ -34,14 +34,12 @@ impl Declaration for ListSystem {
         module.set_item("pop", NativeFunction::new(|runtime, _, _| {
             let list = runtime.get_local(-1)?
                 .to_owned()
-                .eval()?
                 .take_list()?;
             Ok(list.borrow_mut().pop().unwrap_or(Value::Null))
         }));
         module.set_item("pop_front", NativeFunction::new(|runtime, _, _| {
             let list = runtime.get_local(-1)?
                 .to_owned()
-                .eval()?
                 .take_list()?;
             if list.borrow().is_empty() {
                 Ok(Value::Null)
@@ -53,14 +51,11 @@ impl Declaration for ListSystem {
         module.set_item("replace", NativeFunction::new(|runtime, _, _| {
             let idx = runtime.get_local(-1)?
                 .to_owned()
-                .eval()?
                 .take_int()? as usize;
             let value = runtime.get_local(-2)?
-                .to_owned()
-                .eval()?;
+                .to_owned();
             let list = runtime.get_local(-3)?
                 .to_owned()
-                .eval()?
                 .take_list()?;
             if (idx as isize) < 0 || list.borrow().len() - 1 < idx {
                 Err(RuntimeError::IndexOutOfBounds { index: idx, size: list.borrow().len() })?;
@@ -73,14 +68,11 @@ impl Declaration for ListSystem {
         module.set_item("insert", NativeFunction::new(|runtime, _, _| {
             let idx = runtime.get_local(-1)?
                 .to_owned()
-                .eval()?
                 .take_int()? as usize;
             let value = runtime.get_local(-2)?
-                .to_owned()
-                .eval()?;
+                .to_owned();
             let list = runtime.get_local(-3)?
                 .to_owned()
-                .eval()?
                 .take_list()?;
             let len = list.borrow().len();
             if idx == len {
@@ -96,11 +88,9 @@ impl Declaration for ListSystem {
         module.set_item("remove", NativeFunction::new(|runtime, _, _| {
             let idx = runtime.get_local(-1)?
                 .to_owned()
-                .eval()?
                 .take_int()? as usize;
             let list = runtime.get_local(-2)?
                 .to_owned()
-                .eval()?
                 .take_list()?;
             if (idx as isize) < 0 || list.borrow().len() - 1 < idx {
                 Err(RuntimeError::IndexOutOfBounds { index: idx, size: list.borrow().len() })?;

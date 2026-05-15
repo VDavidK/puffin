@@ -16,6 +16,7 @@ mod dictionary;
 mod derived;
 
 use std::{fmt::Display, hash::Hash, rc::Rc};
+use std::collections::HashMap;
 pub use instance::{new_instance, Instance, InstanceType};
 pub use function::{Function, FunctionType};
 pub use native_function::{NativeFunction, NativeFunctionType};
@@ -533,5 +534,49 @@ impl Value {
 
     pub fn take_reactive(self) -> Result<ReactiveType, RuntimeError> {
         TryInto::<ReactiveType>::try_into(self.eval()?)
+    }
+
+    pub fn deep_clone(self) -> Result<Value, RuntimeError> {
+        let val = match self {
+            Value::Null => Value::Null,
+            Value::Int(v) => Value::Int(v),
+            Value::Float(v) => Value::Float(v),
+            Value::Bool(v) => Value::Bool(v),
+            Value::String(v) => v.borrow().to_owned().into(),
+            Value::Function(v) => Value::Function(v),
+            Value::Class(v) => Value::Class(v),
+            Value::Module(v) => Value::Module(v),
+            Value::List(v) => v
+                .borrow()
+                .to_owned()
+                .into_iter()
+                .map(|v| v.deep_clone())
+                .collect::<Result<Vec<_>, _>>()?
+                .into(),
+            Value::Dictionary(v) => v
+                .borrow()
+                .to_owned()
+                .into_iter()
+                .map(|(k, v)| Ok((k.deep_clone()?, v.deep_clone()?)))
+                .collect::<Result<HashMap<_, _>, RuntimeError>>()?
+                .into(),
+            Value::Reactive(v) => v
+                .borrow()
+                .get()
+                .to_owned()
+                .deep_clone()?,
+            Value::Derived(v) => v
+                .eval()?
+                .deep_clone()?,
+
+            // TODO: Make unique
+            Value::Instance(v) => Value::Instance(v),
+
+            Value::NativeValue(v) => Value::NativeValue(v),
+            Value::NativeFunction(v) => Value::NativeFunction(v),
+            Value::Node(v) => Value::Node(v),
+        };
+
+        Ok(val)
     }
 }

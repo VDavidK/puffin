@@ -5,7 +5,7 @@ use std::fs::OpenOptions;
 use std::io::Write;
 use std::os::unix::prelude::CommandExt;
 use puffin_runtime::RuntimeError;
-use std::process::Command;
+use std::process::{Command, Stdio};
 use puffin_runtime::chunk::LocalOffset;
 
 struct ShellSystem;
@@ -27,7 +27,10 @@ impl Declaration for ShellSystem {
                 .collect::<Vec<_>>();
 
             let mut cmd = Command::new(&*command);
-            cmd.args(args);
+            cmd.args(args)
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped());
+
             let _status = cmd.status().expect(format!("Failed to execute command {}", command.as_str()).as_str());
             let mut res = HashMap::new();
             let out = cmd.output()?;

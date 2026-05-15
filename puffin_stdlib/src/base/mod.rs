@@ -15,7 +15,7 @@ use crate::base::elements::image::define_image_element;
 use crate::base::elements::flow::define_flow_elements;
 use crate::base::elements::frame::define_frame_element;
 use crate::base::elements::input::define_input_element;
-use crate::base::utils::define_len_fn;
+use crate::base::utils::{define_block_fn, define_clone_fn, define_len_fn, define_render_fn};
 
 pub fn define(runtime: &mut Runtime) -> Result<(), RuntimeError>  {
     // define_array_class(runtime);
@@ -28,6 +28,9 @@ pub fn define(runtime: &mut Runtime) -> Result<(), RuntimeError>  {
     define_input_element(runtime)?;
     define_image_element(runtime)?;
     define_len_fn(runtime)?;
+    define_block_fn(runtime)?;
+    define_render_fn(runtime)?;
+    define_clone_fn(runtime)?;
     define_string_cast_fn(runtime)?;
     define_int_cast_fn(runtime)?;
     define_float_cast_fn(runtime)?;

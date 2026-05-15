@@ -76,6 +76,7 @@ impl Runtime {
     }
 
     pub fn execute(&mut self, chunk: Rc<Chunk>) -> Result<Value, RuntimeError> {
+        #[cfg(feature = "debug_tracing")]
         log::debug!("Executing chunk '{}'", chunk.get_name());
 
         self.push_call_frame(chunk.clone(), 0);
@@ -127,6 +128,7 @@ impl Runtime {
     }
 
     pub fn call_fn(&mut self, func: FunctionType) -> Result<Value, RuntimeError> {
+        #[cfg(feature = "debug_tracing")]
         log::debug!("Executing function '{}'", func.borrow().identifier);
 
         self.push_call_frame(func.borrow().chunk.clone(), func.borrow().arity + 1);
