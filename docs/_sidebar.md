@@ -8,14 +8,16 @@
   * [Basic syntax](/pages/getting_started/basic_syntax.md)
   * [Types](/pages/getting_started/types.md)
   * [Layouts](/pages/getting_started/layouts.md)
+  * [Constructors](/pages/getting_started/constructors.md)
+  * [Event handling](/pages/getting_started/event_handling.md)
   * [Using files](/pages/getting_started/using_files.md)
   * [Creating a simple application](/pages/getting_started/simple_app.md)
 
 * Advanced layouts
 
-  * [Understanding components]()
-  * [Using the render function]()
-  * [Creating custom blocks]()
+  * [Understanding components](/pages/advanced/understanding_components.md)
+  * [Using the render function](/pages/advanced/render_function.md)
+  * [Creating custom blocks](/pages/advanced/block_function.md)
 
 * Property reference
 

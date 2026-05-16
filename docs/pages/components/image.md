@@ -1,9 +1,12 @@
 # image
 
 The `image` component takes in a path as an argument and renders the image stored at that path to the terminal.
-A supported terminal must be used for this to function, as not all terminal emulators are capable of displaying images.
 
 The path is relative to the directory that the program was executed from, and not the source file's root.
+
+?> Images may not look as intended on terminals that do not natively support images. Make sure your terminal implements an image viewing protocol (e.g. [kitty](https://sw.kovidgoyal.net/kitty/)).
+
+!> The image component will crash the application if it cannot find and parse the provided file correctly. Please make sure that the file exists and is of a valid format (e.g. .png, .jpg, etc.)
 
 !> Due to cache issues, loading many images will permanently unload previously loaded images. This is a known bug and the only workaround at this time is to not load too many images in a single session.
 

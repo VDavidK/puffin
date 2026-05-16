@@ -21,6 +21,11 @@ fn example() {
         let c = 20;
     }
     
+    // For loops can be constructed to iterate over a range
+    for i in self.a:b {
+        // This will loop from 0 to 9 as the range is inclusive.
+    }
+    
     // 'c' falls out of scope and is no longer accessible.
 }
 ```
@@ -51,13 +56,15 @@ fn bar() {
 
 ## Simple FizzBuzz example
 
+Below is a simple example showing how one would implement the *FizzBuzz* function in Puffin.
+
 ```
 fn example() {
     // Define variables with ‘let
     let value = 7;
     
     // Call functions like normal
-    let result = fizzbuzz(value);
+    let result = self.fizzbuzz(value);
 }
 
 // Calculates the FizzBuzz result of a value
