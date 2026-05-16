@@ -1,5 +1,7 @@
 # Puffin - The friendly TUI programming language!
 
+!> Puffin is not feature complete or ready for production. Use it only if you want to experiment and have fun.
+
 Puffin is a simple programming language that offers a convenient and user friendly way to program your own TUI applications.
 
 ## Installing Puffin
