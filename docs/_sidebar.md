@@ -29,6 +29,16 @@
   * [frame](/pages/components/frame)
   * [image](/pages/components/image)
 
+* Standard library
+
+  * [Built-in functions](/pages/stdlib/builtins.md)
+  * [string](/pages/stdlib/string.md)
+  * [list](/pages/stdlib/list.md)
+  * [dict](/pages/stdlib/dict.md)
+  * [math](/pages/stdlib/math.md)
+  * [fs](/pages/stdlib/fs.md)
+  * [shell](/pages/stdlib/shell.md)
+
 * Puffin's design
 
   * [Grammar](/pages/design/grammar.md)
