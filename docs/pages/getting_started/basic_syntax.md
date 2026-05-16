@@ -21,6 +21,11 @@ fn example() {
         let c = 20;
     }
     
+    // For loops can be constructed to iterate over a range
+    for i in self.a:b {
+        // This will loop from 0 to 9 as the range is inclusive.
+    }
+    
     // 'c' falls out of scope and is no longer accessible.
 }
 ```
