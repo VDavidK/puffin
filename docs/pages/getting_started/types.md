@@ -93,7 +93,7 @@ The value associated with a key can be obtained by indexing the dictionary with 
 let translation_table = {
     Hello: "Halló",
     Goodbye: "Bless",
-}
+};
 
 layout {
     text self.translation_table["Hello"];

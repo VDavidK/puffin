@@ -47,7 +47,7 @@ impl Declaration for ListSystem {
                 Ok(list.borrow_mut().remove(0))
             }
         }));
-        // list.replace(<str>, <value>, <idx>)
+        // list.replace(<list>, <value>, <idx>)
         module.set_item("replace", NativeFunction::new(|runtime, _, _| {
             let idx = runtime.get_local(-1)?
                 .to_owned()
@@ -64,7 +64,7 @@ impl Declaration for ListSystem {
             list.borrow_mut().insert(idx, value.to_owned());
             Ok(value)
         }));
-        // list.insert(<str>, <value>, <idx>)
+        // list.insert(<list>, <value>, <idx>)
         module.set_item("insert", NativeFunction::new(|runtime, _, _| {
             let idx = runtime.get_local(-1)?
                 .to_owned()
@@ -84,7 +84,7 @@ impl Declaration for ListSystem {
             }
             Ok(value)
         }));
-        // list.remove(<str>, <idx>)
+        // list.remove(<list>, <idx>)
         module.set_item("remove", NativeFunction::new(|runtime, _, _| {
             let idx = runtime.get_local(-1)?
                 .to_owned()
