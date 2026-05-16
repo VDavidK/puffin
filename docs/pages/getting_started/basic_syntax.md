@@ -25,6 +25,30 @@ fn example() {
 }
 ```
 
+## Using the 'self' keyword
+
+When accessing variables and functions defined in the top scope of a file (the component scope). The `self` keyword
+is necessary.
+
+```
+let a = 10;
+
+fn foo() {
+    // Invalid: 'a' is not defined in the current scope.
+    a = 20;
+    
+    // Valid
+    self.a = 20;
+    
+    // 'self' is also required for function calls
+    self.bar();
+}
+
+fn bar() {
+    // ...
+}
+```
+
 ## Simple FizzBuzz example
 
 ```
