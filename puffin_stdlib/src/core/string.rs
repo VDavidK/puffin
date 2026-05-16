@@ -189,7 +189,7 @@ impl Declaration for StringSystem {
             }
             let slice = string.borrow();
             let slice = slice.as_str();
-            Ok(slice[(idx as usize)..(idx+len) as usize].to_string().into())
+            Ok(slice.chars().skip(idx as usize).take((idx+len) as usize).collect::<String>().into())
         }));
     }
 }
