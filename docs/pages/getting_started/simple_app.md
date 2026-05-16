@@ -92,7 +92,9 @@ layout {
         // Shows the current file path
         text "Current file: " + self.file_path;
         
+        // Only show the image component if the file path exists, otherwise it would crash the application on startup
         if self.file_path != "" {
+            // Show the image
             image self.file_path;
         }
         
@@ -102,6 +104,8 @@ layout {
 ```
 
 This was the last piece needed for the application. It can now be run using the `puffin run ImageViewer.puff` command.
+
+!> Because of how the [image](/pages/components/image.md) component behaves, the program will crash if a non-existent image is provided. Unfortunately, as of the current release, the [fs](/pages/stdlib/fs.md) module does not contain any way of validating whether a file exists or not.
 
 ## Full source file
 
@@ -154,7 +158,9 @@ layout {
         // Shows the current file path
         text "Current file: " + self.file_path;
 
+        // Only show the image component if the file path exists, otherwise it would crash the application on startup
         if self.file_path != "" {
+            // Show the image
             image self.file_path;
         }
 

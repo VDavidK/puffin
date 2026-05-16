@@ -51,13 +51,15 @@ fn bar() {
 
 ## Simple FizzBuzz example
 
+Below is a simple example showing how one would implement the *FizzBuzz* function in Puffin.
+
 ```
 fn example() {
     // Define variables with ‘let
     let value = 7;
     
     // Call functions like normal
-    let result = fizzbuzz(value);
+    let result = self.fizzbuzz(value);
 }
 
 // Calculates the FizzBuzz result of a value
