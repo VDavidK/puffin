@@ -85,7 +85,7 @@ impl<'a> Iterator for PuffinLexer<'a> {
                 while let Some(c) = self.peek(1) && (c.is_alphabetic() || c.is_ascii_digit() || c == '_') {
                     self.next_char();
                 }
-                match self.lexeme() {
+                match self.lexeme().as_str() {
                     "or" => self.token(TokenType::KwOr),
                     "not" => self.token(TokenType::KwNot),
                     "and" => self.token(TokenType::KwAnd),
@@ -223,8 +223,11 @@ impl<'a> PuffinLexer<'a> {
         c
     }
 
-    fn lexeme(&self) -> &str {
-        &self.src[self.start.idx()..=self.end.idx()]
+    fn lexeme(&self) -> String {
+        self.src.chars()
+            .skip(self.start.idx())
+            .take(self.end.idx() - self.start.idx() + 1)
+            .collect::<String>()
     }
 
     pub fn get_src_ref(&self) -> &str {
