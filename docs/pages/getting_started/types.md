@@ -2,7 +2,7 @@
 
 ### Primitive Types
 
-Puffin features three primitive types. These are `boolean`, `integer`, `float`.
+Puffin features four primitive types. These are `boolean`, `integer`, `float` and `null`.
 
 #### Boolean
 
@@ -56,9 +56,17 @@ fn foo() {
 ?> Any operation on a floating-point value with an integer will produce a
 floating-point value, even if there is no decimal point in the result.
 
+#### Null
+
+`null` is the absence of a value.
+
+All functions which do not return a value automatically return `null` when called.
+
+?> `null` cannot be operated on with mathematical operators.
+
 ### Complex Types
 
-Puffin features three data types. These are `string`, `dictionary` and `list`.
+Puffin features three complex types. These are `string`, `dictionary` and `list`.
 
 #### String
 
@@ -94,6 +102,9 @@ layout {
 ````
 
 ?> Dictionaries return `null` if the entry does not exist rather than crashing the program.
+
+?> Puffin currently only supports initializing dictionaries with identifiers as keys.
+This can be worked around using the standard library's `dictionary.insert()`.
 
 #### List
 
