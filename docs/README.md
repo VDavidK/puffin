@@ -23,7 +23,7 @@ rm -r ./tmp
 ## Using puffin
 
 In order to run puffin files, use the `puffin run` subcommand with a file passed in as the third argument (e.g. `puffin run Main.puff`).
-In case you do not want to install Puffin, it is possible to use the `cargo run --` command in the `puffin_cli` directory as a substitute. The above example would then become `cargo run -- run Main.puff`
+In case you do not want to install Puffin, it is possible to use the `cargo run --` command as a substitute. The above example would then become `cargo run -- run Main.puff`
 
 ## Building the docs
 
