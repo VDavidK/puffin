@@ -1,7 +1,5 @@
 # Using files
 
-## The `use` keyword
-
 As many developers prefer segmenting their code into multiple files, Puffin offers them to do precisely that.
 
 The `use` keyword imports another Puffin component from another `.puff` file.

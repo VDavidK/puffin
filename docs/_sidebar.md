@@ -8,7 +8,7 @@
   * [Basic syntax](/pages/getting_started/basic_syntax.md)
   * [Types](/pages/getting_started/types.md)
   * [Layouts](/pages/getting_started/layouts.md)
-  * [Constructors](/pages/getting_started/constructors.md)
+  * [Custom components](/pages/getting_started/components.md)
   * [Event handling](/pages/getting_started/event_handling.md)
   * [Using files](/pages/getting_started/using_files.md)
   * [Creating a simple application](/pages/getting_started/simple_app.md)
