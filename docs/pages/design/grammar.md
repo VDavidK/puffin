@@ -1,5 +1,7 @@
 # Puffin's grammar
 
+?> Puffin's grammar is an LL(2) grammar documented in Extended Backus-Naur Form.
+
 ```ebnf
 component ::= {declaration}
 

@@ -21,11 +21,42 @@ fn example() {
         let c = 20;
     }
     
+    // For loops can be constructed to iterate over a range
+    for i in self.a:b {
+        // This will loop from 0 to 9 as the range is inclusive.
+    }
+    
     // 'c' falls out of scope and is no longer accessible.
 }
 ```
 
+## Using the 'self' keyword
+
+When accessing variables and functions defined in the top scope of a file (the component scope). The `self` keyword
+is necessary.
+
+```
+let a = 10;
+
+fn foo() {
+    // Invalid: 'a' is not defined in the current scope.
+    a = 20;
+    
+    // Valid
+    self.a = 20;
+    
+    // 'self' is also required for function calls
+    self.bar();
+}
+
+fn bar() {
+    // ...
+}
+```
+
 ## Simple FizzBuzz example
+
+Below is a simple example showing how one would implement the *FizzBuzz* function in Puffin.
 
 ```
 fn example() {
@@ -33,7 +64,7 @@ fn example() {
     let value = 7;
     
     // Call functions like normal
-    let result = fizzbuzz(value);
+    let result = self.fizzbuzz(value);
 }
 
 // Calculates the FizzBuzz result of a value
