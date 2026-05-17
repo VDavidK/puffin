@@ -78,6 +78,6 @@ fn fizzbuzz(value) {
     }
     
     // Cast the number to a string
-    return str(value)
+    return str(value);
 }
 ```
