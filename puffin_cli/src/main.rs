@@ -54,7 +54,7 @@ fn main() -> color_eyre::Result<()> {
 
             // Parse and compile source
             let ast = puffin_parser::run_parser(source, input_path_str)?;
-            let chunk = puffin_compiler::compile_ast(input_path_str, &ast)?;
+            let chunk = puffin_codegen::generate_from_ast(input_path_str, &ast)?;
 
             // Write compiled output to disk
             let file = File::create(output.unwrap_or("out.pfb".into()))?;
@@ -106,7 +106,7 @@ fn compile_file(path: impl AsRef<Path>, chunks: &mut Vec<Chunk>) -> color_eyre::
     let mut file_contents = String::new();
     file.read_to_string(&mut file_contents)?;
     let ast = puffin_parser::run_parser(file_contents, input_path_str)?;
-    let (chunk, deps) = puffin_compiler::compile_ast(input_path_str, &ast)?;
+    let (chunk, deps) = puffin_codegen::generate_from_ast(input_path_str, &ast)?;
 
     #[cfg(feature = "logging")]
     log::debug!("Compiling chunk: {}\n{}", chunk.get_name(), chunk);

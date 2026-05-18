@@ -1761,7 +1761,7 @@ dependencies = [
  "clap",
  "color-eyre",
  "log",
- "puffin_compiler",
+ "puffin_codegen",
  "puffin_parser",
  "puffin_runtime",
  "puffin_stdlib",
@@ -1769,7 +1769,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "puffin_compiler"
+name = "puffin_codegen"
 version = "0.1.0"
 dependencies = [
  "puffin_ast",

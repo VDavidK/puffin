@@ -11,11 +11,11 @@ use puffin_runtime::op::OpCode;
 use puffin_runtime::value::{FloatType, Function, IntType};
 use puffin_runtime::{Chunk, value::Value};
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::rc::Rc;
 
 #[derive(thiserror::Error, Debug)]
-pub enum CompileError {
+pub enum GenError {
     #[error("Invalid literal '{0}'")]
     InvalidLiteral(String),
 
@@ -41,7 +41,7 @@ pub enum CompileError {
     InvalidUsePath,
 }
 
-pub struct Compiler<'a> {
+pub struct CodeGenerator<'a> {
     chunk: &'a mut Chunk,
     constant_table: HashMap<Value, ConstantOffset>,
     markup_declarations: HashMap<String, LocalOffset>,
@@ -49,7 +49,7 @@ pub struct Compiler<'a> {
     scope: Scope,
 }
 
-impl<'a> Compiler<'a> {
+impl<'a> CodeGenerator<'a> {
     pub fn new(chunk: &'a mut Chunk) -> Self {
         Self {
             chunk,
@@ -60,14 +60,14 @@ impl<'a> Compiler<'a> {
         }
     }
 
-    pub fn compile(&mut self, ast: &'a Ast) -> Result<(), CompileError> {
+    pub fn generate(&mut self, ast: &'a Ast) -> Result<(), GenError> {
         let name = self.add_to_constants(ast.component_name.to_owned())?;
         self.chunk.push_op(OpCode::NewClass);
         self.chunk.push_constant_offset(name);
         self.scope.define_unnamed_local();
 
         for decl in &ast.declarations {
-            self.compile_declaration(decl)?;
+            self.generate_declaration(decl)?;
         }
 
         self.chunk.push_op(OpCode::SetGlobal);
@@ -80,7 +80,7 @@ impl<'a> Compiler<'a> {
         self.dependencies.to_owned()
     }
 
-    fn compile_declaration(&mut self, declaration: &'a Declaration) -> Result<(), CompileError> {
+    fn generate_declaration(&mut self, declaration: &'a Declaration) -> Result<(), GenError> {
         match declaration {
             // Declaration::Component(_) => {}
             Declaration::Var(var) => {
@@ -89,7 +89,7 @@ impl<'a> Compiler<'a> {
                 self.scope.define_unnamed_local();
 
                 let name = self.chunk.new_constant(var.name.lexeme.clone());
-                self.compile_expression(&var.value)?;
+                self.generate_expression(&var.value)?;
                 self.chunk.push_op(OpCode::MakeReactive);
 
                 self.chunk.push_op(OpCode::SetField);
@@ -108,7 +108,7 @@ impl<'a> Compiler<'a> {
                     .to_owned();
 
                 let mut chunk = Chunk::new(&name);
-                let mut layout_compiler = Compiler::new(&mut chunk);
+                let mut layout_compiler = CodeGenerator::new(&mut chunk);
 
                 for arg in &layout.parameters {
                     layout_compiler.scope.define_local(&arg.lexeme);
@@ -116,7 +116,7 @@ impl<'a> Compiler<'a> {
 
                 layout_compiler.scope.define_local("self");
 
-                layout_compiler.compile_markup(&layout.markup)?;
+                layout_compiler.generate_markup(&layout.markup)?;
                 layout_compiler.chunk.push_op(OpCode::Return);
 
                 let func = Function {
@@ -142,7 +142,7 @@ impl<'a> Compiler<'a> {
                 self.scope.define_unnamed_local();
 
                 let mut chunk = Chunk::new(method.name.lexeme.clone());
-                let mut method_compiler = Compiler::new(&mut chunk);
+                let mut method_compiler = CodeGenerator::new(&mut chunk);
 
                 for arg in &method.parameters {
                     method_compiler.scope.define_local(&arg.lexeme);
@@ -150,7 +150,7 @@ impl<'a> Compiler<'a> {
 
                 method_compiler.scope.define_local("self");
 
-                method_compiler.compile_statement(&method.block)?;
+                method_compiler.generate_statement(&method.block)?;
                 method_compiler.ensure_return()?;
 
                 let func = Function {
@@ -180,7 +180,7 @@ impl<'a> Compiler<'a> {
                 self.scope.define_unnamed_local();
 
                 let mut chunk = Chunk::new("constructor");
-                let mut method_compiler = Compiler::new(&mut chunk);
+                let mut method_compiler = CodeGenerator::new(&mut chunk);
 
                 for arg in &constructor.parameters {
                     method_compiler.scope.define_local(&arg.lexeme);
@@ -188,7 +188,7 @@ impl<'a> Compiler<'a> {
 
                 method_compiler.scope.define_local("self");
 
-                method_compiler.compile_statement(&constructor.block)?;
+                method_compiler.generate_statement(&constructor.block)?;
                 method_compiler.ensure_return()?;
 
                 let func = Function {
@@ -217,7 +217,7 @@ impl<'a> Compiler<'a> {
         Ok(())
     }
 
-    fn expr_to_filepath(expr: &Expression) -> Result<String, CompileError> {
+    fn expr_to_filepath(expr: &Expression) -> Result<String, GenError> {
         let mut names = vec![];
         Self::extract_file_path_from_accessor_expr(expr, &mut names)?;
         let mut path = names.join("/");
@@ -225,7 +225,7 @@ impl<'a> Compiler<'a> {
         Ok(path)
     }
 
-    fn extract_file_path_from_accessor_expr(expr: &Expression, v: &mut Vec<String>) -> Result<(), CompileError> {
+    fn extract_file_path_from_accessor_expr(expr: &Expression, v: &mut Vec<String>) -> Result<(), GenError> {
         match expr {
             Expression::Literal(ex) => {
                 v.push(ex.token.lexeme.to_owned());
@@ -234,24 +234,24 @@ impl<'a> Compiler<'a> {
                 Self::extract_file_path_from_accessor_expr(&acc.expression, v)?;
                 v.push(acc.field.lexeme.to_owned());
             }
-            _ => return Err(CompileError::InvalidUsePath)?,
+            _ => return Err(GenError::InvalidUsePath)?,
         }
         Ok(())
     }
 
-    fn compile_statement(&mut self, statement: &'a Statement) -> Result<(), CompileError> {
+    fn generate_statement(&mut self, statement: &'a Statement) -> Result<(), GenError> {
         //
         match statement {
             Statement::Block(block) => {
                 self.push_scope();
                 for stmt in &block.statements {
-                    self.compile_statement(stmt)?;
+                    self.generate_statement(stmt)?;
                 }
                 self.pop_scope()?;
             }
             Statement::Assign(assign) => {
                 let target = self.fetch_target(&assign.lhs)?;
-                self.compile_expression(&assign.rhs)?;
+                self.generate_expression(&assign.rhs)?;
                 match target {
                     VariableTarget::Local(local) => {
                         self.chunk.push_op(OpCode::SetLocal);
@@ -292,9 +292,9 @@ impl<'a> Compiler<'a> {
                     // end:
 
                     self.push_scope();
-                    self.compile_expression(&stmt.iterable)?;
+                    self.generate_expression(&stmt.iterable)?;
                     let start_local = self.scope.replace_local(&stmt.var_name.lexeme);
-                    self.compile_expression(end)?;
+                    self.generate_expression(end)?;
                     let end_local = self.scope.get_top_local();
 
                     self.chunk.push_op(OpCode::GetLocal);
@@ -307,7 +307,7 @@ impl<'a> Compiler<'a> {
                     let one = self.add_to_constants(1)?;
 
                     let loop_addr = self.chunk.addr();
-                    self.compile_statement(&stmt.block)?;
+                    self.generate_statement(&stmt.block)?;
                     self.chunk.push_op(OpCode::GetLocal);
                     self.chunk.push_local_offset(start_local);
                     self.chunk.push_op(OpCode::Constant);
@@ -330,17 +330,17 @@ impl<'a> Compiler<'a> {
             }
 
             Statement::If(stmt) => {
-                self.compile_expression(&stmt.condition)?;
+                self.generate_expression(&stmt.condition)?;
                 self.chunk.push_op(OpCode::Not);
                 let jmp = self.chunk.push_jump(OpCode::JumpIf);
                 self.scope.remove_top_local();
 
-                self.compile_statement(&stmt.if_block)?;
+                self.generate_statement(&stmt.if_block)?;
 
                 let end_addr = if let Some(else_stmt) = &stmt.else_stat {
                     let if_to_end_jump = self.chunk.push_jump(OpCode::Jump);
                     let else_addr = self.chunk.addr();
-                    self.compile_statement(else_stmt)?;
+                    self.generate_statement(else_stmt)?;
                     self.chunk.patch_jump(if_to_end_jump, self.chunk.addr());
                     else_addr
                 } else {
@@ -350,13 +350,13 @@ impl<'a> Compiler<'a> {
                 self.chunk.patch_jump(jmp, end_addr);
             }
             Statement::Expression(expr_stmt) => {
-                self.compile_expression(&expr_stmt.expression)?;
+                self.generate_expression(&expr_stmt.expression)?;
                 self.chunk.push_op(OpCode::Pop);
                 self.scope.remove_top_local();
             }
             Statement::Return(ret) => {
                 if let Some(expr) = &ret.expression {
-                    self.compile_expression(expr)?;
+                    self.generate_expression(expr)?;
                 } else {
                     let null = self.add_to_constants(Value::Null)?;
                     self.chunk.push_op(OpCode::Constant);
@@ -368,7 +368,7 @@ impl<'a> Compiler<'a> {
             }
             // Statement::Match(_) => {}
             Statement::VariableDeclaration(var) => {
-                self.compile_expression(&var.value)?;
+                self.generate_expression(&var.value)?;
                 self.scope.replace_local(&var.name.lexeme);
             }
             Statement::Break(_) => todo!(),
@@ -376,7 +376,7 @@ impl<'a> Compiler<'a> {
             Statement::Match(_) => todo!(),
             Statement::Increment(increment) => {
                 let target = self.fetch_target(&increment.target)?;
-                self.compile_expression(&increment.target)?;
+                self.generate_expression(&increment.target)?;
                 let offset = self.add_to_constants(1)?;
                 self.chunk.push_op(OpCode::Constant);
                 self.chunk.push_constant_offset(offset);
@@ -400,7 +400,7 @@ impl<'a> Compiler<'a> {
             },
             Statement::Decrement(decrement) => {
                 let target = self.fetch_target(&decrement.target)?;
-                self.compile_expression(&decrement.target)?;
+                self.generate_expression(&decrement.target)?;
                 let offset = self.add_to_constants(1)?;
                 self.chunk.push_op(OpCode::Constant);
                 self.chunk.push_constant_offset(offset);
@@ -424,8 +424,8 @@ impl<'a> Compiler<'a> {
             },
             Statement::OpAssign(op_assign) => {
                 let target = self.fetch_target(&op_assign.lhs)?;
-                self.compile_expression(&op_assign.lhs)?;
-                self.compile_expression(&op_assign.rhs)?;
+                self.generate_expression(&op_assign.lhs)?;
+                self.generate_expression(&op_assign.rhs)?;
                 let op = Self::get_shorthand_operator(op_assign.op.ty)?;
                 self.chunk.push_op(op);
                 match target {
@@ -453,7 +453,7 @@ impl<'a> Compiler<'a> {
         Ok(())
     }
 
-    fn compile_expression(&mut self, expression: &'a Expression) -> Result<(), CompileError> {
+    fn generate_expression(&mut self, expression: &'a Expression) -> Result<(), GenError> {
         match expression {
             Expression::Literal(literal) => {
                 if literal.token.ty == TokenType::Identifier {
@@ -478,7 +478,7 @@ impl<'a> Compiler<'a> {
                 }
             }
             Expression::Binary(BinaryExpression{ lhs, rhs, op: Token { ty: t @ (TokenType::KwAnd | TokenType::KwOr), .. }}) => {
-                self.compile_expression(lhs)?;
+                self.generate_expression(lhs)?;
                 let loc = self.scope.get_top_local();
 
                 self.chunk.push_op(OpCode::GetLocal);
@@ -491,19 +491,19 @@ impl<'a> Compiler<'a> {
                 self.chunk.push_op(OpCode::Pop);
                 self.scope.remove_top_local();
 
-                self.compile_expression(rhs)?;
+                self.generate_expression(rhs)?;
 
                 let chunk_addr = self.chunk.addr();
                 self.chunk.patch_jump(jmp, chunk_addr);
             }
             Expression::Binary(binary) => {
-                self.compile_expression(&binary.lhs)?;
-                self.compile_expression(&binary.rhs)?;
+                self.generate_expression(&binary.lhs)?;
+                self.generate_expression(&binary.rhs)?;
                 self.chunk.push_op(Self::get_binary_operator(binary.op.ty)?);
                 self.scope.remove_top_local();
             }
             Expression::Unary(unary) => {
-                self.compile_expression(&unary.rhs)?;
+                self.generate_expression(&unary.rhs)?;
 
                 if unary.op.ty != TokenType::Plus {
                     self.chunk.push_op(Self::get_unary_operator(unary.op.ty)?);
@@ -511,9 +511,9 @@ impl<'a> Compiler<'a> {
             }
             Expression::FunctionCall(call) => {
                 for arg in &call.arguments {
-                    self.compile_expression(arg)?;
+                    self.generate_expression(arg)?;
                 }
-                self.compile_expression(&call.callee)?;
+                self.generate_expression(&call.callee)?;
                 self.chunk.push_op(OpCode::Call);
                 self.chunk.push_u8(call.arguments.len() as u8);
                 for _ in &call.arguments {
@@ -522,7 +522,7 @@ impl<'a> Compiler<'a> {
             }
             Expression::Accessor(accessor) => {
                 let name = self.token_to_constant(&accessor.field)?;
-                self.compile_expression(&accessor.expression)?;
+                self.generate_expression(&accessor.expression)?;
                 self.chunk.push_op(OpCode::GetField);
                 self.chunk.push_constant_offset(name);
             }
@@ -533,7 +533,7 @@ impl<'a> Compiler<'a> {
                 for elem in &arr.entries {
                     self.chunk.push_op(OpCode::GetLocal);
                     self.chunk.push_local_offset(list);
-                    self.compile_expression(elem)?;
+                    self.generate_expression(elem)?;
                     self.chunk.push_op(OpCode::PushList);
                     self.scope.remove_top_local();
                 }
@@ -545,7 +545,7 @@ impl<'a> Compiler<'a> {
                 for (key, value) in &dict.entries {
                     self.chunk.push_op(OpCode::GetLocal);
                     self.chunk.push_local_offset(obj);
-                    self.compile_expression(value)?;
+                    self.generate_expression(value)?;
                     self.chunk.push_op(OpCode::SetField);
                     let name = self.token_to_constant(key)?;
                     self.chunk.push_constant_offset(name);
@@ -553,8 +553,8 @@ impl<'a> Compiler<'a> {
                 }
             },
             Expression::Index(e) => {
-                self.compile_expression(&e.expression)?;
-                self.compile_expression(&e.index)?;
+                self.generate_expression(&e.expression)?;
+                self.generate_expression(&e.index)?;
                 self.chunk.push_op(OpCode::GetIndex);
                 self.scope.remove_top_local();
             },
@@ -564,7 +564,7 @@ impl<'a> Compiler<'a> {
         Ok(())
     }
 
-    fn compile_markup(&mut self, markup: &'a Markup) -> Result<(), CompileError> {
+    fn generate_markup(&mut self, markup: &'a Markup) -> Result<(), GenError> {
         match markup {
             Markup::Block(block) => {
                 self.chunk.push_op(OpCode::NewList);
@@ -574,7 +574,7 @@ impl<'a> Compiler<'a> {
                     self.chunk.push_op(OpCode::GetLocal);
                     self.chunk.push_local_offset(children);
                     self.scope.define_unnamed_local();
-                    self.compile_markup(elem)?;
+                    self.generate_markup(elem)?;
                     self.chunk.push_op(OpCode::PushList);
                     self.scope.remove_top_n_locals(2);
                 }
@@ -589,10 +589,10 @@ impl<'a> Compiler<'a> {
                         self.chunk.push_constant_offset(null);
                     },
                     Some(ComponentParameter::Expression(expr)) => {
-                        self.compile_expression(expr)?;
+                        self.generate_expression(expr)?;
                     }
                     Some(ComponentParameter::Children(inner)) => {
-                        self.compile_markup(inner)?;
+                        self.generate_markup(inner)?;
                     }
                 };
 
@@ -603,7 +603,7 @@ impl<'a> Compiler<'a> {
                     self.chunk.push_local_offset(prop_map);
                     self.scope.define_unnamed_local();
                     let name = self.token_to_constant(name)?;
-                    self.compile_expression(expr)?;
+                    self.generate_expression(expr)?;
                     self.chunk.push_op(OpCode::SetField);
                     self.chunk.push_constant_offset(name);
                     self.scope.remove_top_n_locals(2);
@@ -624,12 +624,12 @@ impl<'a> Compiler<'a> {
                 if match_markup.cases.is_empty() {
                     if let Some((name, markup)) = &match_markup.default_case {
                         if let Some(name) = name {
-                            self.compile_expression(&match_markup.comparator)?;
+                            self.generate_expression(&match_markup.comparator)?;
                             let offset = self.scope.replace_local(&name.lexeme);
                             self.markup_declarations.insert(name.lexeme.to_owned(), offset);
                         }
 
-                        self.compile_markup(&markup)?;
+                        self.generate_markup(&markup)?;
 
                         if let Some(name) = name {
                             self.chunk.push_op(OpCode::ReservePush);
@@ -647,17 +647,17 @@ impl<'a> Compiler<'a> {
                     break 'exit;
                 }
 
-                self.compile_expression(&match_markup.comparator)?;
+                self.generate_expression(&match_markup.comparator)?;
                 let comparator_expr = self.scope.get_top_local();
 
                 if let Some((name, markup)) = &match_markup.default_case {
                     if let Some(name) = name {
-                        self.compile_expression(&match_markup.comparator)?;
+                        self.generate_expression(&match_markup.comparator)?;
                         let offset = self.scope.replace_local(&name.lexeme);
                         self.markup_declarations.insert(name.lexeme.to_owned(), offset);
                     }
 
-                    self.compile_markup(&markup)?;
+                    self.generate_markup(&markup)?;
 
                     if let Some(name) = name {
                         self.chunk.push_op(OpCode::ReservePush);
@@ -673,13 +673,13 @@ impl<'a> Compiler<'a> {
                 }
 
                 for (expr, markup) in &match_markup.cases {
-                    self.compile_markup(&markup)?;
+                    self.generate_markup(&markup)?;
 
                     self.chunk.push_op(OpCode::GetLocal);
                     self.chunk.push_local_offset(comparator_expr);
                     self.scope.define_unnamed_local();
 
-                    self.compile_expression(expr)?;
+                    self.generate_expression(expr)?;
 
                     self.chunk.push_op(OpCode::Eq);
                     self.chunk.push_op(OpCode::NewNodeIf);
@@ -694,7 +694,7 @@ impl<'a> Compiler<'a> {
             Markup::If(markup) => {
                 match &markup.else_markup {
                     Some(markup) => {
-                        self.compile_markup(markup)?;
+                        self.generate_markup(markup)?;
                     }
                     None => {
                         let null = self.add_to_constants(Value::Null)?;
@@ -704,14 +704,14 @@ impl<'a> Compiler<'a> {
                     }
                 }
 
-                self.compile_markup(&markup.if_markup)?;
-                self.compile_expression(&markup.condition)?;
+                self.generate_markup(&markup.if_markup)?;
+                self.generate_expression(&markup.condition)?;
                 self.chunk.push_op(OpCode::NewNodeIf);
                 self.scope.remove_top_n_locals(2);
             }
             Markup::Iterative(markup) => {
                 let mut chunk = Chunk::new("for_generator");
-                let mut gen_compiler = Compiler::new(&mut chunk);
+                let mut gen_compiler = CodeGenerator::new(&mut chunk);
 
                 for (name, offset) in &self.markup_declarations {
                     self.chunk.push_op(OpCode::GetLocal);
@@ -750,9 +750,9 @@ impl<'a> Compiler<'a> {
                     gen_compiler.chunk.push_op(OpCode::NewList);
                     let list = gen_compiler.scope.define_unnamed_local();
 
-                    gen_compiler.compile_expression(&markup.iterable)?;
+                    gen_compiler.generate_expression(&markup.iterable)?;
                     let start_local = gen_compiler.scope.replace_local(&markup.var_name.lexeme);
-                    gen_compiler.compile_expression(end)?;
+                    gen_compiler.generate_expression(end)?;
                     let end_local = gen_compiler.scope.get_top_local();
 
                     gen_compiler.chunk.push_op(OpCode::GetLocal);
@@ -769,7 +769,7 @@ impl<'a> Compiler<'a> {
                     gen_compiler.chunk.push_op(OpCode::GetLocal);
                     gen_compiler.chunk.push_local_offset(list);
                     gen_compiler.scope.define_unnamed_local();
-                    gen_compiler.compile_markup(&markup.block)?;
+                    gen_compiler.generate_markup(&markup.block)?;
                     gen_compiler.chunk.push_op(OpCode::PushList);
                     gen_compiler.scope.remove_top_n_locals(2);
 
@@ -819,7 +819,7 @@ impl<'a> Compiler<'a> {
         Ok(())
     }
 
-    fn ensure_return(&mut self) -> Result<(), CompileError> {
+    fn ensure_return(&mut self) -> Result<(), GenError> {
         if !self.chunk.last_op_is(OpCode::Return) {
             self.chunk.push_op(OpCode::Constant);
             let null = self.add_to_constants(Value::Null)?;
@@ -829,7 +829,7 @@ impl<'a> Compiler<'a> {
         Ok(())
     }
 
-    fn fetch_target(&mut self, expr: &'a Expression) -> Result<VariableTarget, CompileError> {
+    fn fetch_target(&mut self, expr: &'a Expression) -> Result<VariableTarget, GenError> {
         match expr {
             Expression::Accessor(accessor) => {
                 match self.fetch_target(&accessor.expression)? {
@@ -863,11 +863,11 @@ impl<'a> Compiler<'a> {
                 }
             }
 
-            _ => Err(CompileError::InvalidTarget),
+            _ => Err(GenError::InvalidTarget),
         }
     }
 
-    fn token_to_value(&self, token: &Token) -> Result<Value, CompileError> {
+    fn token_to_value(&self, token: &Token) -> Result<Value, GenError> {
         match token.ty {
             TokenType::KwTrue => Ok(Value::Bool(true)),
             TokenType::KwFalse => Ok(Value::Bool(false)),
@@ -876,7 +876,7 @@ impl<'a> Compiler<'a> {
                 let val = token
                     .lexeme
                     .parse::<IntType>()
-                    .map_err(|_| CompileError::InvalidLiteral(token.lexeme.clone()))?;
+                    .map_err(|_| GenError::InvalidLiteral(token.lexeme.clone()))?;
 
                 Ok(Value::Int(val))
             }
@@ -884,7 +884,7 @@ impl<'a> Compiler<'a> {
                 let val = token
                     .lexeme
                     .parse::<FloatType>()
-                    .map_err(|_| CompileError::InvalidLiteral(token.lexeme.clone()))?;
+                    .map_err(|_| GenError::InvalidLiteral(token.lexeme.clone()))?;
 
                 Ok(Value::Float(val))
             }
@@ -897,11 +897,11 @@ impl<'a> Compiler<'a> {
             )),
             TokenType::Identifier => Ok(Value::String(Rc::new(RefCell::new(token.lexeme.to_owned())))),
 
-            _ => Err(CompileError::InvalidLiteral(token.lexeme.clone())),
+            _ => Err(GenError::InvalidLiteral(token.lexeme.clone())),
         }
     }
 
-    fn get_binary_operator(ty: TokenType) -> Result<OpCode, CompileError> {
+    fn get_binary_operator(ty: TokenType) -> Result<OpCode, GenError> {
         match ty {
             TokenType::Plus => Ok(OpCode::Add),
             TokenType::Minus => Ok(OpCode::Sub),
@@ -914,29 +914,29 @@ impl<'a> Compiler<'a> {
             TokenType::GreaterOrEqual => Ok(OpCode::Ge),
             TokenType::LessOrEqual => Ok(OpCode::Le),
 
-            _ => Err(CompileError::InvalidBinaryOperator(ty)),
+            _ => Err(GenError::InvalidBinaryOperator(ty)),
         }
     }
 
-    fn get_shorthand_operator(ty: TokenType) -> Result<OpCode, CompileError> {
+    fn get_shorthand_operator(ty: TokenType) -> Result<OpCode, GenError> {
         match ty {
             TokenType::IncrementAssign => Ok(OpCode::Add),
             TokenType::DecrementAssign => Ok(OpCode::Sub),
             TokenType::MulAssign => Ok(OpCode::Mul),
             TokenType::DivAssign => Ok(OpCode::Div),
-            _ => Err(CompileError::InvalidShorthandOperator(ty)),
+            _ => Err(GenError::InvalidShorthandOperator(ty)),
         }
     }
 
-    fn get_unary_operator(ty: TokenType) -> Result<OpCode, CompileError> {
+    fn get_unary_operator(ty: TokenType) -> Result<OpCode, GenError> {
         match ty {
             TokenType::KwNot => Ok(OpCode::Not),
             TokenType::Minus => Ok(OpCode::Neg),
-            _ => Err(CompileError::InvalidBinaryOperator(ty)),
+            _ => Err(GenError::InvalidBinaryOperator(ty)),
         }
     }
 
-    fn token_to_constant(&mut self, token: &Token) -> Result<ConstantOffset, CompileError> {
+    fn token_to_constant(&mut self, token: &Token) -> Result<ConstantOffset, GenError> {
         let constant = self.token_to_value(token)?;
         self.add_to_constants(constant)
     }
@@ -944,7 +944,7 @@ impl<'a> Compiler<'a> {
     fn add_to_constants(
         &mut self,
         constant: impl Into<Value>,
-    ) -> Result<ConstantOffset, CompileError> {
+    ) -> Result<ConstantOffset, GenError> {
         let constant = constant.into();
 
         if let Some(addr) = self.constant_table.get(&constant) {
@@ -961,7 +961,7 @@ impl<'a> Compiler<'a> {
         self.scope.set_parent(Box::new(old_scope));
     }
 
-    fn pop_scope(&mut self) -> Result<(), CompileError> {
+    fn pop_scope(&mut self) -> Result<(), GenError> {
         match self.scope.remove_parent() {
             Some(parent) => {
                 for _ in 0..self.scope.local_count() {
@@ -971,7 +971,7 @@ impl<'a> Compiler<'a> {
                 self.scope = *parent;
                 Ok(())
             }
-            None => Err(CompileError::TopScopePopped),
+            None => Err(GenError::TopScopePopped),
         }
     }
 }

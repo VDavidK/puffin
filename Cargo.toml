@@ -4,7 +4,7 @@ members = [
     "puffin_cli",
     "puffin_parser",
     "puffin_ast",
-    "puffin_compiler",
+    "puffin_codegen",
     "puffin_runtime",
     "puffin_stdlib",
 ]
